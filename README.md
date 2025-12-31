@@ -76,6 +76,8 @@ https://github.com/user-attachments/assets/67c92ac7-dd09-41ac-a08a-35ee215b5ee4
 ---
 > 目前只支持 Android，win ，没有苹果设备无法适配😭
 
+## 下载
+- 右侧 release 下载，目前仅发布最早的 0.1版本，0.2版本还在开发中
 ## 计划
 - [x] 美化uxi
 - [x] 增加 win 的适配，处理数据的传输
