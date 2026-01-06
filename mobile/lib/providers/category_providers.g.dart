@@ -154,3 +154,74 @@ final class AllCategoriesProvider
 }
 
 String _$allCategoriesHash() => r'faae0ff1fbcbbdb146c6a710f42392cb5373f14f';
+
+/// 分类操作 Notifier - 封装所有分类相关的业务操作
+///
+/// UI 层应通过此 Notifier 进行分类的增删改操作，
+/// 而不是直接调用 CategoryService
+
+@ProviderFor(CategoryActions)
+const categoryActionsProvider = CategoryActionsProvider._();
+
+/// 分类操作 Notifier - 封装所有分类相关的业务操作
+///
+/// UI 层应通过此 Notifier 进行分类的增删改操作，
+/// 而不是直接调用 CategoryService
+final class CategoryActionsProvider
+    extends $NotifierProvider<CategoryActions, void> {
+  /// 分类操作 Notifier - 封装所有分类相关的业务操作
+  ///
+  /// UI 层应通过此 Notifier 进行分类的增删改操作，
+  /// 而不是直接调用 CategoryService
+  const CategoryActionsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'categoryActionsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$categoryActionsHash();
+
+  @$internal
+  @override
+  CategoryActions create() => CategoryActions();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(void value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<void>(value),
+    );
+  }
+}
+
+String _$categoryActionsHash() => r'd6cbcff8950b67cdbe1da0c8d787eee4d8f1769a';
+
+/// 分类操作 Notifier - 封装所有分类相关的业务操作
+///
+/// UI 层应通过此 Notifier 进行分类的增删改操作，
+/// 而不是直接调用 CategoryService
+
+abstract class _$CategoryActions extends $Notifier<void> {
+  void build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    build();
+    final ref = this.ref as $Ref<void, void>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<void, void>,
+              void,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, null);
+  }
+}

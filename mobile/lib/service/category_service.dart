@@ -31,14 +31,22 @@ class CategoryService {
   }
 
   /// 添加分类
-  Future<int> addCategory({required String name, String? description}) async {
+  Future<int> addCategory({
+    required String name,
+    String? description,
+    String? iconPath,
+  }) async {
     final newCategory = Category()
       ..name = name
       ..description = description
+      ..iconPath = iconPath
       ..createdTime = DateTime.now();
 
     final resultId = await _categoryRepository.save(newCategory);
-    PMlog.d(categoryServiceTag, '分类添加成功: id: $resultId,name: $name');
+    PMlog.d(
+      categoryServiceTag,
+      '分类添加成功: id: $resultId, name: $name, icon: $iconPath',
+    );
     return resultId;
   }
 

@@ -15,6 +15,9 @@ class Category {
 
   String? description; // 分类描述
 
+  /// 分类图标路径，如 'assets/icons/bilibili.svg'
+  String? iconPath;
+
   DateTime? createdTime; // 创建时间
 
   /// 最后更新时间戳（毫秒），用于增量同步和冲突解决
@@ -29,6 +32,7 @@ class Category {
     String? uuid,
     String? name,
     String? description,
+    String? iconPath,
     DateTime? createdTime,
     int? updatedAt,
     bool? isDeleted,
@@ -38,6 +42,7 @@ class Category {
       ..uuid = uuid ?? this.uuid
       ..name = name ?? this.name
       ..description = description ?? this.description
+      ..iconPath = iconPath ?? this.iconPath
       ..createdTime = createdTime ?? this.createdTime
       ..updatedAt = updatedAt ?? this.updatedAt
       ..isDeleted = isDeleted ?? this.isDeleted;

@@ -10,6 +10,7 @@ class HeroGallery extends StatefulWidget {
   final VoidCallback? onImageTap;
   final bool showGradientFade;
   final String? categoryLabel;
+  final Widget? categoryBadge;
   final String? dateLabel;
   final String? overlayTitle;
 
@@ -22,6 +23,7 @@ class HeroGallery extends StatefulWidget {
     this.onImageTap,
     this.showGradientFade = true,
     this.categoryLabel,
+    this.categoryBadge,
     this.dateLabel,
     this.overlayTitle,
   });
@@ -188,11 +190,14 @@ class _HeroGalleryState extends State<HeroGallery> {
 
     final hasCategory =
         widget.categoryLabel != null && widget.categoryLabel!.isNotEmpty;
+    final hasBadge = widget.categoryBadge != null;
     final hasDate = widget.dateLabel != null && widget.dateLabel!.isNotEmpty;
     final hasTitle =
         widget.overlayTitle != null && widget.overlayTitle!.isNotEmpty;
 
-    if (!hasCategory && !hasDate && !hasTitle) return const SizedBox.shrink();
+    if (!hasCategory && !hasBadge && !hasDate && !hasTitle) {
+      return const SizedBox.shrink();
+    }
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 24.w),
@@ -205,10 +210,12 @@ class _HeroGalleryState extends State<HeroGallery> {
           Spacer(),
 
           // 1. 分类和日期
-          if (hasCategory || hasDate)
+          if (hasCategory || hasBadge || hasDate)
             Row(
               children: [
-                if (hasCategory)
+                if (hasBadge)
+                  widget.categoryBadge!
+                else if (hasCategory)
                   Container(
                     padding: EdgeInsets.symmetric(
                       horizontal: 12.w,
@@ -225,7 +232,7 @@ class _HeroGalleryState extends State<HeroGallery> {
                       ),
                     ),
                   ),
-                if (hasCategory && hasDate) SizedBox(width: 12.w),
+                if ((hasCategory || hasBadge) && hasDate) SizedBox(width: 12.w),
                 if (hasDate)
                   Row(
                     mainAxisSize: MainAxisSize.min,

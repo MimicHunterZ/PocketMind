@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/page/widget/hero_gallery.dart';
+import 'package:pocketmind/page/widget/category_selector.dart';
 import 'package:pocketmind/util/url_helper.dart';
 import 'note_link_content_section.dart';
 import 'note_source_link_card.dart';
@@ -10,7 +11,7 @@ class NoteOriginalDataSection extends StatelessWidget {
   final Note note;
   final TextEditingController titleController;
   final TextEditingController contentController;
-  final void Function(int) onCategoryPressed;
+  final ValueChanged<int> onCategorySelected;
   final String categoryName;
   final String formattedDate;
   final String? previewImageUrl;
@@ -27,7 +28,7 @@ class NoteOriginalDataSection extends StatelessWidget {
     required this.note,
     required this.titleController,
     required this.contentController,
-    required this.onCategoryPressed,
+    required this.onCategorySelected,
     required this.categoryName,
     required this.formattedDate,
     this.previewImageUrl,
@@ -79,7 +80,23 @@ class NoteOriginalDataSection extends StatelessWidget {
             title: hasTitle ? note.title! : '',
             isDesktop: isDesktop,
             showGradientFade: true,
-            categoryLabel: categoryName,
+            categoryBadge: CategorySelector(
+              selectedCategoryId: note.categoryId,
+              onCategorySelected: onCategorySelected,
+              builder: (context, category) => Container(
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(4.r),
+                ),
+                child: Text(
+                  category.name,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: const Color(0xcdffffff),
+                  ),
+                ),
+              ),
+            ),
             dateLabel: formattedDate,
             overlayTitle: previewTitle ?? '',
           ),
@@ -110,36 +127,23 @@ class NoteOriginalDataSection extends StatelessWidget {
                 Row(
                   children: [
                     // 分类胶囊 - 可点击切换分类
-                    GestureDetector(
-                      onTap: () => onCategoryPressed(note.categoryId),
-                      child: Container(
+                    CategorySelector(
+                      selectedCategoryId: note.categoryId,
+                      onCategorySelected: onCategorySelected,
+                      builder: (context, category) => Container(
                         padding: EdgeInsets.symmetric(
                           horizontal: 12.w,
                           vertical: 6.h,
                         ),
                         decoration: BoxDecoration(
-                          color: colorScheme.tertiary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20.r),
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(4.r),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              categoryName,
-                              style: TextStyle(
-                                fontSize: 11.sp,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5,
-                                color: colorScheme.tertiary,
-                              ),
-                            ),
-                            SizedBox(width: 4.w),
-                            Icon(
-                              Icons.expand_more_rounded,
-                              size: 14.sp,
-                              color: colorScheme.tertiary,
-                            ),
-                          ],
+                        child: Text(
+                          category.name,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
                     ),
