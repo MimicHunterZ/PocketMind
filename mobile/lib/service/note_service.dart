@@ -4,7 +4,6 @@ import 'package:pocketmind/data/repositories/isar_note_repository.dart';
 import 'package:pocketmind/util/logger_service.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/service/metadata_manager.dart';
-import 'package:pocketmind/api/models/note_metadata.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final String noteServiceTag = 'NoteService';
@@ -313,8 +312,16 @@ class NoteService {
         note.resourceStatus = item.resourceStatus;
         note.previewContent = item.previewContent;
         note.aiSummary = item.aiSummary;
+        // 更新图片信息
+        note.previewImageUrl = item.firstImage;
+        if (item.imageUrls != null && item.imageUrls!.isNotEmpty) {
+          note.previewImageUrls = item.imageUrls!;
+        }
         await _noteRepository.save(note);
-        PMlog.d(noteServiceTag, 'Updated note ${note.id} with metadata');
+        PMlog.d(
+          noteServiceTag,
+          'Updated note ${note.id} with metadata, images=${note.previewImageUrls.length}',
+        );
       }
     }
 

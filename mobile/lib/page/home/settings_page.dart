@@ -162,6 +162,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           _buildNotificationCard(theme),
           SizedBox(height: 24.h),
 
+          // 平台账号
+          _buildSectionTitle('平台账号', theme),
+          _buildPlatformAccountsCard(theme),
+          SizedBox(height: 24.h),
+
           // 局域网同步设置
           _buildSectionTitle('数据同步', theme),
           _buildSyncSettingCard(theme),
@@ -208,6 +213,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         subtitle: Text('未登录也可正常使用，本地功能不受影响', style: theme.textTheme.bodySmall),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: () => context.push(RoutePaths.auth),
+      ),
+    );
+  }
+
+  Widget _buildPlatformAccountsCard(ThemeData theme) {
+    return Card(
+      color: theme.cardColor,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+      ),
+      child: ListTile(
+        leading: const Icon(Icons.language_rounded),
+        title: Text('第三方平台', style: theme.textTheme.bodyLarge),
+        subtitle: Text('小红书等平台账号授权，用于获取链接内容', style: theme.textTheme.bodySmall),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () => context.push(RoutePaths.platformAccounts),
       ),
     );
   }

@@ -9,9 +9,12 @@ class RoutePaths {
   /// 设置页
   static const String settings = '/settings';
 
-  /// 设置页
+  /// 同步设置页
   static const String sync = '/settings/sync';
 
   /// 账号登录/注册
   static const String auth = '/settings/auth';
+
+  /// 平台账号管理
+  static const String platformAccounts = '/settings/platform-accounts';
 }

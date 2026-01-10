@@ -8,6 +8,7 @@ import 'package:pocketmind/page/home/note_detail_page.dart';
 import 'package:pocketmind/page/home/settings_page.dart';
 import 'package:pocketmind/page/home/sync_settings_page.dart';
 import 'package:pocketmind/page/home/auth_page.dart';
+import 'package:pocketmind/page/settings/platform_accounts_page.dart';
 import 'package:pocketmind/page/main_layout.dart';
 import 'package:pocketmind/router/route_paths.dart';
 
@@ -68,6 +69,12 @@ final appRouter = GoRouter(
         GoRoute(
           path: RoutePaths.auth,
           builder: (context, state) => const AuthPage(),
+        ),
+
+        // 平台账号管理
+        GoRoute(
+          path: RoutePaths.platformAccounts,
+          builder: (context, state) => const PlatformAccountsPage(),
         ),
       ],
     ),

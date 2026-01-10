@@ -7,7 +7,6 @@ import 'package:pocketmind/data/repositories/isar_note_repository.dart';
 import 'package:pocketmind/providers/nav_providers.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/service/note_service.dart';
-import 'package:pocketmind/util/url_helper.dart';
 
 import '../util/logger_service.dart';
 
