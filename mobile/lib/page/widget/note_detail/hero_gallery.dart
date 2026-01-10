@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/page/widget/pm_image.dart';
+import 'package:pocketmind/page/widget/common/category_badge.dart';
+import 'package:pocketmind/page/widget/common/date_label.dart';
 
 class HeroGallery extends StatefulWidget {
   final List<String> images;
@@ -216,40 +218,15 @@ class _HeroGalleryState extends State<HeroGallery> {
                 if (hasBadge)
                   widget.categoryBadge!
                 else if (hasCategory)
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 12.w,
-                      vertical: 6.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(4.r),
-                    ),
-                    child: Text(
-                      widget.categoryLabel!,
-                      style: textScheme.bodySmall?.copyWith(
-                        color: const Color(0xcdffffff),
-                      ),
-                    ),
+                  CategoryBadge(
+                    categoryName: widget.categoryLabel!,
+                    style: CategoryBadgeStyle.onImage,
                   ),
                 if ((hasCategory || hasBadge) && hasDate) SizedBox(width: 12.w),
                 if (hasDate)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.schedule_rounded,
-                        size: 14.sp,
-                        color: const Color(0xcdffffff),
-                      ),
-                      SizedBox(width: 4.w),
-                      Text(
-                        widget.dateLabel!,
-                        style: textScheme.bodySmall?.copyWith(
-                          color: const Color(0xcdffffff),
-                        ),
-                      ),
-                    ],
+                  DateLabel(
+                    dateText: widget.dateLabel!,
+                    style: DateLabelStyle.onImage,
                   ),
               ],
             ),

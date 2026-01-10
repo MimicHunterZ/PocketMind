@@ -35,7 +35,17 @@ final appRouter = GoRouter(
             GoRoute(
               path: RoutePaths.noteDetail,
               builder: (context, state) {
-                final note = state.extra as Note;
+                // 安全处理：当通过 URL 导航时 (如 Flutter inspect)，extra 可能为 null
+                final note = state.extra as Note?;
+                if (note == null) {
+                  // 返回到首页，避免崩溃
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    context.go(RoutePaths.home);
+                  });
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                }
                 return NoteDetailPage(note: note);
               },
             ),

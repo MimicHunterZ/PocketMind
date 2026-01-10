@@ -12,7 +12,6 @@ import 'local_text_card.dart';
 
 String tag = 'noteItem';
 
-// 改为 StatefulWidget 以支持 AutomaticKeepAliveClientMixin
 class NoteItem extends ConsumerStatefulWidget {
   final Note note;
   final bool isGridMode;

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/model/note.dart';
-import 'package:pocketmind/page/widget/hero_gallery.dart';
+import 'package:pocketmind/page/widget/note_detail/hero_gallery.dart';
 import 'package:pocketmind/page/widget/category_selector.dart';
+import 'package:pocketmind/page/widget/common/category_badge.dart';
+import 'package:pocketmind/page/widget/common/date_label.dart';
 import 'package:pocketmind/util/url_helper.dart';
 import 'note_link_content_section.dart';
 import 'note_source_link_card.dart';
@@ -83,18 +85,9 @@ class NoteOriginalDataSection extends StatelessWidget {
             categoryBadge: CategorySelector(
               selectedCategoryId: note.categoryId,
               onCategorySelected: onCategorySelected,
-              builder: (context, category) => Container(
-                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(4.r),
-                ),
-                child: Text(
-                  category.name,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: const Color(0xcdffffff),
-                  ),
-                ),
+              builder: (context, category) => CategoryBadge(
+                categoryName: category.name,
+                style: CategoryBadgeStyle.onImage,
               ),
             ),
             dateLabel: formattedDate,
@@ -130,44 +123,16 @@ class NoteOriginalDataSection extends StatelessWidget {
                     CategorySelector(
                       selectedCategoryId: note.categoryId,
                       onCategorySelected: onCategorySelected,
-                      builder: (context, category) => Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 12.w,
-                          vertical: 6.h,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(4.r),
-                        ),
-                        child: Text(
-                          category.name,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
+                      builder: (context, category) => CategoryBadge(
+                        categoryName: category.name,
+                        style: CategoryBadgeStyle.normal,
                       ),
                     ),
                     SizedBox(width: 12.w),
                     // 日期
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.access_time_rounded,
-                          size: 12.sp,
-                          color: colorScheme.secondary,
-                        ),
-                        SizedBox(width: 4.w),
-                        Text(
-                          formattedDate,
-                          style: TextStyle(
-                            fontSize: 11.sp,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.3,
-                            color: colorScheme.secondary,
-                          ),
-                        ),
-                      ],
+                    DateLabel(
+                      dateText: formattedDate,
+                      style: DateLabelStyle.normal,
                     ),
                   ],
                 ),
