@@ -2,6 +2,7 @@ import 'package:isar_community/isar.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../service/notification_service.dart';
+import '../service/scraper/platform_scraper_service.dart';
 
 part 'infrastructure_providers.g.dart';
 
@@ -15,4 +16,10 @@ Isar isar(Ref ref) {
 @Riverpod(keepAlive: true)
 NotificationService notificationService(Ref ref) {
   return NotificationService();
+}
+
+/// 平台爬虫服务 Provider - 全局单例
+@Riverpod(keepAlive: true)
+PlatformScraperService platformScraperService(Ref ref) {
+  return PlatformScraperService();
 }

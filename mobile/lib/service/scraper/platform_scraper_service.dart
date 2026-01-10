@@ -11,7 +11,6 @@ import 'package:pocketmind/utils/platform_detector.dart';
 /// 平台爬虫服务
 ///
 /// 整合爬虫策略，处理 Cookie 管理、图片下载、队列管理等
-/// 作为 MetadataManager 的最高优先级策略
 class PlatformScraperService {
   static const String _tag = 'PlatformScraperService';
 

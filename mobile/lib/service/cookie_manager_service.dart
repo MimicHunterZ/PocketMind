@@ -55,7 +55,6 @@ class PlatformCookie {
 /// Cookie 管理服务
 ///
 /// 负责平台 Cookie 的存储、读取和过期管理
-/// 参考 MediaCrawler tools/crawler_util.py 的 Cookie 转换机制
 class CookieManagerService {
   static const String _tag = 'CookieManager';
   static const String _keyPrefix = 'cookie_';

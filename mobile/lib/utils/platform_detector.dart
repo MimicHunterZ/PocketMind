@@ -69,30 +69,4 @@ class PlatformDetector {
     // 未匹配到特定平台，返回通用类型
     return PlatformType.generic;
   }
-
-  /// 检查 URL 是否需要特定平台的爬虫处理
-  static bool requiresPlatformScraper(String url) {
-    final platform = detectPlatform(url);
-    return platform != PlatformType.generic;
-  }
-
-  /// 获取平台的基础域名（用于 Cookie 设置）
-  static String? getBaseDomain(PlatformType platform) {
-    switch (platform) {
-      case PlatformType.xhs:
-        return '.xiaohongshu.com';
-      case PlatformType.generic:
-        return null;
-    }
-  }
-
-  /// 获取平台的主页 URL（用于登录）
-  static String? getHomeUrl(PlatformType platform) {
-    switch (platform) {
-      case PlatformType.xhs:
-        return 'https://www.xiaohongshu.com';
-      case PlatformType.generic:
-        return null;
-    }
-  }
 }

@@ -18,7 +18,7 @@ class XhsScraper implements IPlatformScraper {
   /// Cookie 域名
   static const String _cookieDomain = '.xiaohongshu.com';
 
-  /// UserAgent（与 MediaCrawler 保持一致）
+  /// UserAgent
   static const String _userAgent =
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
       'AppleWebKit/537.36 (KHTML, like Gecko) '

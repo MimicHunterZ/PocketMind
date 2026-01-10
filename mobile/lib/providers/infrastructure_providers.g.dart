@@ -105,3 +105,56 @@ final class NotificationServiceProvider
 
 String _$notificationServiceHash() =>
     r'58da87941dbfa08925105dcc4d74091ee38c8593';
+
+/// 平台爬虫服务 Provider - 全局单例
+
+@ProviderFor(platformScraperService)
+const platformScraperServiceProvider = PlatformScraperServiceProvider._();
+
+/// 平台爬虫服务 Provider - 全局单例
+
+final class PlatformScraperServiceProvider
+    extends
+        $FunctionalProvider<
+          PlatformScraperService,
+          PlatformScraperService,
+          PlatformScraperService
+        >
+    with $Provider<PlatformScraperService> {
+  /// 平台爬虫服务 Provider - 全局单例
+  const PlatformScraperServiceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'platformScraperServiceProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$platformScraperServiceHash();
+
+  @$internal
+  @override
+  $ProviderElement<PlatformScraperService> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  PlatformScraperService create(Ref ref) {
+    return platformScraperService(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(PlatformScraperService value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<PlatformScraperService>(value),
+    );
+  }
+}
+
+String _$platformScraperServiceHash() =>
+    r'5e7800db8e1ca05c99cb3f2c9c65d2c4388f8bc7';

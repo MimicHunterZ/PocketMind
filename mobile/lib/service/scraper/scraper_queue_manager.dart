@@ -46,10 +46,10 @@ class ScraperQueueManager {
     'com.doublez.pocketmind/scraper',
   );
 
-  /// 任务执行回调（由外部设置）
+  /// 任务执行回调
   Future<void> Function(ScraperTask task)? onExecuteTask;
 
-  /// 任务失败通知回调（由外部设置）
+  /// 任务失败通知回调
   void Function(ScraperTask task, String error)? onTaskFailed;
 
   ScraperQueueManager._() {

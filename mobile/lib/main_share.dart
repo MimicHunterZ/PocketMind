@@ -16,11 +16,13 @@ import 'package:pocketmind/providers/pm_service_providers.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';
 import 'package:pocketmind/service/note_service.dart';
 import 'package:pocketmind/service/notification_service.dart';
+import 'package:pocketmind/service/scraper/scraper_queue_manager.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/util/proxy_config.dart';
 import 'package:pocketmind/util/theme_data.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pocketmind/util/url_helper.dart';
+import 'package:pocketmind/utils/platform_detector.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'util/logger_service.dart';
@@ -101,11 +103,59 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
     _channel.setMethodCallHandler(_handleMethodCall);
     PMlog.d(tag, 'MyShareApp 初始化完成, 等待分享...');
 
+    // 初始化 ScraperQueueManager
+    _initScraperQueueManager();
+
     // 延迟通知原生端引擎已准备好
     // 使用 addPostFrameCallback 确保第一帧渲染完成后再通知
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _notifyEngineReady();
     });
+  }
+
+  /// 初始化爬虫队列管理器
+  Future<void> _initScraperQueueManager() async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    final queueManager = ScraperQueueManager.instance;
+    await queueManager.init(prefs);
+
+    // 设置任务执行回调
+    queueManager.onExecuteTask = (task) async {
+      PMlog.d(tag, '执行爬取任务: noteId=${task.noteId}, url=${task.url}');
+
+      // 使用 PlatformScraperService 爬取
+      final scraperService = ref.read(platformScraperServiceProvider);
+      final metadata = await scraperService.scrape(task.url);
+
+      if (metadata == null) {
+        throw Exception('爬取失败: 无法获取元数据');
+      }
+
+      // 更新 Note
+      final note = await isar.notes.get(task.noteId);
+      if (note == null) {
+        PMlog.w(tag, '笔记不存在: noteId=${task.noteId}');
+        return;
+      }
+
+      // 更新笔记字段
+      note.previewTitle = metadata.title;
+      note.previewDescription = metadata.previewDescription;
+      note.previewContent = metadata.previewContent;
+      note.previewImageUrl = metadata.imageUrl;
+      if (metadata.imageUrls != null && metadata.imageUrls!.isNotEmpty) {
+        note.previewImageUrls = metadata.imageUrls!;
+      }
+
+      // 保存到数据库
+      await isar.writeTxn(() async {
+        await isar.notes.put(note);
+      });
+
+      PMlog.d(tag, '笔记更新成功: noteId=${task.noteId}, title=${metadata.title}');
+    };
+
+    PMlog.d(tag, 'ScraperQueueManager 初始化完成');
   }
 
   // 通知原生端 Flutter 引擎已准备好
@@ -183,11 +233,34 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
             url: url,
           );
 
-          // 1.1 提交后端抓取请求,保存需要查询的 url
+          // 1.1 处理平台爬取
           if (url != null) {
-            if (_sendBackUrl(url)) {
+            final platform = PlatformDetector.detectPlatform(url);
+
+            if (platform == PlatformType.xhs) {
+              // 小红书链接：入队进行本地爬取
+              PMlog.d(tag, '检测到小红书链接，入队进行爬取');
+              final queueManager = ScraperQueueManager.instance;
+              final enqueued = await queueManager.enqueue(
+                _noteId,
+                url,
+                platform.identifier,
+              );
+
+              if (enqueued) {
+                PMlog.d(tag, '成功入队，启动前台服务并处理队列');
+                // 启动 Android 前台服务（通过 ScraperQueueManager 的 scraper channel）
+                await queueManager.startForegroundService();
+
+                // 立即开始处理队列
+                queueManager.processQueue();
+              }
+            } else if (_sendBackUrl(url)) {
+              // Twitter/X 链接：提交后端抓取请求
               ref.read(resourcePmServiceProvider).submit(url: url);
             }
+
+            // 保存需要回调的 URL 列表（用于下次进入主应用时处理）
             final sharedPreferences = ref.read(sharedPreferencesProvider);
             await sharedPreferences.reload();
             var urls = sharedPreferences.getStringList('needCallBackUrl') ?? [];

@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
+import com.doublez.pocketmind.service.ScraperForegroundService
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineCache
@@ -405,13 +406,55 @@ class ShareActivity : FlutterActivity() {
                             pendingShareData = null // 清除已处理的数据
                         } ?: Log.d(TAG, "setupMethodChannel: 无待处理数据")
                     }
+                    
                     else -> result.notImplemented()
                 }
             }
 
             Log.d(TAG, "MethodChannel 已重新设置，isEngineReady=$isEngineReady")
 
-            // 注册日志通道（可选）
+            // 注册爬虫服务通道
+            val scraperChannel = MethodChannel(messenger, "com.doublez.pocketmind/scraper")
+            scraperChannel.setMethodCallHandler { call, result ->
+                Log.d(TAG, "scraperChannel: 收到调用: ${call.method}")
+                when (call.method) {
+                    "startForegroundService" -> {
+                        try {
+                            val taskCount = call.argument<Int>("taskCount") ?: 1
+                            Log.d(TAG, "启动前台服务，任务数: $taskCount")
+                            ScraperForegroundService.start(this@ShareActivity, taskCount)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "启动前台服务失败: ${e.message}", e)
+                            result.error("SERVICE_ERROR", e.message, null)
+                        }
+                    }
+                    "stopForegroundService" -> {
+                        try {
+                            ScraperForegroundService.stop(this@ShareActivity)
+                            Log.d(TAG, "前台服务已停止")
+                            result.success(true)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "停止前台服务失败: ${e.message}", e)
+                            result.error("SERVICE_ERROR", e.message, null)
+                        }
+                    }
+                    "updateProgress" -> {
+                        try {
+                            val currentUrl = call.argument<String>("currentUrl") ?: ""
+                            val pendingCount = call.argument<Int>("pendingCount") ?: 0
+                            ScraperForegroundService.updateProgress(this@ShareActivity, currentUrl, pendingCount)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "更新通知失败: ${e.message}", e)
+                            result.error("SERVICE_ERROR", e.message, null)
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+            // 注册日志通道
             val loggerChannel = MethodChannel(messenger, "com.doublez.pocketmind/logger")
             loggerChannel.setMethodCallHandler { call, result ->
                 if (call.method == "log") {

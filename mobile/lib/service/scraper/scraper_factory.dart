@@ -19,14 +19,6 @@ class ScraperFactory {
     }
   }
 
-  /// 根据平台标识符获取爬虫
-  ///
-  /// [platformId] 平台标识符（如 'xhs'）
-  static IPlatformScraper? getScraperById(String platformId) {
-    final platform = PlatformTypeExtension.fromIdentifier(platformId);
-    return getScraper(platform);
-  }
-
   /// 检查平台是否支持专用爬虫
   static bool hasScraper(PlatformType platform) {
     return getScraper(platform) != null;
