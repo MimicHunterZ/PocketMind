@@ -80,6 +80,7 @@ class NoteService {
     int? categoryId,
     String? tag,
     String? previewImageUrl,
+    List<String>? previewImageUrls,
     String? previewTitle,
     String? previewContent,
     String? previewDescription,
@@ -104,6 +105,8 @@ class NoteService {
     existingNote.tag = tag ?? existingNote.tag;
     existingNote.previewImageUrl =
         previewImageUrl ?? existingNote.previewImageUrl;
+    existingNote.previewImageUrls =
+        previewImageUrls ?? existingNote.previewImageUrls;
     existingNote.previewTitle = previewTitle ?? existingNote.previewTitle;
     existingNote.previewDescription =
         previewDescription ?? existingNote.previewDescription;

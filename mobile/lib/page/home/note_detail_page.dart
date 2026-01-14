@@ -62,27 +62,27 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
           .updateNote(content: _contentController!.text);
     });
 
-    Future.microtask(() {
-      if (!mounted) return;
-
-      // 仅当内容为空且从未尝试过（status == null）时才自动加载
-      // 如果 status != null (说明已尝试过，无论是 SUCCESS 还是 FAILED)，都不再自动重试
-      final shouldFetchContent =
-          (note.previewContent == null || note.previewContent!.isEmpty) &&
-          note.resourceStatus == null;
-      // 用 预览 兜底
-      final shouldFetchPreview =
-          (note.previewDescription == null ||
-          note.previewDescription!.isEmpty ||
-          note.previewTitle == null ||
-          note.previewTitle!.isEmpty);
-      if ((shouldFetchPreview || shouldFetchContent) &&
-          _currentNote.url != null) {
-        ref.read(metadataManagerProvider).fetchAndProcessMetadata([
-          _currentNote.url!,
-        ]);
-      }
-    });
+    // Future.microtask(() {
+    //   if (!mounted) return;
+    //
+    //   // 仅当内容为空且从未尝试过（status == null）时才自动加载
+    //   // 如果 status != null (说明已尝试过，无论是 SUCCESS 还是 FAILED)，都不再自动重试
+    //   final shouldFetchBackendContent =
+    //       (note.previewContent == null || note.previewContent!.isEmpty) &&
+    //       note.resourceStatus == null;
+    //   // 用 预览 兜底
+    //   final shouldFetchPreview =
+    //       (note.previewDescription == null &&
+    //       note.previewDescription!.isEmpty ||
+    //       note.previewTitle == null ||
+    //       note.previewTitle!.isEmpty);
+    //   if ((shouldFetchPreview || shouldFetchBackendContent) &&
+    //       _currentNote.url != null) {
+    //     ref.read(metadataManagerProvider).fetchAndProcessMetadata([
+    //       _currentNote.url!,
+    //     ]);
+    //   }
+    // });
   }
 
   @override

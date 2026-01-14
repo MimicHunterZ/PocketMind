@@ -67,9 +67,6 @@ abstract class IPlatformScraper {
   /// 可能抛出 [CookieExpiredException] 当 Cookie 失效时
   Future<ScrapedMetadata?> scrape(String url, Map<String, String> cookieDict);
 
-  /// 是否需要 Cookie 才能爬取
-  bool requiresCookie();
-
   /// 获取平台名称
   String getPlatformName();
 

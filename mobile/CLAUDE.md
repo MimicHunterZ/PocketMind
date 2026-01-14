@@ -92,7 +92,17 @@ Uses **Riverpod 3.0** with code generation:
 - 元数据抓取或资源本地化失败时，**严禁**向数据库写入错误占位数据（如 "No Title" 或错误提示文字）。
 - 数据库字段应保持为 `null`。UI 层根据字段为 `null` 且非加载状态，显示“预览失败，请检查网络连接”。
 - 这种设计确保了数据的纯净性，并允许用户在下次进入页面时自动或手动触发重试。
-
+### 4. 数据类序列化规则
+- **禁止手写**: 禁止手写 `fromJson()`, `toJson()`, `copyWith()`, `toString()` 方法
+- **使用 json_serializable**: 对于需要 JSON 序列化的可变数据类，使用 `@JsonSerializable()` 注解
+- **使用 freezed**: 对于不可变数据类（如 UI 状态模型），使用 `@freezed` 注解，自动生成 `copyWith()`, `==`, `hashCode`, `toString()` 等
+- **DateTime 处理**: 使用 `@JsonKey` 指定自定义序列化器处理 DateTime:
+  ```dart
+  @JsonKey(fromJson: _dateTimeFromJson, toJson: _dateTimeToJson)
+  DateTime createdAt;
+  ```
+- **生成代码**: 所有序列化代码由 `build_runner` watch 自动生成到 `*.g.dart` 文件
+- **字段可变性判断**: 如果字段需要在对象创建后修改（如任务队列中的状态变化），使用可变类 + json_serializable；否则使用 freezed
 ### Database
 
 **Isar Community Edition** (NoSQL embedded database):

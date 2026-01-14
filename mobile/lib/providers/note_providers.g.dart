@@ -111,7 +111,7 @@ final class MetadataManagerProvider
   }
 }
 
-String _$metadataManagerHash() => r'74916151db50f08432a08c78480ee1a28c71c1e0';
+String _$metadataManagerHash() => r'41e4b0265968f29432728b69f9403255f8f6ff71';
 
 /// NoteService Provider - 业务层
 

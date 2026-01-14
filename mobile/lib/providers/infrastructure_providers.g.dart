@@ -157,4 +157,52 @@ final class PlatformScraperServiceProvider
 }
 
 String _$platformScraperServiceHash() =>
-    r'5e7800db8e1ca05c99cb3f2c9c65d2c4388f8bc7';
+    r'9a7d088c334f0c23c8abbd9fb6d36a75358a8209';
+
+@ProviderFor(cookieManagerService)
+const cookieManagerServiceProvider = CookieManagerServiceProvider._();
+
+final class CookieManagerServiceProvider
+    extends
+        $FunctionalProvider<
+          CookieManagerService,
+          CookieManagerService,
+          CookieManagerService
+        >
+    with $Provider<CookieManagerService> {
+  const CookieManagerServiceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'cookieManagerServiceProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$cookieManagerServiceHash();
+
+  @$internal
+  @override
+  $ProviderElement<CookieManagerService> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  CookieManagerService create(Ref ref) {
+    return cookieManagerService(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(CookieManagerService value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<CookieManagerService>(value),
+    );
+  }
+}
+
+String _$cookieManagerServiceHash() =>
+    r'f7338b989719a0445e4f1237479232fe3e398dce';

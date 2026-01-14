@@ -114,20 +114,22 @@ class _HeroGalleryState extends State<HeroGallery> {
 
             // --- 层级 2：全局渐变层 (The Whole Gradient) ---
             // 这是一个覆盖全屏的渐变，但是通过 stops 控制只在下半部分显示
+            // 使用 IgnorePointer 避免拦截 PageView 的滑动手势
             if (widget.showGradientFade)
               Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      // 这里是关键！颜色数组
-                      colors: [
-                        Colors.transparent, // 0. 顶部透明
-                        Colors.transparent, // 1. 保持透明
-                        bgColor, // 2. 渐变到实色背景
-                        bgColor, // 3. 底部保持实色
-                      ],
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        // 这里是关键！颜色数组
+                        colors: [
+                          Colors.transparent, // 0. 顶部透明
+                          Colors.transparent, // 1. 保持透明
+                          bgColor, // 2. 渐变到实色背景
+                          bgColor, // 3. 底部保持实色
+                        ],
                       // 这里是对应的位置 (0.0 - 1.0)
                       stops: const [
                         0.0,
@@ -139,6 +141,7 @@ class _HeroGalleryState extends State<HeroGallery> {
                   ),
                 ),
               ),
+            ),
 
             // --- 层级 3：文字内容层 ---
             // 文字从渐变开始的地方 (0.5) 就开始布局，一直到底部
@@ -188,7 +191,6 @@ class _HeroGalleryState extends State<HeroGallery> {
   /// 构建文字内容
   Widget _buildTextContent() {
     final textScheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
 
     final hasCategory =
         widget.categoryLabel != null && widget.categoryLabel!.isNotEmpty;

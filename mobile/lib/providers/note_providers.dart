@@ -31,9 +31,11 @@ IsarNoteRepository noteRepository(Ref ref) {
 MetadataManager metadataManager(Ref ref) {
   final apiService = ref.watch(linkPreviewServiceProvider);
   final resourceService = ref.watch(resourcePmServiceProvider);
+  final platformScraperService = ref.watch(platformScraperServiceProvider);
   return MetadataManager(
     linkPreviewApi: apiService,
     resourceService: resourceService,
+    platformScraperService: platformScraperService
   );
 }
 

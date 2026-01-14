@@ -62,10 +62,14 @@ class NoteOriginalDataSection extends StatelessWidget {
       displayImages.add(note.url!);
     }
 
-    // 如果是网络链接且预览图已加载，使用预览图
+    // 如果是网络链接且预览图已加载，使用预览图（优先使用多张，其次使用单张）
     if (isHttpsUrl && !isLocalImage) {
       isNetworkImage = true;
-      if (previewImageUrl != null && previewImageUrl!.isNotEmpty) {
+      // 优先使用 previewImageUrls（多张图片）
+      if (note.previewImageUrls.isNotEmpty) {
+        displayImages.addAll(note.previewImageUrls);
+      } else if (previewImageUrl != null && previewImageUrl!.isNotEmpty) {
+        // 备用：使用单张 previewImageUrl（参数传入的预览图）
         displayImages.add(previewImageUrl!);
       }
     }

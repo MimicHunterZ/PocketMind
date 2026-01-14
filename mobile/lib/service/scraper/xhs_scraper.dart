@@ -37,9 +37,6 @@ class XhsScraper implements IPlatformScraper {
   String getPlatformId() => 'xhs';
 
   @override
-  bool requiresCookie() => true;
-
-  @override
   List<String> getRequiredCookieNames() => ['a1', 'webId'];
 
   @override
@@ -87,6 +84,7 @@ class XhsScraper implements IPlatformScraper {
       final completer = Completer<void>();
       String? pageHtml;
       bool loadError = false;
+      bool authError = false;
 
       headlessWebView = HeadlessInAppWebView(
         initialSettings: InAppWebViewSettings(
@@ -166,6 +164,7 @@ class XhsScraper implements IPlatformScraper {
           PMlog.e(_tag, 'HTTP 错误: ${response.statusCode}');
           if (response.statusCode == 403 || response.statusCode == 401) {
             loadError = true;
+            authError = true;
           }
           if (!completer.isCompleted) {
             completer.complete();
@@ -188,7 +187,11 @@ class XhsScraper implements IPlatformScraper {
       );
 
       if (loadError) {
-        throw CookieExpiredException('页面加载失败，可能Cookie已过期', platform: 'xhs');
+        if (authError) {
+          throw CookieExpiredException('页面返回 401/403，需要登录验证', platform: 'xhs');
+        }
+        PMlog.e(_tag, '页面加载失败');
+        return null;
       }
 
       if (pageHtml == null || pageHtml!.isEmpty) {
@@ -322,6 +325,7 @@ class XhsScraper implements IPlatformScraper {
     InAppWebViewController controller,
     String url,
   ) async {
+    PMlog.d(_tag, 'url: $url');
     // 提取笔记 ID
     final noteId = _extractNoteId(url);
     if (noteId == null) {
@@ -531,6 +535,7 @@ class XhsScraper implements IPlatformScraper {
     // https://xhslink.com/xxxxx
 
     // 尝试匹配 explore/xxxxx 格式
+    PMlog.d(_tag, 'url: $url');
     final exploreMatch = RegExp(r'/explore/([a-zA-Z0-9]+)').firstMatch(url);
     if (exploreMatch != null) {
       return exploreMatch.group(1);

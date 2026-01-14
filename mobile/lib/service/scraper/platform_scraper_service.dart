@@ -1,12 +1,10 @@
 import 'package:pocketmind/api/models/note_metadata.dart';
 import 'package:pocketmind/service/cookie_manager_service.dart';
 import 'package:pocketmind/service/scraper/platform_scraper_interface.dart';
-import 'package:pocketmind/service/scraper/scraper_factory.dart';
-import 'package:pocketmind/service/scraper/scraper_queue_manager.dart';
 import 'package:pocketmind/service/scraper/stealth_js_loader.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/util/logger_service.dart';
-import 'package:pocketmind/utils/platform_detector.dart';
+import 'package:pocketmind/util/platform_detector.dart';
 
 /// 平台爬虫服务
 ///
@@ -18,16 +16,13 @@ class PlatformScraperService {
   static const int _imageDownloadConcurrency = 3;
 
   final CookieManagerService _cookieManager;
-  final ScraperQueueManager _queueManager;
   final ImageStorageHelper _imageHelper;
 
   PlatformScraperService({
-    CookieManagerService? cookieManager,
-    ScraperQueueManager? queueManager,
-    ImageStorageHelper? imageHelper,
-  }) : _cookieManager = cookieManager ?? CookieManagerService(),
-       _queueManager = queueManager ?? ScraperQueueManager(),
-       _imageHelper = imageHelper ?? ImageStorageHelper();
+    required CookieManagerService cookieManager,
+    required ImageStorageHelper imageHelper,
+  }) : _cookieManager = cookieManager,
+       _imageHelper = imageHelper;
 
   /// 初始化服务（预加载 stealth.js）
   Future<void> init() async {
@@ -35,37 +30,59 @@ class PlatformScraperService {
     PMlog.d(_tag, '服务初始化完成');
   }
 
-  /// 检查 URL 是否支持平台爬虫
+  /// 判断 URL 是否需要本地无头浏览器爬取
   ///
   /// [url] 目标链接
-  /// 返回是否可以使用平台爬虫处理
+  /// 返回 (需要后台爬取, 平台类型) 的元组
   bool canHandle(String url) {
-    final platform = PlatformDetector.detectPlatform(url);
-    return platform != PlatformType.generic &&
-        ScraperFactory.hasScraper(platform);
+    final platform =
+        PlatformDetector.detectPlatform(url) != PlatformType.generic;
+    return platform;
   }
 
-  /// 检查平台 Cookie 是否可用
+  /// 批量爬取
   ///
-  /// [url] 目标链接
-  /// 返回 Cookie 是否已配置且未过期
-  Future<bool> hasCookie(String url) async {
-    final platform = PlatformDetector.detectPlatform(url);
-    final scraper = ScraperFactory.getScraper(platform);
+  /// [urls] 目标链接列表
+  /// 返回以 URL 为 Key 的元数据 Map
+  Future<List<NoteMetadata>> scrapeBatch(List<String> urls) async {
+    final results = <NoteMetadata>[];
 
-    if (scraper == null || !scraper.requiresCookie()) {
-      return true; // 不需要 Cookie 的平台直接返回 true
+    // 按平台分分类
+    final groupedUrls = <PlatformType, List<String>>{};
+    for (var url in urls) {
+      final platform = PlatformDetector.detectPlatform(url);
+      if (platform != PlatformType.generic) {
+        groupedUrls.putIfAbsent(platform, () => []).add(url);
+      }
     }
 
-    final platformId = scraper.getPlatformId();
-    final isExpired = await _cookieManager.isExpired(platformId);
+    // 逐平台处理（避免同时启动多个 WebView）
+    for (var entry in groupedUrls.entries) {
+      final platform = entry.key;
+      final platformUrls = entry.value;
 
-    if (isExpired) {
-      return false;
+      PMlog.d(
+        _tag,
+        '批量爬取 [${platform.displayName}]: ${platformUrls.length} 个链接',
+      );
+
+      for (var url in platformUrls) {
+        try {
+          final metadata = await scrape(url);
+          if(metadata != null){
+            results.add(metadata);
+          }
+        } on CookieExpiredException {
+          // Cookie 过期后停止该平台的处理
+          PMlog.w(_tag, '${platform.displayName} Cookie 已过期，跳过剩余链接');
+          break;
+        } catch (e) {
+          PMlog.e(_tag, '爬取失败 [$url]: $e');
+        }
+      }
     }
 
-    final cookieDict = await _cookieManager.getCookieDict(platformId);
-    return scraper.validateCookies(cookieDict ?? {});
+    return results;
   }
 
   /// 爬取单个 URL
@@ -74,22 +91,20 @@ class PlatformScraperService {
   /// 返回 [NoteMetadata] 或 null（失败时）
   /// 可能抛出 [CookieExpiredException] 当 Cookie 失效时
   Future<NoteMetadata?> scrape(String url) async {
-    final platform = PlatformDetector.detectPlatform(url);
-    final scraper = ScraperFactory.getScraper(platform);
+    final scraper = PlatformDetector.getScraper(url);
 
     if (scraper == null) {
       PMlog.w(_tag, '不支持的平台: $url');
       return null;
     }
 
-    PMlog.d(_tag, '开始爬�?[${scraper.getPlatformName()}]: $url');
+    PMlog.d(_tag, '开始爬取?[${scraper.getPlatformName()}]: $url');
 
     // 获取 Cookie
     final platformId = scraper.getPlatformId();
     final cookieDict = await _cookieManager.getCookieDict(platformId);
 
-    if (scraper.requiresCookie() &&
-        !scraper.validateCookies(cookieDict ?? {})) {
+    if (!scraper.validateCookies(cookieDict ?? {})) {
       PMlog.e(_tag, 'Cookie 不完整，需要用户登录');
       throw CookieExpiredException('Cookie 不完整', platform: platformId);
     }
@@ -131,67 +146,6 @@ class PlatformScraperService {
       PMlog.e(_tag, '爬取失败: $e');
       return null;
     }
-  }
-
-  /// 批量爬取
-  ///
-  /// [urls] 目标链接列表
-  /// 返回以 URL 为 Key 的元数据 Map
-  Future<Map<String, NoteMetadata>> scrapeBatch(List<String> urls) async {
-    final results = <String, NoteMetadata>{};
-
-    // 按平台分�?
-    final groupedUrls = <PlatformType, List<String>>{};
-    for (var url in urls) {
-      final platform = PlatformDetector.detectPlatform(url);
-      if (platform != PlatformType.generic &&
-          ScraperFactory.hasScraper(platform)) {
-        groupedUrls.putIfAbsent(platform, () => []).add(url);
-      }
-    }
-
-    // 逐平台处理（避免同时启动多个 WebView）
-    for (var entry in groupedUrls.entries) {
-      final platform = entry.key;
-      final platformUrls = entry.value;
-
-      PMlog.d(
-        _tag,
-        '批量爬取 [${platform.displayName}]: ${platformUrls.length} 个链接',
-      );
-
-      for (var url in platformUrls) {
-        try {
-          final metadata = await scrape(url);
-          if (metadata != null) {
-            results[url] = metadata;
-          }
-        } on CookieExpiredException {
-          // Cookie 过期后停止该平台的处�?
-          PMlog.w(_tag, '${platform.displayName} Cookie 已过期，跳过剩余链接');
-          break;
-        } catch (e) {
-          PMlog.e(_tag, '爬取失败 [$url]: $e');
-        }
-      }
-    }
-
-    return results;
-  }
-
-  /// 加入爬取队列（后台处理）
-  ///
-  /// [noteId] 笔记 ID
-  /// [url] 目标链接
-  Future<void> enqueueForScraping(int noteId, String url) async {
-    final platform = PlatformDetector.detectPlatform(url);
-    if (platform == PlatformType.generic) {
-      PMlog.w(_tag, '不支持的平台，不加入队列: $url');
-      return;
-    }
-
-    await _queueManager.enqueue(noteId, url, platform.identifier);
-    PMlog.d(_tag, '已加入爬取队列: noteId=$noteId, url=$url');
   }
 
   /// 批量下载图片并本地化
@@ -254,23 +208,5 @@ class PlatformScraperService {
 
     PMlog.d(_tag, '图片本地化: ${localizedPaths.length}/${uniqueUrls.length} 成功');
     return localizedPaths;
-  }
-
-  /// 获取平台 Cookie 状�?
-  Future<Map<String, bool>> getPlatformCookieStatus() async {
-    final status = <String, bool>{};
-
-    for (var platform in ScraperFactory.getSupportedPlatforms()) {
-      final scraper = ScraperFactory.getScraper(platform);
-      if (scraper != null && scraper.requiresCookie()) {
-        final platformId = scraper.getPlatformId();
-        final isExpired = await _cookieManager.isExpired(platformId);
-        final cookieDict = await _cookieManager.getCookieDict(platformId);
-        status[platformId] =
-            !isExpired && scraper.validateCookies(cookieDict ?? {});
-      }
-    }
-
-    return status;
   }
 }

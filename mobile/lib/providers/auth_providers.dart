@@ -19,12 +19,10 @@ class AuthSessionState {
 
   const AuthSessionState({this.userId, this.token, this.expiryTime});
 
-  bool get isLoggedIn {
-    if (token == null || token!.isEmpty) return false;
-    if (expiryTime != null && expiryTime!.isBefore(DateTime.now()))
-      return false;
-    return true;
-  }
+  bool get isLoggedIn =>
+      token != null &&
+      token!.isNotEmpty &&
+      (expiryTime == null || !expiryTime!.isBefore(DateTime.now()));
 
   AuthSessionState copyWith({
     String? userId,

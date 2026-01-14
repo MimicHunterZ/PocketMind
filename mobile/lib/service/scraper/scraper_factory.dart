@@ -1,4 +1,4 @@
-import 'package:pocketmind/utils/platform_detector.dart';
+import 'package:pocketmind/util/platform_detector.dart';
 import 'package:pocketmind/service/scraper/platform_scraper_interface.dart';
 import 'package:pocketmind/service/scraper/xhs_scraper.dart';
 

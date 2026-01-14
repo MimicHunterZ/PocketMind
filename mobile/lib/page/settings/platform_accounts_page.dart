@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/service/cookie_manager_service.dart';
 import 'package:pocketmind/service/scraper/scraper_factory.dart';
 import 'package:pocketmind/page/settings/xhs_login_page.dart';
 import 'package:pocketmind/util/logger_service.dart';
+import 'package:pocketmind/util/platform_detector.dart';
 
 /// 平台账号管理页面
 ///
 /// 展示各平台的登录状态，提供登录/退出功能
-class PlatformAccountsPage extends StatefulWidget {
+class PlatformAccountsPage extends ConsumerStatefulWidget {
   const PlatformAccountsPage({super.key});
 
   @override
-  State<PlatformAccountsPage> createState() => _PlatformAccountsPageState();
+  ConsumerState<PlatformAccountsPage> createState() => _PlatformAccountsPageState();
 }
 
-class _PlatformAccountsPageState extends State<PlatformAccountsPage> {
+class _PlatformAccountsPageState extends ConsumerState<PlatformAccountsPage> {
   static const String _tag = 'PlatformAccountsPage';
-
-  final CookieManagerService _cookieManager = CookieManagerService();
 
   Map<String, _PlatformStatus> _platformStatuses = {};
   bool _isLoading = true;
@@ -35,26 +36,24 @@ class _PlatformAccountsPageState extends State<PlatformAccountsPage> {
     try {
       final statuses = <String, _PlatformStatus>{};
 
-      for (var platform in ScraperFactory.getSupportedPlatforms()) {
+      for (var platform in PlatformType.getSupportedPlatforms) {
         final scraper = ScraperFactory.getScraper(platform);
         if (scraper == null) continue;
 
         final platformId = scraper.getPlatformId();
-        final isExpired = await _cookieManager.isExpired(platformId);
-        final cookieDict = await _cookieManager.getCookieDict(platformId);
-        final hasValidCookie =
-            !isExpired && scraper.validateCookies(cookieDict ?? {});
+        CookieManagerService cm = ref.read(cookieManagerServiceProvider);
+        bool isExpired = await cm.isExpired(platform.identifier);
 
         DateTime? expiresAt;
-        if (hasValidCookie) {
-          final cookie = await _cookieManager.getCookie(platformId);
+        if (isExpired) {
+          final cookie = await cm.getCookie(platformId);
           expiresAt = cookie?.expiresAt;
         }
 
         statuses[platformId] = _PlatformStatus(
           platformId: platformId,
           platformName: scraper.getPlatformName(),
-          isLoggedIn: hasValidCookie,
+          isLoggedIn: !isExpired,
           expiresAt: expiresAt,
         );
       }
@@ -121,7 +120,7 @@ class _PlatformAccountsPageState extends State<PlatformAccountsPage> {
     );
 
     if (confirmed == true) {
-      await _cookieManager.clearCookies(platformId);
+      await ref.read(cookieManagerServiceProvider).clearCookies(platformId);
       await _loadPlatformStatuses();
 
       if (mounted) {

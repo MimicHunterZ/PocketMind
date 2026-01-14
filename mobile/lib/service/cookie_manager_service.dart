@@ -70,7 +70,7 @@ class CookieManagerService {
     return _instance!;
   }
 
-  /// 工厂构造函数（兼容旧代码）
+  /// 工厂构造函数（使用 instance）
   factory CookieManagerService() => instance;
 
   /// 初始化（需要在使用前调用）
@@ -81,9 +81,7 @@ class CookieManagerService {
 
   /// 确保已初始化
   Future<SharedPreferences> _ensurePrefs() async {
-    if (_prefs == null) {
-      _prefs = await SharedPreferences.getInstance();
-    }
+    _prefs ??= await SharedPreferences.getInstance();
     return _prefs!;
   }
 
@@ -185,15 +183,6 @@ class CookieManagerService {
       PMlog.d(_tag, '[$platform] Cookie 已过期');
     }
     return expired;
-  }
-
-  /// 检查是否存在有效的 Cookie
-  ///
-  /// [platform] 平台标识符
-  /// 返回 true 表示存在且未过期
-  Future<bool> hasValidCookie(String platform) async {
-    final expired = await isExpired(platform);
-    return !expired;
   }
 
   /// 标记 Cookie 为已过期

@@ -1,3 +1,7 @@
+import 'package:json_annotation/json_annotation.dart';
+
+part 'scraper_task.g.dart';
+
 /// 爬虫任务状态枚举
 enum TaskStatus {
   /// 等待执行
@@ -56,6 +60,7 @@ extension TaskStatusExtension on TaskStatus {
 /// 爬虫任务数据模型
 ///
 /// 表示一个待处理的 URL 抓取任务
+@JsonSerializable()
 class ScraperTask {
   /// 关联的笔记 ID
   final int noteId;
@@ -70,12 +75,15 @@ class ScraperTask {
   TaskStatus status;
 
   /// 创建时间
+  @JsonKey(fromJson: _dateTimeFromJson, toJson: _dateTimeToJson)
   final DateTime createdAt;
 
   /// 开始执行时间
+  @JsonKey(fromJson: _dateTimeFromJsonNullable, toJson: _dateTimeToJsonNullable)
   DateTime? startedAt;
 
   /// 完成时间
+  @JsonKey(fromJson: _dateTimeFromJsonNullable, toJson: _dateTimeToJsonNullable)
   DateTime? completedAt;
 
   /// 错误信息
@@ -85,6 +93,7 @@ class ScraperTask {
   int retryCount;
 
   /// 下次重试时间（用于延迟重试）
+  @JsonKey(fromJson: _dateTimeFromJsonNullable, toJson: _dateTimeToJsonNullable)
   DateTime? nextRetryAt;
 
   ScraperTask({
@@ -92,51 +101,13 @@ class ScraperTask {
     required this.url,
     required this.platform,
     this.status = TaskStatus.pending,
-    DateTime? createdAt,
+    required this.createdAt,
     this.startedAt,
     this.completedAt,
     this.errorMessage,
     this.retryCount = 0,
     this.nextRetryAt,
-  }) : createdAt = createdAt ?? DateTime.now();
-
-  /// 从 JSON 反序列化
-  factory ScraperTask.fromJson(Map<String, dynamic> json) {
-    return ScraperTask(
-      noteId: json['noteId'] as int,
-      url: json['url'] as String,
-      platform: json['platform'] as String,
-      status: TaskStatusExtension.fromString(json['status'] ?? 'pending'),
-      createdAt: DateTime.parse(json['createdAt']),
-      startedAt: json['startedAt'] != null
-          ? DateTime.parse(json['startedAt'])
-          : null,
-      completedAt: json['completedAt'] != null
-          ? DateTime.parse(json['completedAt'])
-          : null,
-      errorMessage: json['errorMessage'] as String?,
-      retryCount: json['retryCount'] ?? 0,
-      nextRetryAt: json['nextRetryAt'] != null
-          ? DateTime.parse(json['nextRetryAt'])
-          : null,
-    );
-  }
-
-  /// 序列化为 JSON
-  Map<String, dynamic> toJson() {
-    return {
-      'noteId': noteId,
-      'url': url,
-      'platform': platform,
-      'status': status.name,
-      'createdAt': createdAt.toIso8601String(),
-      'startedAt': startedAt?.toIso8601String(),
-      'completedAt': completedAt?.toIso8601String(),
-      'errorMessage': errorMessage,
-      'retryCount': retryCount,
-      'nextRetryAt': nextRetryAt?.toIso8601String(),
-    };
-  }
+  });
 
   /// 是否可以立即执行
   bool get canExecuteNow {
@@ -154,36 +125,26 @@ class ScraperTask {
     return '${url.substring(0, 40)}...';
   }
 
-  /// 复制并修改
-  ScraperTask copyWith({
-    int? noteId,
-    String? url,
-    String? platform,
-    TaskStatus? status,
-    DateTime? createdAt,
-    DateTime? startedAt,
-    DateTime? completedAt,
-    String? errorMessage,
-    int? retryCount,
-    DateTime? nextRetryAt,
-  }) {
-    return ScraperTask(
-      noteId: noteId ?? this.noteId,
-      url: url ?? this.url,
-      platform: platform ?? this.platform,
-      status: status ?? this.status,
-      createdAt: createdAt ?? this.createdAt,
-      startedAt: startedAt ?? this.startedAt,
-      completedAt: completedAt ?? this.completedAt,
-      errorMessage: errorMessage ?? this.errorMessage,
-      retryCount: retryCount ?? this.retryCount,
-      nextRetryAt: nextRetryAt ?? this.nextRetryAt,
-    );
-  }
+  /// 从 JSON 反序列化
+  factory ScraperTask.fromJson(Map<String, dynamic> json) =>
+      _$ScraperTaskFromJson(json);
+
+  /// 序列化为 JSON
+  Map<String, dynamic> toJson() => _$ScraperTaskToJson(this);
 
   @override
-  String toString() {
-    return 'ScraperTask(noteId: $noteId, url: $truncatedUrl, '
-        'status: ${status.displayName}, retryCount: $retryCount)';
-  }
+  String toString() =>
+      'ScraperTask(noteId: $noteId, url: $truncatedUrl, '
+      'status: ${status.displayName}, retryCount: $retryCount)';
 }
+
+// DateTime 序列化辅助函数
+DateTime _dateTimeFromJson(String json) => DateTime.parse(json);
+
+String _dateTimeToJson(DateTime dateTime) => dateTime.toIso8601String();
+
+DateTime? _dateTimeFromJsonNullable(String? json) =>
+    json != null ? DateTime.parse(json) : null;
+
+String? _dateTimeToJsonNullable(DateTime? dateTime) =>
+    dateTime?.toIso8601String();

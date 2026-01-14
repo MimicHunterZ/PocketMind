@@ -12,7 +12,6 @@ import 'package:pocketmind/page/widget/flowing_background.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/providers/auth_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
-import 'package:pocketmind/providers/pm_service_providers.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';
 import 'package:pocketmind/service/note_service.dart';
 import 'package:pocketmind/service/notification_service.dart';
@@ -22,11 +21,11 @@ import 'package:pocketmind/util/proxy_config.dart';
 import 'package:pocketmind/util/theme_data.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pocketmind/util/url_helper.dart';
-import 'package:pocketmind/utils/platform_detector.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'util/logger_service.dart';
 import 'package:flutter_uri_to_file/flutter_uri_to_file.dart';
+import 'package:pocketmind/util/platform_detector.dart';
 
 late Isar isar;
 final String tag = 'main_share';
@@ -123,12 +122,12 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
     queueManager.onExecuteTask = (task) async {
       PMlog.d(tag, '执行爬取任务: noteId=${task.noteId}, url=${task.url}');
 
-      // 使用 PlatformScraperService 爬取
       final scraperService = ref.read(platformScraperServiceProvider);
       final metadata = await scraperService.scrape(task.url);
 
       if (metadata == null) {
-        throw Exception('爬取失败: 无法获取元数据');
+        PMlog.e(tag, '爬取失败: 无法获取元数据');
+        return;
       }
 
       // 更新 Note
@@ -137,22 +136,26 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
         PMlog.w(tag, '笔记不存在: noteId=${task.noteId}');
         return;
       }
+      ref
+          .read(noteServiceProvider)
+          .updateNote(
+            id: task.noteId,
+            previewTitle: metadata.title,
+            previewContent: metadata.previewContent,
+            previewDescription: metadata.previewDescription,
+            previewImageUrls: (metadata.imageUrls?.isNotEmpty ?? false)
+                ? metadata.imageUrls
+                : null,
+          );
 
-      // 更新笔记字段
-      note.previewTitle = metadata.title;
-      note.previewDescription = metadata.previewDescription;
-      note.previewContent = metadata.previewContent;
-      note.previewImageUrl = metadata.imageUrl;
-      if (metadata.imageUrls != null && metadata.imageUrls!.isNotEmpty) {
-        note.previewImageUrls = metadata.imageUrls!;
-      }
-
-      // 保存到数据库
-      await isar.writeTxn(() async {
-        await isar.notes.put(note);
-      });
-
-      PMlog.d(tag, '笔记更新成功: noteId=${task.noteId}, title=${metadata.title}');
+      // todo 不能放在这边
+      // 爬取成功后，从备份列表移除该 URL
+      final prefs = ref.read(sharedPreferencesProvider);
+      await prefs.reload();
+      final urls = prefs.getStringList('needCallBackUrl') ?? [];
+      urls.remove(task.url);
+      await prefs.setStringList('needCallBackUrl', urls);
+      PMlog.d(tag, '已从备份列表移除 URL: ${task.url}');
     };
 
     PMlog.d(tag, 'ScraperQueueManager 初始化完成');
@@ -233,40 +236,30 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
             url: url,
           );
 
-          // 1.1 处理平台爬取
+          // 1.1 将 URL 入队异步处理
+          // ScraperQueueManager 会根据平台类型选择合适的爬取策略
           if (url != null) {
+            // 直接入队：识别平台 -> 丢入队列 -> 触发消费者
+            // ScraperQueueManager 会自动启动前台服务并处理爬取任务
             final platform = PlatformDetector.detectPlatform(url);
+            await ScraperQueueManager.instance.enqueue(
+              _noteId,
+              url,
+              platform.identifier,
+            );
+            PMlog.d(tag, '已入队后台爬取任务: url=$url');
 
-            if (platform == PlatformType.xhs) {
-              // 小红书链接：入队进行本地爬取
-              PMlog.d(tag, '检测到小红书链接，入队进行爬取');
-              final queueManager = ScraperQueueManager.instance;
-              final enqueued = await queueManager.enqueue(
-                _noteId,
-                url,
-                platform.identifier,
-              );
-
-              if (enqueued) {
-                PMlog.d(tag, '成功入队，启动前台服务并处理队列');
-                // 启动 Android 前台服务（通过 ScraperQueueManager 的 scraper channel）
-                await queueManager.startForegroundService();
-
-                // 立即开始处理队列
-                queueManager.processQueue();
-              }
-            } else if (_sendBackUrl(url)) {
-              // Twitter/X 链接：提交后端抓取请求
-              ref.read(resourcePmServiceProvider).submit(url: url);
-            }
-
-            // 保存需要回调的 URL 列表（用于下次进入主应用时处理）
+            // 备份机制：保存到 needCallBackUrl
+            // 防止分享过程中意外崩溃导致任务丢失
+            // 主应用启动时会检查并处理这些 URL
             final sharedPreferences = ref.read(sharedPreferencesProvider);
             await sharedPreferences.reload();
             var urls = sharedPreferences.getStringList('needCallBackUrl') ?? [];
-            urls.add(url);
-            await sharedPreferences.setStringList('needCallBackUrl', urls);
-            PMlog.d(tag, '已保存需要回调的 URL 列表: $urls');
+            if (!urls.contains(url)) {
+              urls.add(url);
+              await sharedPreferences.setStringList('needCallBackUrl', urls);
+              PMlog.d(tag, '已保存到备份列表: needCallBackUrl');
+            }
           }
 
           // 2. 更新 UI 状态以显示 ShareSuccessPage
@@ -288,13 +281,6 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
           message: 'Unknown method ${call.method}',
         );
     }
-  }
-
-  bool _sendBackUrl(String url) {
-    final u = url.toLowerCase();
-    return u.contains('x.com') ||
-        u.contains('twitter.com') ||
-        u.contains('t.co');
   }
 
   @override
