@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/service/cookie_manager_service.dart';
-import 'package:pocketmind/service/scraper/scraper_factory.dart';
 import 'package:pocketmind/page/settings/xhs_login_page.dart';
+import 'package:pocketmind/page/settings/zhihu_login_page.dart';
 import 'package:pocketmind/util/logger_service.dart';
 import 'package:pocketmind/util/platform_detector.dart';
 
@@ -37,22 +37,18 @@ class _PlatformAccountsPageState extends ConsumerState<PlatformAccountsPage> {
       final statuses = <String, _PlatformStatus>{};
 
       for (var platform in PlatformType.getSupportedPlatforms) {
-        final scraper = ScraperFactory.getScraper(platform);
-        if (scraper == null) continue;
-
-        final platformId = scraper.getPlatformId();
         CookieManagerService cm = ref.read(cookieManagerServiceProvider);
         bool isExpired = await cm.isExpired(platform.identifier);
 
         DateTime? expiresAt;
         if (isExpired) {
-          final cookie = await cm.getCookie(platformId);
+          final cookie = await cm.getCookie(platform.identifier);
           expiresAt = cookie?.expiresAt;
         }
 
-        statuses[platformId] = _PlatformStatus(
-          platformId: platformId,
-          platformName: scraper.getPlatformName(),
+        statuses[platform.identifier] = _PlatformStatus(
+          platformId: platform.identifier,
+          platformName: platform.displayName,
           isLoggedIn: !isExpired,
           expiresAt: expiresAt,
         );
@@ -75,6 +71,9 @@ class _PlatformAccountsPageState extends ConsumerState<PlatformAccountsPage> {
     switch (platformId) {
       case 'xhs':
         loginPage = const XhsLoginPage();
+        break;
+      case 'zhihu':
+        loginPage = const ZhihuLoginPage();
         break;
       default:
         ScaffoldMessenger.of(
@@ -185,6 +184,10 @@ class _PlatformAccountsPageState extends ConsumerState<PlatformAccountsPage> {
       case 'xhs':
         iconData = Icons.auto_awesome;
         iconColor = Colors.red;
+        break;
+      case 'zhihu':
+        iconData = Icons.question_answer;
+        iconColor = Colors.blue;
         break;
       default:
         iconData = Icons.language;

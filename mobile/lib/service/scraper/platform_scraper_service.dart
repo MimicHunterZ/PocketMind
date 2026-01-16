@@ -92,16 +92,16 @@ class PlatformScraperService {
   /// 可能抛出 [CookieExpiredException] 当 Cookie 失效时
   Future<NoteMetadata?> scrape(String url) async {
     final scraper = PlatformDetector.getScraper(url);
+    final platform = PlatformDetector.detectPlatform(url);
 
     if (scraper == null) {
       PMlog.w(_tag, '不支持的平台: $url');
       return null;
     }
-
-    PMlog.d(_tag, '开始爬取?[${scraper.getPlatformName()}]: $url');
+    final platformId = platform.identifier;
+    PMlog.d(_tag, '开始爬取?[${platformId}]: $url');
 
     // 获取 Cookie
-    final platformId = scraper.getPlatformId();
     final cookieDict = await _cookieManager.getCookieDict(platformId);
 
     if (!scraper.validateCookies(cookieDict ?? {})) {

@@ -37,8 +37,8 @@ class LinkPreviewConfig {
   }
 
   static bool shouldUsePlatformScraper(String url){
-    final canHanlde =
+    final canHandle =
         PlatformDetector.detectPlatform(url) != PlatformType.generic;
-    return canHanlde;
+    return canHandle;
   }
 }

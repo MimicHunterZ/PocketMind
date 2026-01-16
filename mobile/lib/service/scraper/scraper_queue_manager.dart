@@ -105,6 +105,7 @@ class ScraperQueueManager {
     await prefs.setString(_queueKey, jsonEncode(jsonList));
     PMlog.d(_tag, '队列已持久化, 任务数: ${_queue.length}');
   }
+
   /// 入队新任务
   ///
   /// [noteId] 笔记 ID
@@ -194,7 +195,10 @@ class ScraperQueueManager {
           await markCompleted(task.noteId);
         } on CookieExpiredException catch (e) {
           final errorMsg = e.toString();
-          PMlog.e(_tag, '任务执行失败(Cookie): noteId=${task.noteId}, error=$errorMsg');
+          PMlog.e(
+            _tag,
+            '任务执行失败(Cookie): noteId=${task.noteId}, error=$errorMsg',
+          );
           await markFailed(task.noteId, errorMsg, canRetry: false);
         } catch (e) {
           // 执行失败（可重试）

@@ -1,5 +1,6 @@
 import '../service/scraper/platform_scraper_interface.dart';
 import '../service/scraper/xhs_scraper.dart';
+import '../service/scraper/zhihu_scraper.dart';
 
 /// 平台类型枚举
 ///
@@ -7,6 +8,9 @@ import '../service/scraper/xhs_scraper.dart';
 enum PlatformType {
   /// 小红书
   xhs('小红书', 'xhs'),
+
+  /// 知乎
+  zhihu('知乎', 'zhihu'),
 
   /// 通用平台（使用默认策略）
   generic('通用', 'generic');
@@ -34,6 +38,13 @@ class PlatformDetector {
     caseSensitive: false,
   );
 
+  /// 知乎 URL 匹配正则
+  /// 支持：zhihu.com, zhuanlan.zhihu.com
+  static final RegExp _zhihuPattern = RegExp(
+    r'(zhihu|zhuanlan\.zhihu)\.com',
+    caseSensitive: false,
+  );
+
   /// 检测 URL 对应的平台类型
   ///
   /// [url] 目标链接
@@ -46,6 +57,11 @@ class PlatformDetector {
     // 小红书检测
     if (_xhsPattern.hasMatch(url)) {
       return PlatformType.xhs;
+    }
+
+    // 知乎检测
+    if (_zhihuPattern.hasMatch(url)) {
+      return PlatformType.zhihu;
     }
 
     // 未匹配到特定平台，返回通用类型
@@ -61,6 +77,8 @@ class PlatformDetector {
     switch (platform) {
       case PlatformType.xhs:
         return XhsScraper();
+      case PlatformType.zhihu:
+        return ZhihuScraper();
       case PlatformType.generic:
         return null; // 通用平台使用其他策略
     }
