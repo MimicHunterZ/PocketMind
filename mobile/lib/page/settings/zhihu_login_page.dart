@@ -182,7 +182,10 @@ class _ZhihuLoginPageState extends State<ZhihuLoginPage> {
 
       if (zc0 != null && zc0.isNotEmpty) {
         PMlog.d(_tag, '检测到 z_c0，登录成功！');
-        PMlog.d(_tag, 'z_c0 值: ${zc0.substring(0, 20.clamp(0, zc0.length))}...');
+        PMlog.d(
+          _tag,
+          'z_c0 值: ${zc0.substring(0, 20.clamp(0, zc0.length))}...',
+        );
 
         timer.cancel();
         await _handleLoginSuccess();

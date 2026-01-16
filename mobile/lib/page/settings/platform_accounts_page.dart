@@ -14,7 +14,8 @@ class PlatformAccountsPage extends ConsumerStatefulWidget {
   const PlatformAccountsPage({super.key});
 
   @override
-  ConsumerState<PlatformAccountsPage> createState() => _PlatformAccountsPageState();
+  ConsumerState<PlatformAccountsPage> createState() =>
+      _PlatformAccountsPageState();
 }
 
 class _PlatformAccountsPageState extends ConsumerState<PlatformAccountsPage> {

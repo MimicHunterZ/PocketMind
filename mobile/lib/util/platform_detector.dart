@@ -22,9 +22,7 @@ enum PlatformType {
 
   // 直接在枚举内部定义静态 getter
   static List<PlatformType> get getSupportedPlatforms {
-    return PlatformType.values
-        .where((p) => p != PlatformType.generic)
-        .toList();
+    return PlatformType.values.where((p) => p != PlatformType.generic).toList();
   }
 }
 

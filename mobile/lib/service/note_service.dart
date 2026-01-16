@@ -29,6 +29,7 @@ class NoteService {
     String? previewImageUrl,
     String? previewTitle,
     String? previewDescription,
+    String? aiSummary,
   }) async {
     PMlog.d(
       noteServiceTag,
@@ -46,6 +47,7 @@ class NoteService {
       ..previewImageUrl = previewImageUrl
       ..previewTitle = previewTitle
       ..previewDescription = previewDescription
+      ..aiSummary = aiSummary
       ..updatedAt = 0;
 
     final savedId = await _noteRepository.save(note, updateTimestamp: true);
@@ -84,6 +86,7 @@ class NoteService {
     String? previewTitle,
     String? previewContent,
     String? previewDescription,
+    String? aiSummary,
     int? updatedAt,
     bool updateTimestamp = true,
   }) async {
@@ -110,8 +113,9 @@ class NoteService {
     existingNote.previewTitle = previewTitle ?? existingNote.previewTitle;
     existingNote.previewDescription =
         previewDescription ?? existingNote.previewDescription;
-    existingNote.updatedAt = updatedAt ?? existingNote.updatedAt;
     existingNote.previewContent = previewContent ?? existingNote.previewContent;
+    if (aiSummary != null) existingNote.aiSummary = aiSummary;
+    existingNote.updatedAt = updatedAt ?? existingNote.updatedAt;
 
     final savedId = await _noteRepository.save(
       existingNote,

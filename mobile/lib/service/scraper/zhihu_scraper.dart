@@ -42,8 +42,9 @@ class ZhihuScraper implements IPlatformScraper {
 
   @override
   bool validateCookies(Map<String, String> cookieDict) {
-    return getRequiredCookieNames()
-        .every((name) => cookieDict[name]?.isNotEmpty == true);
+    return getRequiredCookieNames().every(
+      (name) => cookieDict[name]?.isNotEmpty == true,
+    );
   }
 
   @override
@@ -227,8 +228,10 @@ class ZhihuScraper implements IPlatformScraper {
   /// 设置 Cookie
   Future<void> _setCookies(Map<String, String> cookieDict) async {
     final cookieManager = CookieManager.instance();
-    final expiry = DateTime.now().add(const Duration(days: 30)).millisecondsSinceEpoch;
-    
+    final expiry = DateTime.now()
+        .add(const Duration(days: 30))
+        .millisecondsSinceEpoch;
+
     for (var entry in cookieDict.entries) {
       for (var domain in [_domain, _zhuanlanDomain]) {
         await cookieManager.setCookie(
@@ -252,13 +255,15 @@ class ZhihuScraper implements IPlatformScraper {
   /// 检测是否需要登录
   Future<bool> _checkNeedLogin(InAppWebViewController controller) async {
     try {
-      final result = await controller.evaluateJavascript(source: '''
+      final result = await controller.evaluateJavascript(
+        source: '''
         (function() {
           var text = document.body?.innerText || '';
           return text.includes('请先登录') || text.includes('登录后查看') ||
                  !!document.querySelector('.Modal-wrapper .Login-content');
         })()
-      ''');
+      ''',
+      );
       return result == true;
     } catch (_) {
       return false;
@@ -286,7 +291,8 @@ class ZhihuScraper implements IPlatformScraper {
     InAppWebViewController controller,
     ZhihuContentType contentType,
   ) async {
-    final extractJs = '''
+    final extractJs =
+        '''
 (function() {
   try {
     var el = document.getElementById('js-initialData');
@@ -374,7 +380,9 @@ class ZhihuScraper implements IPlatformScraper {
 
       final data = jsonDecode(result as String);
       final content = _stripHtmlTags(data['content'] ?? '');
-      final images = _normalizeImageUrls(List<String>.from(data['images'] ?? []));
+      final images = _normalizeImageUrls(
+        List<String>.from(data['images'] ?? []),
+      );
 
       return ScrapedMetadata(
         title: data['title'] as String?,
@@ -389,9 +397,12 @@ class ZhihuScraper implements IPlatformScraper {
   }
 
   /// 从 OG 标签提取（降级方案）
-  Future<ScrapedMetadata?> _extractFromOgTags(InAppWebViewController controller) async {
+  Future<ScrapedMetadata?> _extractFromOgTags(
+    InAppWebViewController controller,
+  ) async {
     try {
-      final result = await controller.evaluateJavascript(source: '''
+      final result = await controller.evaluateJavascript(
+        source: '''
 (function() {
   var title = document.querySelector('meta[property="og:title"]')?.content ||
               document.querySelector('title')?.innerText || '';
@@ -404,7 +415,8 @@ class ZhihuScraper implements IPlatformScraper {
   });
   return JSON.stringify({ title: title, desc: desc, images: imgs });
 })()
-''');
+''',
+      );
       if (result == null || result == 'null') return null;
 
       final data = jsonDecode(result as String);
@@ -438,7 +450,11 @@ class ZhihuScraper implements IPlatformScraper {
     final seen = <String>{};
     return urls
         .where((u) => u.isNotEmpty && !u.startsWith('data:'))
-        .map((u) => u.startsWith('http://') ? u.replaceFirst('http://', 'https://') : u)
+        .map(
+          (u) => u.startsWith('http://')
+              ? u.replaceFirst('http://', 'https://')
+              : u,
+        )
         .where((u) => seen.add(u))
         .toList();
   }
@@ -447,7 +463,8 @@ class ZhihuScraper implements IPlatformScraper {
   static const Map<String, String> _requestHeaders = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-    'Sec-Ch-Ua': '"Chromium";v="128", "Google Chrome";v="128", "Not;A=Brand";v="24"',
+    'Sec-Ch-Ua':
+        '"Chromium";v="128", "Google Chrome";v="128", "Not;A=Brand";v="24"',
     'Sec-Ch-Ua-Mobile': '?0',
     'Sec-Ch-Ua-Platform': '"macOS"',
     'Sec-Fetch-Dest': 'document',
