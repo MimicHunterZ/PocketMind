@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
+import 'package:pocketmind/service/call_back_dispatcher.dart';
 import 'package:pocketmind/service/notification_service.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/providers/auth_providers.dart';
@@ -17,6 +18,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import 'package:workmanager/workmanager.dart';
 import 'model/category.dart';
 import 'model/note.dart';
 import 'lan_sync/model/sync_log.dart';
@@ -31,56 +33,6 @@ import 'package:pocketmind/main_share.dart';
 
 late Isar isar;
 
-const _uuid = Uuid();
-
-/// 为旧数据迁移 UUID
-///
-/// 检查所有没有 UUID 的 Note 和 Category，为它们生成 UUID
-/// 这是为了支持跨设备同步功能
-Future<void> _migrateUuidsIfNeeded(Isar db) async {
-  final tag = 'UuidMigration';
-
-  await db.writeTxn(() async {
-    // 迁移没有 UUID 的 Notes
-    final notesWithoutUuid = await db.notes.filter().uuidIsNull().findAll();
-    if (notesWithoutUuid.isNotEmpty) {
-      PMlog.i(tag, 'Migrating ${notesWithoutUuid.length} notes without UUID');
-      final now = DateTime.now().millisecondsSinceEpoch;
-      for (final note in notesWithoutUuid) {
-        note.uuid = _uuid.v4();
-        // 如果没有 updatedAt，使用 time 或当前时间
-        if (note.updatedAt == 0) {
-          note.updatedAt = note.time?.millisecondsSinceEpoch ?? now;
-        }
-      }
-      await db.notes.putAll(notesWithoutUuid);
-      PMlog.i(tag, 'Notes migration completed');
-    }
-
-    // 迁移没有 UUID 的 Categories
-    final categoriesWithoutUuid = await db.categorys
-        .filter()
-        .uuidIsNull()
-        .findAll();
-    if (categoriesWithoutUuid.isNotEmpty) {
-      PMlog.i(
-        tag,
-        'Migrating ${categoriesWithoutUuid.length} categories without UUID',
-      );
-      final now = DateTime.now().millisecondsSinceEpoch;
-      for (final category in categoriesWithoutUuid) {
-        category.uuid = _uuid.v4();
-        // 如果没有 updatedAt，使用 createdTime 或当前时间
-        if (category.updatedAt == 0) {
-          category.updatedAt =
-              category.createdTime?.millisecondsSinceEpoch ?? now;
-        }
-      }
-      await db.categorys.putAll(categoriesWithoutUuid);
-      PMlog.i(tag, 'Categories migration completed');
-    }
-  });
-}
 
 Future<void> main() async {
   // 确保 flutter 绑定初始化了
@@ -113,12 +65,13 @@ Future<void> main() async {
   final categoryRepository = IsarCategoryRepository(isar);
   await categoryRepository.initDefaultCategories();
 
-  // 为旧数据迁移 UUID（确保所有记录都有 UUID）
-  await _migrateUuidsIfNeeded(isar);
-
   await ImageStorageHelper().init();
   final notificationSvc = NotificationService();
   await notificationSvc.init();
+
+  //开启后台进程
+  Workmanager().initialize(callbackDispatcher);
+
   runApp(
     // 使用 ProviderScope 包裹应用，并 override isarProvider
     // 后续都使用状态管理里面的isar
@@ -153,7 +106,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
     // 启动时检查是否有待处理的 URL 回调
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(noteServiceProvider).processPendingUrls();
+      ref.read(noteServiceProvider).
+      processPendingUrls();
     });
   }
 

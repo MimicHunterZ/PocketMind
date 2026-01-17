@@ -1,4 +1,3 @@
-// 路径: lib/main_share.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +12,7 @@ import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/providers/auth_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';
+import 'package:pocketmind/service/call_back_dispatcher.dart';
 import 'package:pocketmind/service/note_service.dart';
 import 'package:pocketmind/service/notification_service.dart';
 import 'package:pocketmind/service/scraper/scraper_queue_manager.dart';
@@ -22,7 +22,10 @@ import 'package:pocketmind/util/theme_data.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pocketmind/util/url_helper.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workmanager/workmanager.dart';
+import 'api/note_api_service.dart';
 import 'util/logger_service.dart';
 import 'package:flutter_uri_to_file/flutter_uri_to_file.dart';
 import 'package:pocketmind/util/platform_detector.dart';
@@ -63,6 +66,9 @@ Future<void> mainShare() async {
 
   await ImageStorageHelper().init();
 
+  //开启后台进程
+  Workmanager().initialize(callbackDispatcher);
+
   // 4. 运行一个 只 包含分享 UI 的应用
   runApp(
     ProviderScope(
@@ -90,6 +96,7 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
   ShareUIState _currentState = ShareUIState.waiting;
   ShareData? _currentShare;
   int _noteId = -1;
+  String? url;
 
   late final NoteService noteService;
 
@@ -101,9 +108,6 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
     noteService = ref.read(noteServiceProvider);
     _channel.setMethodCallHandler(_handleMethodCall);
     PMlog.d(tag, 'MyShareApp 初始化完成, 等待分享...');
-
-    // 初始化 ScraperQueueManager
-    _initScraperQueueManager();
 
     // 延迟通知原生端引擎已准备好
     // 使用 addPostFrameCallback 确保第一帧渲染完成后再通知
@@ -182,6 +186,19 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
       _noteId = -1;
     });
 
+    // 启动后台任务进行抓取数据
+    if (url != null) {
+      PMlog.d(tag, '后台开始处理 URLs: $url');
+      Workmanager().registerOneOffTask(
+        'url_scraper',
+        'scrapeAndSave',
+        inputData: {
+          'urls': [url]
+        },
+        initialDelay: Duration(seconds: 0),
+      );
+    }
+
     // 关闭 ShareActivity
     SystemNavigator.pop();
   }
@@ -224,7 +241,7 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
         final args = call.arguments as Map;
         final title = args['title'] as String;
         final content = _contentWithoutUrl(args['content'] as String);
-        final url = await _extractedUrl(args['content'] as String);
+        url = await _extractedUrl(args['content'] as String);
 
         PMlog.d(tag, 'showShare: title=$title, url=$url, content= $url');
 
@@ -236,27 +253,12 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
             url: url,
           );
 
-          // 1.1 将 URL 入队异步处理
-          // ScraperQueueManager 会根据平台类型选择合适的爬取策略
-          if (url != null) {
-            // 直接入队：识别平台 -> 丢入队列 -> 触发消费者
-            // ScraperQueueManager 会自动启动前台服务并处理爬取任务
-            final platform = PlatformDetector.detectPlatform(url);
-            await ScraperQueueManager.instance.enqueue(
-              _noteId,
-              url,
-              platform.identifier,
-            );
-            PMlog.d(tag, '已入队后台爬取任务: url=$url');
-
-            // 备份机制：保存到 needCallBackUrl
-            // 防止分享过程中意外崩溃导致任务丢失
-            // 主应用启动时会检查并处理这些 URL
+          if(url != null){
             final sharedPreferences = ref.read(sharedPreferencesProvider);
             await sharedPreferences.reload();
             var urls = sharedPreferences.getStringList('needCallBackUrl') ?? [];
             if (!urls.contains(url)) {
-              urls.add(url);
+              urls.add(url!);
               await sharedPreferences.setStringList('needCallBackUrl', urls);
               PMlog.d(tag, '已保存到备份列表: needCallBackUrl');
             }

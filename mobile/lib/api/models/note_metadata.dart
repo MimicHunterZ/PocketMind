@@ -6,25 +6,25 @@ class NoteMetadata {
   /// 标题
   final String? title;
 
-  /// 描述（来自本地LinkPreview）
+  /// 描述
   final String? previewDescription;
 
-  /// 正文内容（来自后端API）
+  /// 正文内容
   final String? previewContent;
 
-  /// AI摘要（来自后端API）
+  /// AI摘要（
   final String? aiSummary;
 
-  /// 预览图片URL（已本地化的路径，兼容单图场景）
+  /// 预览图片URL
   final String? imageUrl;
 
-  /// 预览图片URL列表（多图支持，如小红书笔记）
+  /// 预览图片URL列表
   final List<String>? imageUrls;
 
   /// 原始URL
   final String url;
 
-  /// 资源状态（来自后端API：PENDING, SUCCESS, FAILED）
+  /// 资源状态
   final String? resourceStatus;
 
   NoteMetadata({

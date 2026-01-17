@@ -68,6 +68,7 @@ dependencies:
   json_annotation: ^4.9.0
   flutter_inappwebview: ^6.1.5
   share_handler: ^0.0.24
+  workmanager: ^0.9.0+3
 dev_dependencies:
   flutter_test:
     sdk: flutter

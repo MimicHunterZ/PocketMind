@@ -33,46 +33,51 @@ const NoteSchema = CollectionSchema(
       name: r'isDeleted',
       type: IsarType.bool,
     ),
-    r'previewContent': PropertySchema(
+    r'pendingAiQuestion': PropertySchema(
       id: 4,
+      name: r'pendingAiQuestion',
+      type: IsarType.string,
+    ),
+    r'previewContent': PropertySchema(
+      id: 5,
       name: r'previewContent',
       type: IsarType.string,
     ),
     r'previewDescription': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'previewDescription',
       type: IsarType.string,
     ),
     r'previewImageUrl': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'previewImageUrl',
       type: IsarType.string,
     ),
     r'previewImageUrls': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'previewImageUrls',
       type: IsarType.stringList,
     ),
     r'previewTitle': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'previewTitle',
       type: IsarType.string,
     ),
     r'resourceStatus': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'resourceStatus',
       type: IsarType.string,
     ),
-    r'tag': PropertySchema(id: 10, name: r'tag', type: IsarType.string),
-    r'time': PropertySchema(id: 11, name: r'time', type: IsarType.dateTime),
-    r'title': PropertySchema(id: 12, name: r'title', type: IsarType.string),
+    r'tag': PropertySchema(id: 11, name: r'tag', type: IsarType.string),
+    r'time': PropertySchema(id: 12, name: r'time', type: IsarType.dateTime),
+    r'title': PropertySchema(id: 13, name: r'title', type: IsarType.string),
     r'updatedAt': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'updatedAt',
       type: IsarType.long,
     ),
-    r'url': PropertySchema(id: 14, name: r'url', type: IsarType.string),
-    r'uuid': PropertySchema(id: 15, name: r'uuid', type: IsarType.string),
+    r'url': PropertySchema(id: 15, name: r'url', type: IsarType.string),
+    r'uuid': PropertySchema(id: 16, name: r'uuid', type: IsarType.string),
   },
 
   estimateSize: _noteEstimateSize,
@@ -156,6 +161,12 @@ int _noteEstimateSize(
     }
   }
   {
+    final value = object.pendingAiQuestion;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.previewContent;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -229,18 +240,19 @@ void _noteSerialize(
   writer.writeLong(offsets[1], object.categoryId);
   writer.writeString(offsets[2], object.content);
   writer.writeBool(offsets[3], object.isDeleted);
-  writer.writeString(offsets[4], object.previewContent);
-  writer.writeString(offsets[5], object.previewDescription);
-  writer.writeString(offsets[6], object.previewImageUrl);
-  writer.writeStringList(offsets[7], object.previewImageUrls);
-  writer.writeString(offsets[8], object.previewTitle);
-  writer.writeString(offsets[9], object.resourceStatus);
-  writer.writeString(offsets[10], object.tag);
-  writer.writeDateTime(offsets[11], object.time);
-  writer.writeString(offsets[12], object.title);
-  writer.writeLong(offsets[13], object.updatedAt);
-  writer.writeString(offsets[14], object.url);
-  writer.writeString(offsets[15], object.uuid);
+  writer.writeString(offsets[4], object.pendingAiQuestion);
+  writer.writeString(offsets[5], object.previewContent);
+  writer.writeString(offsets[6], object.previewDescription);
+  writer.writeString(offsets[7], object.previewImageUrl);
+  writer.writeStringList(offsets[8], object.previewImageUrls);
+  writer.writeString(offsets[9], object.previewTitle);
+  writer.writeString(offsets[10], object.resourceStatus);
+  writer.writeString(offsets[11], object.tag);
+  writer.writeDateTime(offsets[12], object.time);
+  writer.writeString(offsets[13], object.title);
+  writer.writeLong(offsets[14], object.updatedAt);
+  writer.writeString(offsets[15], object.url);
+  writer.writeString(offsets[16], object.uuid);
 }
 
 Note _noteDeserialize(
@@ -255,18 +267,19 @@ Note _noteDeserialize(
   object.content = reader.readStringOrNull(offsets[2]);
   object.id = id;
   object.isDeleted = reader.readBool(offsets[3]);
-  object.previewContent = reader.readStringOrNull(offsets[4]);
-  object.previewDescription = reader.readStringOrNull(offsets[5]);
-  object.previewImageUrl = reader.readStringOrNull(offsets[6]);
-  object.previewImageUrls = reader.readStringList(offsets[7]) ?? [];
-  object.previewTitle = reader.readStringOrNull(offsets[8]);
-  object.resourceStatus = reader.readStringOrNull(offsets[9]);
-  object.tag = reader.readStringOrNull(offsets[10]);
-  object.time = reader.readDateTimeOrNull(offsets[11]);
-  object.title = reader.readStringOrNull(offsets[12]);
-  object.updatedAt = reader.readLong(offsets[13]);
-  object.url = reader.readStringOrNull(offsets[14]);
-  object.uuid = reader.readStringOrNull(offsets[15]);
+  object.pendingAiQuestion = reader.readStringOrNull(offsets[4]);
+  object.previewContent = reader.readStringOrNull(offsets[5]);
+  object.previewDescription = reader.readStringOrNull(offsets[6]);
+  object.previewImageUrl = reader.readStringOrNull(offsets[7]);
+  object.previewImageUrls = reader.readStringList(offsets[8]) ?? [];
+  object.previewTitle = reader.readStringOrNull(offsets[9]);
+  object.resourceStatus = reader.readStringOrNull(offsets[10]);
+  object.tag = reader.readStringOrNull(offsets[11]);
+  object.time = reader.readDateTimeOrNull(offsets[12]);
+  object.title = reader.readStringOrNull(offsets[13]);
+  object.updatedAt = reader.readLong(offsets[14]);
+  object.url = reader.readStringOrNull(offsets[15]);
+  object.uuid = reader.readStringOrNull(offsets[16]);
   return object;
 }
 
@@ -292,22 +305,24 @@ P _noteDeserializeProp<P>(
     case 6:
       return (reader.readStringOrNull(offset)) as P;
     case 7:
-      return (reader.readStringList(offset) ?? []) as P;
-    case 8:
       return (reader.readStringOrNull(offset)) as P;
+    case 8:
+      return (reader.readStringList(offset) ?? []) as P;
     case 9:
       return (reader.readStringOrNull(offset)) as P;
     case 10:
       return (reader.readStringOrNull(offset)) as P;
     case 11:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 12:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 13:
-      return (reader.readLong(offset)) as P;
-    case 14:
       return (reader.readStringOrNull(offset)) as P;
+    case 14:
+      return (reader.readLong(offset)) as P;
     case 15:
+      return (reader.readStringOrNull(offset)) as P;
+    case 16:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1171,6 +1186,169 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.equalTo(property: r'isDeleted', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'pendingAiQuestion'),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'pendingAiQuestion'),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'pendingAiQuestion',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'pendingAiQuestion',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'pendingAiQuestion',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'pendingAiQuestion',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'pendingAiQuestion',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'pendingAiQuestion',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionContains(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'pendingAiQuestion',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionMatches(
+    String pattern, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'pendingAiQuestion',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'pendingAiQuestion', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition>
+  pendingAiQuestionIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'pendingAiQuestion', value: ''),
       );
     });
   }
@@ -3031,6 +3209,18 @@ extension NoteQuerySortBy on QueryBuilder<Note, Note, QSortBy> {
     });
   }
 
+  QueryBuilder<Note, Note, QAfterSortBy> sortByPendingAiQuestion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'pendingAiQuestion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> sortByPendingAiQuestionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'pendingAiQuestion', Sort.desc);
+    });
+  }
+
   QueryBuilder<Note, Note, QAfterSortBy> sortByPreviewContent() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'previewContent', Sort.asc);
@@ -3225,6 +3415,18 @@ extension NoteQuerySortThenBy on QueryBuilder<Note, Note, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Note, Note, QAfterSortBy> thenByPendingAiQuestion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'pendingAiQuestion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> thenByPendingAiQuestionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'pendingAiQuestion', Sort.desc);
+    });
+  }
+
   QueryBuilder<Note, Note, QAfterSortBy> thenByPreviewContent() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'previewContent', Sort.asc);
@@ -3387,6 +3589,17 @@ extension NoteQueryWhereDistinct on QueryBuilder<Note, Note, QDistinct> {
     });
   }
 
+  QueryBuilder<Note, Note, QDistinct> distinctByPendingAiQuestion({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'pendingAiQuestion',
+        caseSensitive: caseSensitive,
+      );
+    });
+  }
+
   QueryBuilder<Note, Note, QDistinct> distinctByPreviewContent({
     bool caseSensitive = true,
   }) {
@@ -3518,6 +3731,12 @@ extension NoteQueryProperty on QueryBuilder<Note, Note, QQueryProperty> {
   QueryBuilder<Note, bool, QQueryOperations> isDeletedProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isDeleted');
+    });
+  }
+
+  QueryBuilder<Note, String?, QQueryOperations> pendingAiQuestionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'pendingAiQuestion');
     });
   }
 

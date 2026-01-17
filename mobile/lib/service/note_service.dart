@@ -4,7 +4,9 @@ import 'package:pocketmind/data/repositories/isar_note_repository.dart';
 import 'package:pocketmind/util/logger_service.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/service/metadata_manager.dart';
+import 'package:pocketmind/api/note_api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workmanager/workmanager.dart';
 
 final String noteServiceTag = 'NoteService';
 
@@ -13,9 +15,15 @@ class NoteService {
   final IsarNoteRepository _noteRepository;
   final MetadataManager _metadataManager;
   final SharedPreferences _prefs;
+  final NoteApiService? _noteApiService;
   final ImageStorageHelper _imageHelper = ImageStorageHelper();
 
-  NoteService(this._noteRepository, this._metadataManager, this._prefs);
+  NoteService(
+    this._noteRepository,
+    this._metadataManager,
+    this._prefs, [
+    this._noteApiService,
+  ]);
 
   /// 新增笔记
   ///
@@ -87,6 +95,7 @@ class NoteService {
     String? previewContent,
     String? previewDescription,
     String? aiSummary,
+    String? pendingAiQuestion,
     int? updatedAt,
     bool updateTimestamp = true,
   }) async {
@@ -115,6 +124,8 @@ class NoteService {
         previewDescription ?? existingNote.previewDescription;
     existingNote.previewContent = previewContent ?? existingNote.previewContent;
     if (aiSummary != null) existingNote.aiSummary = aiSummary;
+    if (pendingAiQuestion != null)
+      existingNote.pendingAiQuestion = pendingAiQuestion;
     existingNote.updatedAt = updatedAt ?? existingNote.updatedAt;
 
     final savedId = await _noteRepository.save(
@@ -210,6 +221,11 @@ class NoteService {
     return _noteRepository.findByQuery(query);
   }
 
+  /// 根据 tag 查询笔记
+  Future<List<Note>> findNotesWithUrls(List<String> urls) async {
+    return await _noteRepository.findByUrls(urls);
+  }
+
   // /// 丰富笔记元数据（链接预览）
   // ///
   // /// 自动抓取链接预览信息，本地化图片，并更新数据库
@@ -297,6 +313,7 @@ class NoteService {
   ///
   /// 检查 SharedPreferences 中的 needCallBackUrl 列表
   /// 对每个 URL 尝试查找对应的 Note 并向后端资源内容
+  /// 如果笔记有待处理的 AI 问题，获取 content 成功后会调用 AI 分析
   Future<void> processPendingUrls() async {
     // 重新获取 SharedPreferences 实例，确保数据是最新的
     // 因为 Android 的 SharedPreferences 在不同进程（主应用和分享扩展）之间不会自动同步内存缓存。
@@ -307,43 +324,13 @@ class NoteService {
       return;
     }
 
-    PMlog.d(noteServiceTag, '开始处理 URLs: $urls');
-    final items = await _metadataManager.fetchAndProcessMetadata(urls);
-
-    var notes = await _noteRepository.findByUrls(urls);
-    for (final note in notes) {
-      final item = items[note.url];
-      if (item != null) {
-        note.previewTitle = item.title;
-        note.previewDescription = item.displayDescription;
-        note.resourceStatus = item.resourceStatus;
-        note.previewContent = item.previewContent;
-        note.aiSummary = item.aiSummary;
-        // 更新图片信息
-        note.previewImageUrl = item.firstImage;
-        if (item.imageUrls != null && item.imageUrls!.isNotEmpty) {
-          note.previewImageUrls = item.imageUrls!;
-        }
-        await _noteRepository.save(note);
-        PMlog.d(
-          noteServiceTag,
-          'Updated note ${note.id} with metadata, images=${note.previewImageUrls.length}',
-        );
-      }
-    }
-
-    PMlog.d(noteServiceTag, '开始消除 URLs: $urls');
-
-    // 再次刷新，防止在处理过程中有新的 URL 加入
-    await _prefs.reload();
-    final currentUrls = _prefs.getStringList('needCallBackUrl') ?? [];
-    for (var url in urls) {
-      currentUrls.remove(url);
-    }
-    await _prefs.setStringList('needCallBackUrl', currentUrls);
-    PMlog.d(
-      noteServiceTag,
-      'Pending URLs processed and cleared. Remaining: $currentUrls',
+    PMlog.d(noteServiceTag, '后台开始处理 URLs: $urls');
+    Workmanager().registerOneOffTask(
+      'url_scraper',
+      'scrapeAndSave',
+      inputData: {'urls': urls},
+      initialDelay: Duration(seconds: 0),
+      constraints: Constraints(networkType: NetworkType.connected),
     );
   }
 }

@@ -255,7 +255,10 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
           SizedBox(height: 24.h),
 
           // 2. AI 洞察区
-          const NoteAIInsightSection(),
+          if (state.note.aiSummary != null && state.note.aiSummary!.isNotEmpty)
+            NoteAIInsightSection(
+              aiSummary: state.note.aiSummary!,
+            ), //
 
           SizedBox(height: 32.h),
 

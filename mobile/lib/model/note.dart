@@ -59,6 +59,9 @@ class Note {
   /// AI 生成的摘要
   String? aiSummary;
 
+  /// 待处理的 AI 问题（用户保存时输入，content 获取成功后再调用 AI）
+  String? pendingAiQuestion;
+
   Note copyWith({
     Id? id,
     String? uuid,
@@ -77,6 +80,7 @@ class Note {
     String? previewContent,
     String? resourceStatus,
     String? aiSummary,
+    String? pendingAiQuestion,
   }) {
     return Note()
       ..id = id ?? this.id
@@ -95,6 +99,7 @@ class Note {
       ..previewDescription = previewDescription ?? this.previewDescription
       ..previewContent = previewContent ?? this.previewContent
       ..resourceStatus = resourceStatus ?? this.resourceStatus
-      ..aiSummary = aiSummary ?? this.aiSummary;
+      ..aiSummary = aiSummary ?? this.aiSummary
+      ..pendingAiQuestion = pendingAiQuestion ?? this.pendingAiQuestion;
   }
 }

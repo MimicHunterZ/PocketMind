@@ -7,6 +7,7 @@ import 'package:pocketmind/data/repositories/isar_note_repository.dart';
 import 'package:pocketmind/providers/nav_providers.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/service/note_service.dart';
+import 'package:pocketmind/api/note_api_service.dart';
 
 import '../util/logger_service.dart';
 
@@ -35,7 +36,7 @@ MetadataManager metadataManager(Ref ref) {
   return MetadataManager(
     linkPreviewApi: apiService,
     resourceService: resourceService,
-    platformScraperService: platformScraperService
+    platformScraperService: platformScraperService,
   );
 }
 
@@ -45,7 +46,8 @@ NoteService noteService(Ref ref) {
   final repository = ref.watch(noteRepositoryProvider);
   final metadataManager = ref.watch(metadataManagerProvider);
   final prefs = ref.watch(sharedPreferencesProvider);
-  return NoteService(repository, metadataManager, prefs);
+  final noteApiService = ref.watch(noteApiServiceProvider);
+  return NoteService(repository, metadataManager, prefs, noteApiService);
 }
 
 /// 搜索查询 Provider - 用于管理当前搜索关键词

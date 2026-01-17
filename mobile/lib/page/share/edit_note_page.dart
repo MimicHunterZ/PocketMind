@@ -1,9 +1,7 @@
-// 路径: lib/pages/edit_note_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:pocketmind/api/note_api_service.dart';
 import 'package:pocketmind/page/widget/add_category_dialog.dart';
 import 'package:pocketmind/page/widget/category_selector.dart';
 import 'package:pocketmind/providers/note_providers.dart';
@@ -112,14 +110,13 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
     }
 
     if (_aiController.text.isNotEmpty) {
-      // 直接发送不用 await
-      ref
-          .read(noteApiServiceProvider)
-          .analyzePage(
-            userQuery: _aiController.text,
-            webUrl: widget.webUrl,
-            userEmail: 'double2z2@163.com',
-          );
+      // 用户输入了 AI 问题，保存到 pendingAiQuestion 字段
+      // 等 processPendingUrls() 获取到 content 后再调用 AI 分析
+      await noteService.updateNote(
+        id: widget.id,
+        pendingAiQuestion: _aiController.text,
+        updateTimestamp: false,
+      );
     }
     widget.onDone();
   }

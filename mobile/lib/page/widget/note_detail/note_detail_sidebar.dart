@@ -28,7 +28,10 @@ class NoteDetailSidebar extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // AI 洞察区
-        const NoteAIInsightSection(),
+        if (note.aiSummary != null && note.aiSummary!.isNotEmpty)
+          NoteAIInsightSection(
+            aiSummary: note.aiSummary!,
+          ), //
 
         SizedBox(height: 32.h),
 

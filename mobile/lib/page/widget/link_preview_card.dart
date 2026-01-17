@@ -42,7 +42,7 @@ class LinkPreviewCard extends ConsumerWidget {
     // 创建 Metadata 对象用于显示
     final metadata = Metadata();
     metadata.title = note.previewTitle;
-    metadata.desc = note.previewDescription;
+    metadata.desc = note.previewContent ?? note.previewDescription;
     metadata.image = note.previewImageUrl;
     metadata.url = note.url;
 
@@ -332,7 +332,7 @@ class _VerticalContentSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            metadata.title ?? '预览失败，请检查网络连接',
+            metadata.title ?? '预览失败',
             style: titleStyle?.copyWith(
               color: metadata.title == null ? colorScheme.error : null,
             ),
