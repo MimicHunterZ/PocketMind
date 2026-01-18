@@ -157,7 +157,7 @@ final class NoteServiceProvider
   }
 }
 
-String _$noteServiceHash() => r'77bf538c02957f7791a2529169f0bd72f7b45f33';
+String _$noteServiceHash() => r'96de4e37cb5321144fe987d7953ebc2f2201421b';
 
 /// 搜索查询 Provider - 用于管理当前搜索关键词
 

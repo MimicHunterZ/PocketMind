@@ -52,4 +52,4 @@ final class NoteApiServiceProvider
   }
 }
 
-String _$noteApiServiceHash() => r'17a81579d9a1b7f0a834ce0e0318a3d340926fd4';
+String _$noteApiServiceHash() => r'413eb141c37874b97b4481136d94b52180eae71a';

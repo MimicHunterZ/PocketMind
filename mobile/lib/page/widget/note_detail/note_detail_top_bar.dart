@@ -47,18 +47,18 @@ class NoteDetailTopBar extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildNavButton(
-                icon: Icons.share_outlined,
-                label: '分享',
-                onPressed: onShare,
-                colorScheme: colorScheme,
-              ),
-              _buildNavButton(
-                icon: Icons.edit_outlined,
-                label: '编辑',
-                onPressed: onEdit,
-                colorScheme: colorScheme,
-              ),
+              // _buildNavButton(
+              //   icon: Icons.share_outlined,
+              //   label: '分享',
+              //   onPressed: onShare,
+              //   colorScheme: colorScheme,
+              // ),
+              // _buildNavButton(
+              //   icon: Icons.edit_outlined,
+              //   label: '编辑',
+              //   onPressed: onEdit,
+              //   colorScheme: colorScheme,
+              // ),
               Container(
                 width: 1,
                 height: 20.h,

@@ -11,7 +11,7 @@ part 'http_providers.g.dart';
 HttpClient httpClient(Ref ref) {
   final httpClient = HttpClient();
   // 从 AppConfig 获取当前环境的 baseUrl
-  final config = ref.read(appConfigProvider);
+  final config = ref.watch(appConfigProvider);
   httpClient.dio.options.baseUrl = config.baseUrl;
   return httpClient;
 }

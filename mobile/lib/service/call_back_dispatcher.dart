@@ -87,8 +87,10 @@ Future<void> scrapeAndSave(ProviderContainer ref, List<String> urls) async {
       final metaDataNote = metadataResults[url];
 
       // 更新基础元数据
-      note.previewContent = metaDataNote?.previewContent;
+      note.previewContent = metaDataNote?.previewContent ?? metaDataNote?.previewDescription;
       note.previewTitle = metaDataNote?.title;
+      note.previewImageUrl = metaDataNote?.imageUrl;
+      note.previewImageUrls =  metaDataNote?.imageUrls ?? note.previewImageUrls;
 
       await noteRepo.save(note);
       needCleanUrls.add(url);

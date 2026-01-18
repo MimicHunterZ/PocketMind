@@ -493,7 +493,7 @@ class XhsScraper implements IPlatformScraper {
 
       return ScrapedMetadata(
         title: data['title'] as String?,
-        description: data['desc'] as String?,
+        content: data['desc'] as String?,
         images: images,
       );
     } catch (e) {
