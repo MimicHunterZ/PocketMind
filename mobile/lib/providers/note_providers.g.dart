@@ -111,7 +111,7 @@ final class MetadataManagerProvider
   }
 }
 
-String _$metadataManagerHash() => r'74916151db50f08432a08c78480ee1a28c71c1e0';
+String _$metadataManagerHash() => r'41e4b0265968f29432728b69f9403255f8f6ff71';
 
 /// NoteService Provider - 业务层
 
@@ -157,7 +157,7 @@ final class NoteServiceProvider
   }
 }
 
-String _$noteServiceHash() => r'6dfc7a2f839c66c8246127e978801af7dccebb30';
+String _$noteServiceHash() => r'96de4e37cb5321144fe987d7953ebc2f2201421b';
 
 /// 搜索查询 Provider - 用于管理当前搜索关键词
 
@@ -545,7 +545,7 @@ final class NoteDetailProvider
   }
 }
 
-String _$noteDetailHash() => r'1e6f05a7d2070e18f6b2383b9c6abbbc7d4ce818';
+String _$noteDetailHash() => r'1f39d787e319f977f54fcd0a30aa9430d46148d8';
 
 final class NoteDetailFamily extends $Family
     with

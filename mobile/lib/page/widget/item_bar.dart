@@ -3,7 +3,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 class ItemBar extends StatelessWidget {
-  // 假设这些是来自 'assets/' 的路径
   final String svgPath;
   final String text;
   final bool isActive;

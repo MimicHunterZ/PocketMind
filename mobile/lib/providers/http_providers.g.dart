@@ -58,4 +58,4 @@ final class HttpClientProvider
   }
 }
 
-String _$httpClientHash() => r'9bded5c3efa47e20f60553e1b75414fd41510411';
+String _$httpClientHash() => r'865eefb29639bcb07175ea9eb99a35322418658b';

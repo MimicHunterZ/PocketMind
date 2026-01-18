@@ -14,7 +14,6 @@ import '../widget/note_detail/note_detail_sidebar.dart';
 import '../widget/note_detail/note_tags_section.dart';
 import '../widget/note_detail/note_ai_insight_section.dart';
 import '../widget/note_detail/note_original_data_section.dart';
-import '../widget/note_detail/note_category_selector.dart';
 import '../../util/date_formatter.dart';
 
 /// 笔记详情页
@@ -63,27 +62,27 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
           .updateNote(content: _contentController!.text);
     });
 
-    Future.microtask(() {
-      if (!mounted) return;
-
-      // 仅当内容为空且从未尝试过（status == null）时才自动加载
-      // 如果 status != null (说明已尝试过，无论是 SUCCESS 还是 FAILED)，都不再自动重试
-      final shouldFetchContent =
-          (note.previewContent == null || note.previewContent!.isEmpty) &&
-          note.resourceStatus == null;
-      // 用 预览 兜底
-      final shouldFetchPreview =
-          (note.previewDescription == null ||
-          note.previewDescription!.isEmpty ||
-          note.previewTitle == null ||
-          note.previewTitle!.isEmpty);
-      if ((shouldFetchPreview || shouldFetchContent) &&
-          _currentNote.url != null) {
-        ref.read(metadataManagerProvider).fetchAndProcessMetadata([
-          _currentNote.url!,
-        ]);
-      }
-    });
+    // Future.microtask(() {
+    //   if (!mounted) return;
+    //
+    //   // 仅当内容为空且从未尝试过（status == null）时才自动加载
+    //   // 如果 status != null (说明已尝试过，无论是 SUCCESS 还是 FAILED)，都不再自动重试
+    //   final shouldFetchBackendContent =
+    //       (note.previewContent == null || note.previewContent!.isEmpty) &&
+    //       note.resourceStatus == null;
+    //   // 用 预览 兜底
+    //   final shouldFetchPreview =
+    //       (note.previewDescription == null &&
+    //       note.previewDescription!.isEmpty ||
+    //       note.previewTitle == null ||
+    //       note.previewTitle!.isEmpty);
+    //   if ((shouldFetchPreview || shouldFetchBackendContent) &&
+    //       _currentNote.url != null) {
+    //     ref.read(metadataManagerProvider).fetchAndProcessMetadata([
+    //       _currentNote.url!,
+    //     ]);
+    //   }
+    // });
   }
 
   @override
@@ -158,7 +157,9 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
               note: state.note,
               titleController: _titleController!,
               contentController: _contentController!,
-              onCategoryPressed: _onCategoryPressed,
+              onCategorySelected: (id) => ref
+                  .read(noteDetailProvider(_currentNote).notifier)
+                  .updateCategory(id),
               categoryName: _getCategoryName(state.note.categoryId),
               formattedDate: DateFormatter.formatChinese(state.note.time),
               previewImageUrl: state.note.previewImageUrl,
@@ -167,7 +168,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                   state.note.previewContent ?? state.note.previewDescription,
               isLoadingPreview: state.isLoading,
               onSave: () => ref
-                  .read(noteDetailProvider(_currentNote!).notifier)
+                  .read(noteDetailProvider(_currentNote).notifier)
                   .saveNote(),
               onLaunchUrl: _launchUrl,
               isDesktop: true,
@@ -193,10 +194,22 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
               note: state.note,
               onLaunchUrl: _launchUrl,
               tags: state.tags,
-              onAddTag: _showAddTagDialog,
-              onRemoveTag: (tag) => ref
-                  .read(noteDetailProvider(_currentNote!).notifier)
-                  .removeTag(tag),
+              onTagsChanged: (newTags) {
+                final oldTags = state.tags;
+                final added = newTags.toSet().difference(oldTags.toSet());
+                final removed = oldTags.toSet().difference(newTags.toSet());
+
+                final notifier = ref.read(
+                  noteDetailProvider(_currentNote).notifier,
+                );
+
+                for (var tag in added) {
+                  notifier.addTag(tag);
+                }
+                for (var tag in removed) {
+                  notifier.removeTag(tag);
+                }
+              },
               formattedDate: DateFormatter.formatChinese(state.note.time),
             ),
           ),
@@ -222,7 +235,9 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
             note: state.note,
             titleController: _titleController!,
             contentController: _contentController!,
-            onCategoryPressed: _onCategoryPressed,
+            onCategorySelected: (id) => ref
+                .read(noteDetailProvider(_currentNote).notifier)
+                .updateCategory(id),
             categoryName: _getCategoryName(state.note.categoryId),
             formattedDate: DateFormatter.formatChinese(state.note.time),
             previewImageUrl: state.note.previewImageUrl,
@@ -231,7 +246,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                 state.note.previewContent ?? state.note.previewDescription,
             isLoadingPreview: state.isLoading,
             onSave: () =>
-                ref.read(noteDetailProvider(_currentNote!).notifier).saveNote(),
+                ref.read(noteDetailProvider(_currentNote).notifier).saveNote(),
             onLaunchUrl: _launchUrl,
             isDesktop: false,
             titleEnabled: ref.watch(appConfigProvider).titleEnabled,
@@ -240,17 +255,36 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
           SizedBox(height: 24.h),
 
           // 2. AI 洞察区
-          const NoteAIInsightSection(),
+          if (state.note.aiSummary != null && state.note.aiSummary!.isNotEmpty)
+            NoteAIInsightSection(
+              aiSummary: state.note.aiSummary!,
+            ), //
 
           SizedBox(height: 32.h),
 
           // 3. 元数据/标签区
           NoteTagsSection(
             tags: state.tags,
-            onAddTag: _showAddTagDialog,
-            onRemoveTag: (tag) => ref
-                .read(noteDetailProvider(_currentNote!).notifier)
-                .removeTag(tag),
+            onTagsChanged: (newTags) {
+              // 找出新增的或删除的
+              // 简单处理：直接更新整个列表
+              // 但 NoteDetailNotifier 可能只有 addTag 和 removeTag
+              // 我们需要适配一下
+              final oldTags = state.tags;
+              final added = newTags.toSet().difference(oldTags.toSet());
+              final removed = oldTags.toSet().difference(newTags.toSet());
+
+              final notifier = ref.read(
+                noteDetailProvider(_currentNote).notifier,
+              );
+
+              for (var tag in added) {
+                notifier.addTag(tag);
+              }
+              for (var tag in removed) {
+                notifier.removeTag(tag);
+              }
+            },
           ),
 
           SizedBox(height: 32.h),
@@ -261,7 +295,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
 
   /// 分享笔记
   void _onSharePressed() {
-    ref.read(noteDetailProvider(_currentNote!).notifier).shareNote(context);
+    ref.read(noteDetailProvider(_currentNote).notifier).shareNote(context);
   }
 
   /// 删除笔记
@@ -274,7 +308,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
       confirmText: '确认',
     );
     if (confirmed == true) {
-      await ref.read(noteDetailProvider(_currentNote!).notifier).deleteNote();
+      await ref.read(noteDetailProvider(_currentNote).notifier).deleteNote();
       if (mounted) {
         if (context.canPop()) {
           context.pop();
@@ -304,85 +338,6 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
       return category.name.toUpperCase();
     }
     return 'HOME';
-  }
-
-  /// 显示分类选择器
-  void _onCategoryPressed(int currentCategoryId) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => NoteCategorySelector(
-        currentCategoryId: currentCategoryId,
-        onCategorySelected: (id) {
-          ref
-              .read(noteDetailProvider(_currentNote!).notifier)
-              .updateCategory(id);
-        },
-        onAddCategory: (name) async {
-          final categoryId = await ref
-              .read(categoryServiceProvider)
-              .addCategory(name: name);
-          ref
-              .read(noteDetailProvider(_currentNote!).notifier)
-              .updateCategory(categoryId);
-          ref.invalidate(allCategoriesProvider);
-        },
-      ),
-    );
-  }
-
-  /// 显示添加标签对话框
-  void _showAddTagDialog() {
-    final textController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) {
-        final colorScheme = Theme.of(context).colorScheme;
-        return AlertDialog(
-          backgroundColor: colorScheme.surface,
-          title: Text('添加标签', style: TextStyle(color: colorScheme.primary)),
-          content: TextField(
-            controller: textController,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: '输入标签名称',
-              hintStyle: TextStyle(color: colorScheme.secondary),
-              enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: colorScheme.outlineVariant),
-              ),
-              focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(
-                  color: colorScheme.surfaceContainerHighest,
-                ),
-              ),
-            ),
-            style: TextStyle(color: colorScheme.onSurface),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('取消', style: TextStyle(color: colorScheme.secondary)),
-            ),
-            TextButton(
-              onPressed: () {
-                final tag = textController.text.trim();
-                if (tag.isNotEmpty) {
-                  ref
-                      .read(noteDetailProvider(_currentNote!).notifier)
-                      .addTag(tag);
-                }
-                Navigator.of(context).pop();
-              },
-              child: Text(
-                '添加',
-                style: TextStyle(color: colorScheme.surfaceContainerHighest),
-              ),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   /// 跳转 URL

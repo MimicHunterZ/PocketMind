@@ -1,11 +1,11 @@
-// 路径: lib/pages/edit_note_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:pocketmind/api/note_api_service.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:pocketmind/page/widget/add_category_dialog.dart';
+import 'package:pocketmind/page/widget/category_selector.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/providers/category_providers.dart';
-import 'package:pocketmind/service/category_service.dart';
 import 'package:pocketmind/providers/app_config_provider.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:intl/intl.dart';
@@ -37,7 +37,6 @@ class EditNotePage extends ConsumerStatefulWidget {
 
 class EditNotePageState extends ConsumerState<EditNotePage> {
   late final TextEditingController _contentController;
-  late final TextEditingController _categoryController;
   late final TextEditingController _tagController;
   late final TextEditingController _titleController;
   late final TextEditingController _aiController;
@@ -48,7 +47,6 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
 
   String _selectedCategory = 'home';
   int _selectedCategoryId = 1;
-  bool _isAddingCategory = false;
   DateTime? _scheduledTime;
 
   @override
@@ -56,7 +54,6 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
     super.initState();
     _titleController = TextEditingController(text: widget.initialTitle);
     _contentController = TextEditingController(text: widget.initialContent);
-    _categoryController = TextEditingController();
     _tagController = TextEditingController();
     _aiController = TextEditingController();
     // 在下一帧获取配置，因为 initState 中不能直接 watch
@@ -77,7 +74,6 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
   @override
   void dispose() {
     _contentController.dispose();
-    _categoryController.dispose();
     _tagController.dispose();
     _titleController.dispose();
     _aiController.dispose();
@@ -114,14 +110,13 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
     }
 
     if (_aiController.text.isNotEmpty) {
-      // 直接发送不用 await
-      ref
-          .read(noteApiServiceProvider)
-          .analyzePage(
-            userQuery: _aiController.text,
-            webUrl: widget.webUrl,
-            userEmail: 'double2z2@163.com',
-          );
+      // 用户输入了 AI 问题，保存到 pendingAiQuestion 字段
+      // 等 processPendingUrls() 获取到 content 后再调用 AI 分析
+      await noteService.updateNote(
+        id: widget.id,
+        pendingAiQuestion: _aiController.text,
+        updateTimestamp: false,
+      );
     }
     widget.onDone();
   }
@@ -301,34 +296,14 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
     );
   }
 
-  Future<void> _addCategory(String name) async {
-    CategoryService service = ref.read(categoryServiceProvider);
-    await service.addCategory(name: name);
-  }
-
-  void _startAddingCategory() {
-    setState(() {
-      _isAddingCategory = true;
-    });
-  }
-
-  void _cancelAddingCategory() {
-    setState(() {
-      _isAddingCategory = false;
-      _categoryController.clear();
-    });
-  }
-
-  Future<void> _confirmAddCategory() async {
-    final name = _categoryController.text.trim();
-    if (name.isNotEmpty) {
-      await _addCategory(name);
-      ref.invalidate(allCategoriesProvider);
+  /// 显示添加分类对话框（通过 Provider 处理业务逻辑）
+  Future<void> _showAddCategoryDialog() async {
+    final result = await showAddCategoryDialog(context);
+    if (result != null) {
+      await ref
+          .read(categoryActionsProvider.notifier)
+          .addCategory(name: result.name, iconPath: result.iconPath);
     }
-    setState(() {
-      _isAddingCategory = false;
-      _categoryController.clear();
-    });
   }
 
   // 构建分类选择页面
@@ -376,8 +351,20 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ...categories.map((category) {
+                    final iconPath = getCategoryIcon(category);
                     return RadioListTile<String>(
                       contentPadding: EdgeInsets.zero,
+                      secondary: SvgPicture.asset(
+                        iconPath,
+                        width: 20.w,
+                        height: 20.w,
+                        colorFilter: ColorFilter.mode(
+                          _selectedCategory == category.name
+                              ? colorScheme.primary
+                              : colorScheme.onSurfaceVariant,
+                          BlendMode.srcIn,
+                        ),
+                      ),
                       title: Text(
                         category.name,
                         style: TextStyle(
@@ -396,119 +383,27 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
                       activeColor: colorScheme.primary,
                     );
                   }),
-                  if (_isAddingCategory) ...[
-                    SizedBox(height: 16.h),
-                    Container(
-                      margin: EdgeInsets.symmetric(horizontal: 10.w),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 16.w,
-                        vertical: 12.h,
-                      ),
+                  // 添加分类按钮 - 使用统一对话框
+                  SizedBox(height: 16.h),
+                  GestureDetector(
+                    onTap: _showAddCategoryDialog,
+                    child: Container(
+                      padding: EdgeInsets.all(12.r),
                       decoration: BoxDecoration(
-                        color: colorScheme.surface.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(20.r),
+                        color: colorScheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(50.r),
                         border: Border.all(
-                          color: colorScheme.primary.withValues(alpha: 0.3),
+                          color: colorScheme.primary.withValues(alpha: 0.2),
                           width: 1.w,
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: colorScheme.primary.withValues(alpha: 0.1),
-                            blurRadius: 8.r,
-                            offset: Offset(0, 2.h),
-                          ),
-                        ],
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 4.w,
-                            height: 20.h,
-                            decoration: BoxDecoration(
-                              color: colorScheme.primary,
-                              borderRadius: BorderRadius.circular(2.r),
-                            ),
-                          ),
-                          SizedBox(width: 12.w),
-                          Expanded(
-                            child: TextField(
-                              controller: _categoryController,
-                              autofocus: true,
-                              decoration: InputDecoration(
-                                hintText: '新分类',
-                                hintStyle: TextStyle(
-                                  color: colorScheme.secondary.withValues(
-                                    alpha: 0.4,
-                                  ),
-                                  fontSize: 16.sp,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                                border: InputBorder.none,
-                                isDense: true,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                              style: TextStyle(
-                                fontSize: 16.sp,
-                                color: colorScheme.onSurface,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              onSubmitted: (_) => _confirmAddCategory(),
-                            ),
-                          ),
-                          SizedBox(width: 12.w),
-                          GestureDetector(
-                            onTap: _confirmAddCategory,
-                            child: Container(
-                              padding: EdgeInsets.all(4.r),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primary.withValues(
-                                  alpha: 0.1,
-                                ),
-                                borderRadius: BorderRadius.circular(12.r),
-                              ),
-                              child: Icon(
-                                Icons.check,
-                                color: colorScheme.primary,
-                                size: 20.sp,
-                              ),
-                            ),
-                          ),
-                          SizedBox(width: 8.w),
-                          GestureDetector(
-                            onTap: _cancelAddingCategory,
-                            child: Icon(
-                              Icons.close,
-                              color: colorScheme.secondary.withValues(
-                                alpha: 0.6,
-                              ),
-                              size: 20.sp,
-                            ),
-                          ),
-                        ],
+                      child: Icon(
+                        Icons.add,
+                        color: colorScheme.primary,
+                        size: 24.sp,
                       ),
                     ),
-                  ] else ...[
-                    SizedBox(height: 16.h),
-                    GestureDetector(
-                      onTap: _startAddingCategory,
-                      child: Container(
-                        padding: EdgeInsets.all(12.r),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(50.r),
-                          border: Border.all(
-                            color: colorScheme.primary.withValues(alpha: 0.2),
-                            width: 1.w,
-                          ),
-                        ),
-                        child: Icon(
-                          Icons.add,
-                          color: colorScheme.primary,
-                          size: 24.sp,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ],
               );
             },

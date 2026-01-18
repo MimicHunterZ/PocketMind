@@ -10,8 +10,7 @@ class NoteDetailSidebar extends StatelessWidget {
   final Note note;
   final Function(String) onLaunchUrl;
   final List<String> tags;
-  final VoidCallback onAddTag;
-  final Function(String) onRemoveTag;
+  final ValueChanged<List<String>> onTagsChanged;
   final String formattedDate;
 
   const NoteDetailSidebar({
@@ -19,8 +18,7 @@ class NoteDetailSidebar extends StatelessWidget {
     required this.note,
     required this.onLaunchUrl,
     required this.tags,
-    required this.onAddTag,
-    required this.onRemoveTag,
+    required this.onTagsChanged,
     required this.formattedDate,
   });
 
@@ -30,7 +28,10 @@ class NoteDetailSidebar extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // AI 洞察区
-        const NoteAIInsightSection(),
+        if (note.aiSummary != null && note.aiSummary!.isNotEmpty)
+          NoteAIInsightSection(
+            aiSummary: note.aiSummary!,
+          ), //
 
         SizedBox(height: 32.h),
 
@@ -40,11 +41,7 @@ class NoteDetailSidebar extends StatelessWidget {
         SizedBox(height: 24.h),
 
         // 标签区
-        NoteTagsSection(
-          tags: tags,
-          onAddTag: onAddTag,
-          onRemoveTag: onRemoveTag,
-        ),
+        NoteTagsSection(tags: tags, onTagsChanged: onTagsChanged),
 
         SizedBox(height: 24.h),
 

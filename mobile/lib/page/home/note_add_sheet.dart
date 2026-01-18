@@ -2,11 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:pocketmind/model/category.dart';
-import 'package:pocketmind/providers/category_providers.dart';
-import 'package:pocketmind/providers/note_providers.dart';
-import 'package:pocketmind/providers/nav_providers.dart';
-import 'package:pocketmind/page/widget/creative_toast.dart';
+import 'package:pocketmind/page/home/mixin/note_editor_logic_mixin.dart';
+import 'package:pocketmind/page/widget/category_selector.dart';
+import 'package:pocketmind/page/widget/tag_selector.dart';
 
 class NoteEditorRoute extends PageRouteBuilder {
   NoteEditorRoute()
@@ -31,36 +29,15 @@ class NoteEditorSheet extends ConsumerStatefulWidget {
 }
 
 class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
-    with SingleTickerProviderStateMixin {
-  // 控制器
-  late final TextEditingController _titleController;
-  late final TextEditingController _contentController;
-  late final TextEditingController _tagInputController;
-
+    with SingleTickerProviderStateMixin, NoteEditorLogicMixin {
   // 动画控制器
   late AnimationController _animationController;
   late Animation<Offset> _headerSlideAnimation;
   late Animation<Offset> _bodySlideAnimation;
 
-  // 状态
-  int _selectedCategoryId = 1; // 默认分类ID
-  final List<String> _tags = [];
-  bool _isTagInputVisible = false;
-
-  // 图片相关
-  String? _localImagePath;
-  String? _uploadedImageUrl; // 模拟上传后的URL
-  bool _isImageInputVisible = false;
-
-  // 焦点
-  final FocusNode _tagFocusNode = FocusNode();
-
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController();
-    _contentController = TextEditingController();
-    _tagInputController = TextEditingController();
 
     // 动画初始化
     _animationController = AnimationController(
@@ -88,117 +65,19 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
 
     // 启动动画
     _animationController.forward();
-
-    // 初始化分类
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final activeId = await ref.read(activeCategoryIdProvider.future);
-      if (mounted) {
-        setState(() {
-          _selectedCategoryId = activeId;
-        });
-      }
-    });
   }
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _contentController.dispose();
-    _tagInputController.dispose();
-    _tagFocusNode.dispose();
     _animationController.dispose();
     super.dispose();
   }
 
-  // --- 逻辑处理方法 ---
-
-  void _handleAddTag() {
-    final text = _tagInputController.text.trim();
-    if (text.isNotEmpty && !_tags.contains(text)) {
-      setState(() {
-        _tags.add(text);
-        _tagInputController.clear();
-        _isTagInputVisible = false;
-      });
-    } else if (text.isEmpty) {
-      setState(() {
-        _isTagInputVisible = false;
-      });
-    }
-  }
-
-  // Future<void> _pickImage() async {
-  //   final ImagePicker picker = ImagePicker();
-  //   final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-  //
-  //   if (image != null) {
-  //     setState(() {
-  //       _localImagePath = image.path;
-  //       _isImageInputVisible = true;
-  //     });
-  //
-  //     // TODO: 调用实际的上传API
-  //   }
-  // }
-
-  Future<void> _handleClose() async {
+  @override
+  Future<void> handleClose() async {
     // 反向播放动画
     await _animationController.reverse();
-
-    if (!mounted) return;
-
-    if (widget.onClose != null) {
-      widget.onClose!();
-    } else {
-      Navigator.of(context).pop();
-    }
-  }
-
-  Future<void> _onSave() async {
-    final title = _titleController.text.trim();
-    final content = _contentController.text.trim();
-
-    if (content.isEmpty && title.isEmpty) {
-      CreativeToast.error(
-        context,
-        title: '空笔记',
-        message: '请至少输入标题或内容',
-        direction: ToastDirection.top,
-      );
-      return;
-    }
-
-    final noteService = ref.read(noteServiceProvider);
-
-    try {
-      await noteService.addNote(
-        title: title.isNotEmpty ? title : null,
-        content: content,
-        categoryId: _selectedCategoryId,
-        tag: _tags.isNotEmpty ? _tags.join(',') : null,
-        // 如果有上传后的URL则使用，否则如果只是本地预览则暂不保存(或根据需求保存本地路径)
-        // 这里假设需要上传后才能保存，暂时留空或使用本地路径作为占位
-        previewImageUrl: _uploadedImageUrl ?? _localImagePath,
-      );
-
-      if (!mounted) return;
-
-      CreativeToast.success(
-        context,
-        title: '已保存',
-        message: '笔记已成功保存',
-        direction: ToastDirection.top,
-      );
-      await _handleClose();
-    } catch (e) {
-      if (!mounted) return;
-      CreativeToast.error(
-        context,
-        title: '保存失败',
-        message: e.toString(),
-        direction: ToastDirection.top,
-      );
-    }
+    await super.handleClose();
   }
 
   // --- UI 构建方法 ---
@@ -291,7 +170,7 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
         children: [
           // 关闭按钮
           IconButton(
-            onPressed: _handleClose,
+            onPressed: handleClose,
             icon: Icon(Icons.close, size: 24.sp),
             color: colorScheme.onSurfaceVariant,
             tooltip: '关闭',
@@ -309,7 +188,7 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
 
           // 保存按钮
           ElevatedButton.icon(
-            onPressed: _onSave,
+            onPressed: onSave,
             style: ElevatedButton.styleFrom(
               backgroundColor: colorScheme.primary,
               foregroundColor: colorScheme.onPrimary,
@@ -337,7 +216,6 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
   Widget _buildMetadataBar(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final borderColor = colorScheme.outline.withValues(alpha: 0.2);
-    final iconColor = colorScheme.onSurfaceVariant;
 
     return Wrap(
       spacing: 12.w,
@@ -345,109 +223,13 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         // 分类选择器
-        _buildCategorySelector(context),
-
-        // 添加标签按钮 / 输入框
-        if (_isTagInputVisible)
-          Container(
-            width: 120.w,
-            height: 36.h,
-            padding: EdgeInsets.symmetric(horizontal: 12.w),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(8.r),
-              border: Border.all(color: borderColor),
-            ),
-            child: TextField(
-              controller: _tagInputController,
-              focusNode: _tagFocusNode,
-              autofocus: true,
-              decoration: const InputDecoration(
-                hintText: '输入标签...',
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-              style: TextStyle(fontSize: 12.sp, color: colorScheme.onSurface),
-              onSubmitted: (_) => _handleAddTag(),
-              onEditingComplete: _handleAddTag, // 失去焦点或完成时提交
-            ),
-          )
-        else
-          InkWell(
-            onTap: () {
-              setState(() {
-                _isTagInputVisible = true;
-              });
-            },
-            borderRadius: BorderRadius.circular(8.r),
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: borderColor,
-                  style: BorderStyle.solid,
-                ),
-                borderRadius: BorderRadius.circular(8.r),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.local_offer_outlined,
-                    size: 14.sp,
-                    color: iconColor,
-                  ),
-                  SizedBox(width: 6.w),
-                  Text(
-                    'Add Tag',
-                    style: TextStyle(
-                      fontSize: 12.sp,
-                      color: iconColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-        // 已添加的标签展示
-        ..._tags.map(
-          (tag) => Container(
-            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '#$tag',
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                SizedBox(width: 4.w),
-                InkWell(
-                  onTap: () {
-                    setState(() {
-                      _tags.remove(tag);
-                    });
-                  },
-                  child: Icon(
-                    Icons.close,
-                    size: 12.sp,
-                    color: colorScheme.primary,
-                  ),
-                ),
-              ],
-            ),
-          ),
+        CategorySelector(
+          selectedCategoryId: selectedCategoryId,
+          onCategorySelected: selectCategory,
         ),
+
+        // 标签选择器
+        TagSelector(tags: tags, onTagsChanged: updateTags),
 
         // 分割线
         Container(
@@ -456,98 +238,13 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
           color: borderColor,
           margin: EdgeInsets.symmetric(horizontal: 4.w),
         ),
-
-        // todo
-        // // 图片上传按钮
-        // IconButton(
-        //   onPressed: _pickImage,
-        //   icon: Icon(Icons.image_outlined, size: 20.sp),
-        //   color: (_isImageInputVisible || _localImagePath != null)
-        //       ? colorScheme.primary
-        //       : iconColor,
-        //   tooltip: '上传图片',
-        //   style: IconButton.styleFrom(
-        //     backgroundColor: (_isImageInputVisible || _localImagePath != null)
-        //         ? colorScheme.primary.withValues(alpha: 0.1)
-        //         : null,
-        //   ),
-        // ),
       ],
-    );
-  }
-
-  // 分类选择器组件
-  Widget _buildCategorySelector(BuildContext context) {
-    final categoriesAsync = ref.watch(allCategoriesProvider);
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return categoriesAsync.when(
-      data: (categories) {
-        // 确保 selectedCategoryId 有效
-        if (!categories.any((c) => c.id == _selectedCategoryId) &&
-            categories.isNotEmpty) {
-          _selectedCategoryId = categories.first.id ?? 0;
-        }
-
-        final selectedCategory = categories.firstWhere(
-          (c) => c.id == _selectedCategoryId,
-          orElse: () => Category()
-            ..id = 0
-            ..name = 'Uncategorized',
-        );
-
-        return PopupMenuButton<int>(
-          initialValue: _selectedCategoryId,
-          onSelected: (id) {
-            setState(() {
-              _selectedCategoryId = id;
-            });
-          },
-          itemBuilder: (context) {
-            return categories
-                .map((c) => PopupMenuItem(value: c.id, child: Text(c.name)))
-                .toList();
-          },
-          child: Container(
-            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  selectedCategory.name,
-                  style: TextStyle(
-                    fontSize: 13.sp,
-                    fontWeight: FontWeight.w500,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-                SizedBox(width: 4.w),
-                Icon(
-                  Icons.keyboard_arrow_down,
-                  size: 16.sp,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-      loading: () => const SizedBox(
-        width: 20,
-        height: 20,
-        child: CircularProgressIndicator(strokeWidth: 2),
-      ),
-      error: (error, stack) => const Text('Error'),
     );
   }
 
   // 3. 图片预览区域
   Widget _buildImagePreview(BuildContext context) {
-    if (!_isImageInputVisible || _localImagePath == null) {
+    if (!isImageInputVisible || localImagePath == null) {
       return const SizedBox.shrink();
     }
 
@@ -564,7 +261,7 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
               borderRadius: BorderRadius.circular(12.r),
               border: Border.all(color: colorScheme.outlineVariant),
               image: DecorationImage(
-                image: FileImage(File(_localImagePath!)),
+                image: FileImage(File(localImagePath!)),
                 fit: BoxFit.cover,
                 onError: (exception, stackTrace) {},
               ),
@@ -574,12 +271,7 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
             top: 8.h,
             right: 8.w,
             child: GestureDetector(
-              onTap: () {
-                setState(() {
-                  _localImagePath = null;
-                  _isImageInputVisible = false;
-                });
-              },
+              onTap: clearImage,
               child: Container(
                 padding: EdgeInsets.all(4.r),
                 decoration: BoxDecoration(
@@ -605,7 +297,7 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
       children: [
         // 标题输入
         TextField(
-          controller: _titleController,
+          controller: titleController,
           decoration: InputDecoration(
             hintText: 'Untitled',
             border: InputBorder.none,
@@ -622,7 +314,7 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
 
         // 内容输入
         TextField(
-          controller: _contentController,
+          controller: contentController,
           decoration: InputDecoration(
             hintText: 'Tell your story...',
             border: InputBorder.none,

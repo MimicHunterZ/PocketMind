@@ -2,32 +2,49 @@ import 'package:any_link_preview/any_link_preview.dart';
 import 'package:pocketmind/api/link_preview_api_service.dart';
 import 'package:pocketmind/api/resource_pm_service.dart';
 import 'package:pocketmind/api/models/note_metadata.dart';
+import 'package:pocketmind/service/scraper/platform_scraper_interface.dart';
+import 'package:pocketmind/service/scraper/platform_scraper_service.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/util/link_preview_config.dart';
 import 'package:pocketmind/util/logger_service.dart';
 import 'package:pocketmind/util/url_helper.dart';
-
 /// 元数据管理服务
 ///
 /// 负责处理链接预览数据的获取、加工和本地化。
 /// 不直接操作数据库，只返回处理好的数据对象。
+///
+/// 策略优先级：
+/// 0. 平台专用爬虫（小红书等需要登录的平台）
+/// 1. 后端 API（支持正文提取）
+/// 2. LinkPreview API（公共服务）
+/// 3. 本地解析（AnyLinkPreview）
 class MetadataManager {
   static const String _tag = 'MetadataManager';
   final ImageStorageHelper _imageHelper = ImageStorageHelper();
   final LinkPreviewApiService? _linkPreviewApi;
   final ResourcePmService? _resourceService;
+  final PlatformScraperService? _platformScraperService;
 
   MetadataManager({
     LinkPreviewApiService? linkPreviewApi,
     ResourcePmService? resourceService,
+    PlatformScraperService? platformScraperService,
   }) : _linkPreviewApi = linkPreviewApi,
-       _resourceService = resourceService;
+       _resourceService = resourceService,
+       _platformScraperService =
+           platformScraperService;
 
-  /// 获取并处理链接元数据（批量）
+  /// 获取并处理链接元数据
+  ///
+  /// 调用方无需关心内部策略，所有 URL 抓取都走这个入口。
+  /// 内部自动选择最优策略：
+  /// 1. 平台专用爬虫（小红书等需要登录的平台）
+  /// 2. 后端 API
+  /// 3. LinkPreview API（公共服务）
+  /// 4. 本地解析（AnyLinkPreview）
   ///
   /// [urls] : 目标链接列表
   /// 返回 : 以 URL 为 Key 的元数据 Map
-  /// 此方法只负责处理，不保存数据
   Future<Map<String, NoteMetadata>> fetchAndProcessMetadata(
     List<String> urls,
   ) async {
@@ -36,18 +53,29 @@ class MetadataManager {
     PMlog.d(_tag, '开始批量获取元数据: ${urls.length} 个链接');
 
     try {
+      final scraperUrls = urls
+          .where((u) => LinkPreviewConfig.shouldUsePlatformScraper(u))
+          .toList();
+      if(scraperUrls.isNotEmpty){
+        final ScraperMetaDatas = await _fetchFromPlatformScraper(scraperUrls);
+        results.addAll(ScraperMetaDatas);
+        // 移除已成功获取的
+        urls = urls.where((u) => !results.containsKey(u)).toList();
+        PMlog.d(_tag, '从平台爬虫成功获取 ${ScraperMetaDatas.length} 个元数据');
+      }
+
+      if (urls.isEmpty) return results;
+
       // 策略1: 优先尝试后端 API（批量处理）
       final backendUrls = urls
           .where((u) => LinkPreviewConfig.shouldUseBackendService(u))
           .toList();
       if (backendUrls.isNotEmpty) {
-        final backendMetadatas = await _fetchResourceContentByUrls(backendUrls);
-        results.addAll(backendMetadatas);
+        final backendMetaDatas = await _fetchResourceContentByUrls(backendUrls);
+        results.addAll(backendMetaDatas);
         // 移除已成功获取的
-        urls.removeWhere((u) => results.containsKey(u));
-        if (backendMetadatas.isNotEmpty) {
-          PMlog.d(_tag, '从后端服务成功获取 ${backendMetadatas.length} 个元数据');
-        }
+        urls = urls.where((u) => !results.containsKey(u)).toList();
+        PMlog.d(_tag, '从后端服务成功获取 ${backendMetaDatas.length} 个元数据');
       }
 
       if (urls.isEmpty) return results;
@@ -241,5 +269,19 @@ class MetadataManager {
       PMlog.w(_tag, '图片本地化失败，已清除图片字段: $imageUrl');
     }
     return original;
+  }
+
+  Future<Map<String,NoteMetadata>> _fetchFromPlatformScraper(List<String> scraperUrls) async {
+    if(_platformScraperService == null) return {};
+    PMlog.d(_tag, '策略0: 尝试平台爬虫处理 ${scraperUrls.length} 个链接');
+    try {
+      final platformResults = await _platformScraperService.scrapeBatch(
+        scraperUrls,
+      );
+      return {for (var item in platformResults) item.url: item};
+    } on CookieExpiredException catch (e) {
+      PMlog.w(_tag, '平台 Cookie 过期: ${e.message}');
+      return {};
+    }
   }
 }

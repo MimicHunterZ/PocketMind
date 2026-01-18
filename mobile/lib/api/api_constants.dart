@@ -11,5 +11,6 @@ class ApiConstants {
   /// LinkPreview.net API 基础 URL
   static const String linkPreviewBaseUrl = 'https://api.linkpreview.net';
 
-  static const String analysisService = '/api/analyse/analyze';
+  /// AI 分析服务
+  static const String aiAnalyze = '/api/ai/analyze';
 }

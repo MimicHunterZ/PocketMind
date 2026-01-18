@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/page/widget/pm_image.dart';
+import 'package:pocketmind/page/widget/common/category_badge.dart';
+import 'package:pocketmind/page/widget/common/date_label.dart';
 
 class HeroGallery extends StatefulWidget {
   final List<String> images;
@@ -10,6 +12,7 @@ class HeroGallery extends StatefulWidget {
   final VoidCallback? onImageTap;
   final bool showGradientFade;
   final String? categoryLabel;
+  final Widget? categoryBadge;
   final String? dateLabel;
   final String? overlayTitle;
 
@@ -22,6 +25,7 @@ class HeroGallery extends StatefulWidget {
     this.onImageTap,
     this.showGradientFade = true,
     this.categoryLabel,
+    this.categoryBadge,
     this.dateLabel,
     this.overlayTitle,
   });
@@ -110,20 +114,22 @@ class _HeroGalleryState extends State<HeroGallery> {
 
             // --- 层级 2：全局渐变层 (The Whole Gradient) ---
             // 这是一个覆盖全屏的渐变，但是通过 stops 控制只在下半部分显示
+            // 使用 IgnorePointer 避免拦截 PageView 的滑动手势
             if (widget.showGradientFade)
               Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      // 这里是关键！颜色数组
-                      colors: [
-                        Colors.transparent, // 0. 顶部透明
-                        Colors.transparent, // 1. 保持透明
-                        bgColor, // 2. 渐变到实色背景
-                        bgColor, // 3. 底部保持实色
-                      ],
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        // 这里是关键！颜色数组
+                        colors: [
+                          Colors.transparent, // 0. 顶部透明
+                          Colors.transparent, // 1. 保持透明
+                          bgColor, // 2. 渐变到实色背景
+                          bgColor, // 3. 底部保持实色
+                        ],
                       // 这里是对应的位置 (0.0 - 1.0)
                       stops: const [
                         0.0,
@@ -135,6 +141,7 @@ class _HeroGalleryState extends State<HeroGallery> {
                   ),
                 ),
               ),
+            ),
 
             // --- 层级 3：文字内容层 ---
             // 文字从渐变开始的地方 (0.5) 就开始布局，一直到底部
@@ -184,15 +191,17 @@ class _HeroGalleryState extends State<HeroGallery> {
   /// 构建文字内容
   Widget _buildTextContent() {
     final textScheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
 
     final hasCategory =
         widget.categoryLabel != null && widget.categoryLabel!.isNotEmpty;
+    final hasBadge = widget.categoryBadge != null;
     final hasDate = widget.dateLabel != null && widget.dateLabel!.isNotEmpty;
     final hasTitle =
         widget.overlayTitle != null && widget.overlayTitle!.isNotEmpty;
 
-    if (!hasCategory && !hasDate && !hasTitle) return const SizedBox.shrink();
+    if (!hasCategory && !hasBadge && !hasDate && !hasTitle) {
+      return const SizedBox.shrink();
+    }
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 24.w),
@@ -205,44 +214,21 @@ class _HeroGalleryState extends State<HeroGallery> {
           Spacer(),
 
           // 1. 分类和日期
-          if (hasCategory || hasDate)
+          if (hasCategory || hasBadge || hasDate)
             Row(
               children: [
-                if (hasCategory)
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 12.w,
-                      vertical: 6.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(4.r),
-                    ),
-                    child: Text(
-                      widget.categoryLabel!,
-                      style: textScheme.bodySmall?.copyWith(
-                        color: const Color(0xcdffffff),
-                      ),
-                    ),
+                if (hasBadge)
+                  widget.categoryBadge!
+                else if (hasCategory)
+                  CategoryBadge(
+                    categoryName: widget.categoryLabel!,
+                    style: CategoryBadgeStyle.onImage,
                   ),
-                if (hasCategory && hasDate) SizedBox(width: 12.w),
+                if ((hasCategory || hasBadge) && hasDate) SizedBox(width: 12.w),
                 if (hasDate)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.schedule_rounded,
-                        size: 14.sp,
-                        color: const Color(0xcdffffff),
-                      ),
-                      SizedBox(width: 4.w),
-                      Text(
-                        widget.dateLabel!,
-                        style: textScheme.bodySmall?.copyWith(
-                          color: const Color(0xcdffffff),
-                        ),
-                      ),
-                    ],
+                  DateLabel(
+                    dateText: widget.dateLabel!,
+                    style: DateLabelStyle.onImage,
                   ),
               ],
             ),

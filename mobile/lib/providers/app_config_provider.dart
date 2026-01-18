@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:pocketmind/model/app_config_state.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';
@@ -20,6 +21,7 @@ class AppConfig extends _$AppConfig {
   static const String _keyHighPrecisionNotification =
       'high_precision_notification';
   static const String _keyNotificationIntensity = 'notification_intensity';
+  static const String _keyCustomDomain = 'custom_domain';
 
   @override
   AppConfigState build() {
@@ -40,7 +42,9 @@ class AppConfig extends _$AppConfig {
     }
 
     // Load environment
-    Environment environment = Environment.development;
+    Environment environment = kReleaseMode
+        ? Environment.production
+        : Environment.development;
     final envString = prefs.getString(_keyEnvironment);
     if (envString == 'staging') {
       environment = Environment.staging;
@@ -61,6 +65,7 @@ class AppConfig extends _$AppConfig {
           prefs.getBool(_keyHighPrecisionNotification) ?? false,
       notificationIntensity: prefs.getInt(_keyNotificationIntensity) ?? 2,
       linkPreviewApiKey: prefs.getString(_keyLinkPreviewApiKey) ?? '',
+      customDomain: prefs.getString(_keyCustomDomain) ?? '',
       environment: environment,
     );
   }
@@ -127,6 +132,13 @@ class AppConfig extends _$AppConfig {
         .read(sharedPreferencesProvider)
         .setString(_keyLinkPreviewApiKey, apiKey);
     state = state.copyWith(linkPreviewApiKey: apiKey);
+  }
+
+  Future<void> setCustomDomain(String domain) async {
+    await ref
+        .read(sharedPreferencesProvider)
+        .setString(_keyCustomDomain, domain);
+    state = state.copyWith(customDomain: domain);
   }
 
   Future<void> setEnvironment(Environment env) async {

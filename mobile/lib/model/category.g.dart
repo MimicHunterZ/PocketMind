@@ -27,18 +27,23 @@ const CategorySchema = CollectionSchema(
       name: r'description',
       type: IsarType.string,
     ),
-    r'isDeleted': PropertySchema(
+    r'iconPath': PropertySchema(
       id: 2,
+      name: r'iconPath',
+      type: IsarType.string,
+    ),
+    r'isDeleted': PropertySchema(
+      id: 3,
       name: r'isDeleted',
       type: IsarType.bool,
     ),
-    r'name': PropertySchema(id: 3, name: r'name', type: IsarType.string),
+    r'name': PropertySchema(id: 4, name: r'name', type: IsarType.string),
     r'updatedAt': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'updatedAt',
       type: IsarType.long,
     ),
-    r'uuid': PropertySchema(id: 5, name: r'uuid', type: IsarType.string),
+    r'uuid': PropertySchema(id: 6, name: r'uuid', type: IsarType.string),
   },
 
   estimateSize: _categoryEstimateSize,
@@ -108,6 +113,12 @@ int _categoryEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
+  {
+    final value = object.iconPath;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.name.length * 3;
   {
     final value = object.uuid;
@@ -126,10 +137,11 @@ void _categorySerialize(
 ) {
   writer.writeDateTime(offsets[0], object.createdTime);
   writer.writeString(offsets[1], object.description);
-  writer.writeBool(offsets[2], object.isDeleted);
-  writer.writeString(offsets[3], object.name);
-  writer.writeLong(offsets[4], object.updatedAt);
-  writer.writeString(offsets[5], object.uuid);
+  writer.writeString(offsets[2], object.iconPath);
+  writer.writeBool(offsets[3], object.isDeleted);
+  writer.writeString(offsets[4], object.name);
+  writer.writeLong(offsets[5], object.updatedAt);
+  writer.writeString(offsets[6], object.uuid);
 }
 
 Category _categoryDeserialize(
@@ -141,11 +153,12 @@ Category _categoryDeserialize(
   final object = Category();
   object.createdTime = reader.readDateTimeOrNull(offsets[0]);
   object.description = reader.readStringOrNull(offsets[1]);
+  object.iconPath = reader.readStringOrNull(offsets[2]);
   object.id = id;
-  object.isDeleted = reader.readBool(offsets[2]);
-  object.name = reader.readString(offsets[3]);
-  object.updatedAt = reader.readLong(offsets[4]);
-  object.uuid = reader.readStringOrNull(offsets[5]);
+  object.isDeleted = reader.readBool(offsets[3]);
+  object.name = reader.readString(offsets[4]);
+  object.updatedAt = reader.readLong(offsets[5]);
+  object.uuid = reader.readStringOrNull(offsets[6]);
   return object;
 }
 
@@ -161,12 +174,14 @@ P _categoryDeserializeProp<P>(
     case 1:
       return (reader.readStringOrNull(offset)) as P;
     case 2:
-      return (reader.readBool(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 3:
-      return (reader.readString(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 4:
-      return (reader.readLong(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 5:
+      return (reader.readLong(offset)) as P;
+    case 6:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -850,6 +865,168 @@ extension CategoryQueryFilter
     });
   }
 
+  QueryBuilder<Category, Category, QAfterFilterCondition> iconPathIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'iconPath'),
+      );
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> iconPathIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'iconPath'),
+      );
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> iconPathEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'iconPath',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> iconPathGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'iconPath',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> iconPathLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'iconPath',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> iconPathBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'iconPath',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> iconPathStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'iconPath',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> iconPathEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'iconPath',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> iconPathContains(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'iconPath',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> iconPathMatches(
+    String pattern, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'iconPath',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> iconPathIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'iconPath', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> iconPathIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'iconPath', value: ''),
+      );
+    });
+  }
+
   QueryBuilder<Category, Category, QAfterFilterCondition> idIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -1332,6 +1509,18 @@ extension CategoryQuerySortBy on QueryBuilder<Category, Category, QSortBy> {
     });
   }
 
+  QueryBuilder<Category, Category, QAfterSortBy> sortByIconPath() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'iconPath', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterSortBy> sortByIconPathDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'iconPath', Sort.desc);
+    });
+  }
+
   QueryBuilder<Category, Category, QAfterSortBy> sortByIsDeleted() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isDeleted', Sort.asc);
@@ -1404,6 +1593,18 @@ extension CategoryQuerySortThenBy
   QueryBuilder<Category, Category, QAfterSortBy> thenByDescriptionDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'description', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterSortBy> thenByIconPath() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'iconPath', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterSortBy> thenByIconPathDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'iconPath', Sort.desc);
     });
   }
 
@@ -1484,6 +1685,14 @@ extension CategoryQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Category, Category, QDistinct> distinctByIconPath({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'iconPath', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Category, Category, QDistinct> distinctByIsDeleted() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'isDeleted');
@@ -1530,6 +1739,12 @@ extension CategoryQueryProperty
   QueryBuilder<Category, String?, QQueryOperations> descriptionProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'description');
+    });
+  }
+
+  QueryBuilder<Category, String?, QQueryOperations> iconPathProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'iconPath');
     });
   }
 

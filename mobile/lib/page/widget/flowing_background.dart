@@ -1,4 +1,3 @@
-// 路径: lib/widgets/flowing_background.dart
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';

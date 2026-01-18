@@ -7,6 +7,7 @@ import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/page/widget/glass_nav_bar.dart';
 import 'package:pocketmind/page/widget/note_item.dart';
 import 'package:pocketmind/page/home/note_add_sheet.dart';
+import 'package:pocketmind/page/home/mixin/search_logic_mixin.dart';
 import 'package:pocketmind/providers/nav_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/providers/app_config_provider.dart';
@@ -23,20 +24,14 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, SearchLogicMixin {
   // 滚动控制器，用于保持滚动位置
   final ScrollController _scrollController = ScrollController();
 
-  // 搜索相关
-  final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
   bool _isSearchMode = false;
   late AnimationController _searchAnimationController;
   late Animation<Offset> _navBarSlideAnimation;
   late Animation<Offset> _searchBarSlideAnimation;
-
-  // 防抖计时器
-  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -65,41 +60,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             curve: Curves.easeInOut,
           ),
         );
-
-    // 监听输入变化，实现实时搜索
-    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
-    _searchController.removeListener(_onSearchChanged);
-    _searchController.dispose();
-    _searchFocusNode.dispose();
     _searchAnimationController.dispose();
-    _debounceTimer?.cancel();
     super.dispose();
-  }
-
-  // 监听搜索输入变化（实时搜索 + 防抖）
-  void _onSearchChanged() {
-    // 取消之前的计时器
-    _debounceTimer?.cancel();
-
-    final query = _searchController.text.trim();
-
-    // 如果输入为空，立即清空搜索结果
-    if (query.isEmpty) {
-      ref.read(searchQueryProvider.notifier).set(null);
-      return;
-    }
-
-    // 设置新的防抖计时器，500ms 后执行搜索
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      if (query.isNotEmpty) {
-        ref.read(searchQueryProvider.notifier).set(query);
-      }
-    });
   }
 
   // 切换搜索模式
@@ -110,15 +77,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         _searchAnimationController.forward();
         // 延迟一点让动画先执行，然后再聚焦
         Future.delayed(const Duration(milliseconds: 100), () {
-          _searchFocusNode.requestFocus();
+          searchFocusNode.requestFocus();
         });
       } else {
         _searchAnimationController.reverse();
-        _searchController.clear();
-        _searchFocusNode.unfocus();
-        _debounceTimer?.cancel();
-        // 清空搜索，返回到分类视图
-        ref.read(searchQueryProvider.notifier).set(null);
+        clearSearch();
+        searchFocusNode.unfocus();
       }
     });
   }
@@ -347,8 +311,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           // 搜索输入框
           Expanded(
             child: TextField(
-              controller: _searchController,
-              focusNode: _searchFocusNode,
+              controller: searchController,
+              focusNode: searchFocusNode,
               decoration: InputDecoration(
                 hintText: '搜索笔记...',
                 border: InputBorder.none,
@@ -363,7 +327,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
           // 清空按钮（当有输入时显示）
           ValueListenableBuilder<TextEditingValue>(
-            valueListenable: _searchController,
+            valueListenable: searchController,
             builder: (context, value, child) {
               if (value.text.isEmpty) {
                 return SizedBox(width: 48.w); // 占位，保持布局稳定
@@ -371,8 +335,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               return IconButton(
                 icon: const Icon(Icons.clear),
                 onPressed: () {
-                  _searchController.clear();
-                  _searchFocusNode.requestFocus();
+                  clearSearch();
+                  searchFocusNode.requestFocus();
                 },
                 color: colorScheme.onSurface.withValues(alpha: 0.6),
                 iconSize: 20.sp,

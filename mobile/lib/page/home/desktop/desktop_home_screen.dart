@@ -7,6 +7,7 @@ import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/page/widget/note_item.dart';
 import 'package:pocketmind/page/widget/desktop/desktop_header.dart';
 import 'package:pocketmind/page/home/note_add_sheet.dart';
+import 'package:pocketmind/page/home/mixin/search_logic_mixin.dart';
 import 'package:pocketmind/providers/nav_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/providers/ui_providers.dart';
@@ -24,15 +25,12 @@ class DesktopHomeScreen extends ConsumerStatefulWidget {
   ConsumerState<DesktopHomeScreen> createState() => _DesktopHomeScreenState();
 }
 
-class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen> {
-  final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
+class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
+    with SearchLogicMixin {
   final ScrollController _scrollController = ScrollController();
 
   @override
   void dispose() {
-    _searchController.dispose();
-    _searchFocusNode.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -75,19 +73,15 @@ class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen> {
 
                 // 顶部导航栏
                 DesktopHeader(
-                  searchController: _searchController,
-                  searchFocusNode: _searchFocusNode,
-                  onSearchSubmit: () {
-                    final query = _searchController.text.trim();
-                    if (query.isNotEmpty) {
-                      ref.read(searchQueryProvider.notifier).set(query);
-                    }
-                  },
+                  searchController: searchController,
+                  searchFocusNode: searchFocusNode,
+                  onSearchSubmit: submitSearch,
+                  onClear: clearSearch,
                 ),
 
                 // 内容区域
                 Expanded(
-                  child: searchQuery != null
+                  child: (searchQuery != null && searchQuery.isNotEmpty)
                       ? _buildSearchResults(
                           searchResults,
                           currentLayout,

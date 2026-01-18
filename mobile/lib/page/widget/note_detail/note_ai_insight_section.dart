@@ -3,7 +3,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/page/widget/creative_toast.dart';
 
 class NoteAIInsightSection extends StatelessWidget {
-  const NoteAIInsightSection({super.key});
+  String aiSummary;
+  NoteAIInsightSection({super.key,required this.aiSummary});
 
   @override
   Widget build(BuildContext context) {
@@ -71,45 +72,13 @@ class NoteAIInsightSection extends StatelessWidget {
                   child: Column(
                     children: [
                       Text(
-                        '让 AI 为你提炼核心洞察',
+                        aiSummary,
                         style: TextStyle(
                           fontSize: 13.sp,
                           color: colorScheme.secondary,
                           height: 1.5,
                         ),
                         textAlign: TextAlign.center,
-                      ),
-                      SizedBox(height: 16.h),
-                      // 生成按钮
-                      ElevatedButton(
-                        onPressed: () {
-                          CreativeToast.info(
-                            context,
-                            title: '即将上线',
-                            message: 'AI 洞察功能正在开发中',
-                            direction: ToastDirection.top,
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: colorScheme.onSurface,
-                          foregroundColor: colorScheme.surface,
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 24.w,
-                            vertical: 12.h,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8.r),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: Text(
-                          '生成洞察',
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1,
-                          ),
-                        ),
                       ),
                     ],
                   ),

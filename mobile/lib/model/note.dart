@@ -14,7 +14,7 @@ class Note {
   String? title;
 
   String? content;
-  
+
   @Index()
   String? url;
 
@@ -39,6 +39,9 @@ class Note {
   /// 链接预览图片URL（网络链接笔记用）
   String? previewImageUrl;
 
+  /// 链接预览图片列表（多图支持，如小红书笔记）
+  List<String> previewImageUrls = [];
+
   /// 链接预览标题
   String? previewTitle;
 
@@ -50,11 +53,14 @@ class Note {
 
   /// 后端资源抓取状态：PENDING / CRAWLED / EMBEDDED / FAILED
   ///
-  /// 注意：失败时仍保持 previewContent 为 null，遵循“失败静默”。
+  /// 注意：失败时仍保持 previewContent 为 null，遵循"失败静默"。
   String? resourceStatus;
 
   /// AI 生成的摘要
   String? aiSummary;
+
+  /// 待处理的 AI 问题（用户保存时输入，content 获取成功后再调用 AI）
+  String? pendingAiQuestion;
 
   Note copyWith({
     Id? id,
@@ -68,11 +74,13 @@ class Note {
     int? categoryId,
     String? tag,
     String? previewImageUrl,
+    List<String>? previewImageUrls,
     String? previewTitle,
     String? previewDescription,
     String? previewContent,
     String? resourceStatus,
     String? aiSummary,
+    String? pendingAiQuestion,
   }) {
     return Note()
       ..id = id ?? this.id
@@ -86,10 +94,12 @@ class Note {
       ..categoryId = categoryId ?? this.categoryId
       ..tag = tag ?? this.tag
       ..previewImageUrl = previewImageUrl ?? this.previewImageUrl
+      ..previewImageUrls = previewImageUrls ?? this.previewImageUrls
       ..previewTitle = previewTitle ?? this.previewTitle
       ..previewDescription = previewDescription ?? this.previewDescription
       ..previewContent = previewContent ?? this.previewContent
       ..resourceStatus = resourceStatus ?? this.resourceStatus
-      ..aiSummary = aiSummary ?? this.aiSummary;
+      ..aiSummary = aiSummary ?? this.aiSummary
+      ..pendingAiQuestion = pendingAiQuestion ?? this.pendingAiQuestion;
   }
 }

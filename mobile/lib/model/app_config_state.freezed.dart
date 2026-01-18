@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$AppConfigState {
 
- bool get proxyEnabled; String get proxyHost; int get proxyPort; int get metaCacheTime; bool get titleEnabled; bool get waterfallLayoutEnabled; bool get syncAutoStart; List<Map<String, String>> get reminderShortcuts; bool get highPrecisionNotification; int get notificationIntensity; String get linkPreviewApiKey; Environment get environment;
+ bool get proxyEnabled; String get proxyHost; int get proxyPort; int get metaCacheTime; bool get titleEnabled; bool get waterfallLayoutEnabled; bool get syncAutoStart; List<Map<String, String>> get reminderShortcuts; bool get highPrecisionNotification; int get notificationIntensity; String get linkPreviewApiKey; String get customDomain; Environment get environment;
 /// Create a copy of AppConfigState
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $AppConfigStateCopyWith<AppConfigState> get copyWith => _$AppConfigStateCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is AppConfigState&&(identical(other.proxyEnabled, proxyEnabled) || other.proxyEnabled == proxyEnabled)&&(identical(other.proxyHost, proxyHost) || other.proxyHost == proxyHost)&&(identical(other.proxyPort, proxyPort) || other.proxyPort == proxyPort)&&(identical(other.metaCacheTime, metaCacheTime) || other.metaCacheTime == metaCacheTime)&&(identical(other.titleEnabled, titleEnabled) || other.titleEnabled == titleEnabled)&&(identical(other.waterfallLayoutEnabled, waterfallLayoutEnabled) || other.waterfallLayoutEnabled == waterfallLayoutEnabled)&&(identical(other.syncAutoStart, syncAutoStart) || other.syncAutoStart == syncAutoStart)&&const DeepCollectionEquality().equals(other.reminderShortcuts, reminderShortcuts)&&(identical(other.highPrecisionNotification, highPrecisionNotification) || other.highPrecisionNotification == highPrecisionNotification)&&(identical(other.notificationIntensity, notificationIntensity) || other.notificationIntensity == notificationIntensity)&&(identical(other.linkPreviewApiKey, linkPreviewApiKey) || other.linkPreviewApiKey == linkPreviewApiKey)&&(identical(other.environment, environment) || other.environment == environment));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is AppConfigState&&(identical(other.proxyEnabled, proxyEnabled) || other.proxyEnabled == proxyEnabled)&&(identical(other.proxyHost, proxyHost) || other.proxyHost == proxyHost)&&(identical(other.proxyPort, proxyPort) || other.proxyPort == proxyPort)&&(identical(other.metaCacheTime, metaCacheTime) || other.metaCacheTime == metaCacheTime)&&(identical(other.titleEnabled, titleEnabled) || other.titleEnabled == titleEnabled)&&(identical(other.waterfallLayoutEnabled, waterfallLayoutEnabled) || other.waterfallLayoutEnabled == waterfallLayoutEnabled)&&(identical(other.syncAutoStart, syncAutoStart) || other.syncAutoStart == syncAutoStart)&&const DeepCollectionEquality().equals(other.reminderShortcuts, reminderShortcuts)&&(identical(other.highPrecisionNotification, highPrecisionNotification) || other.highPrecisionNotification == highPrecisionNotification)&&(identical(other.notificationIntensity, notificationIntensity) || other.notificationIntensity == notificationIntensity)&&(identical(other.linkPreviewApiKey, linkPreviewApiKey) || other.linkPreviewApiKey == linkPreviewApiKey)&&(identical(other.customDomain, customDomain) || other.customDomain == customDomain)&&(identical(other.environment, environment) || other.environment == environment));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,proxyEnabled,proxyHost,proxyPort,metaCacheTime,titleEnabled,waterfallLayoutEnabled,syncAutoStart,const DeepCollectionEquality().hash(reminderShortcuts),highPrecisionNotification,notificationIntensity,linkPreviewApiKey,environment);
+int get hashCode => Object.hash(runtimeType,proxyEnabled,proxyHost,proxyPort,metaCacheTime,titleEnabled,waterfallLayoutEnabled,syncAutoStart,const DeepCollectionEquality().hash(reminderShortcuts),highPrecisionNotification,notificationIntensity,linkPreviewApiKey,customDomain,environment);
 
 @override
 String toString() {
-  return 'AppConfigState(proxyEnabled: $proxyEnabled, proxyHost: $proxyHost, proxyPort: $proxyPort, metaCacheTime: $metaCacheTime, titleEnabled: $titleEnabled, waterfallLayoutEnabled: $waterfallLayoutEnabled, syncAutoStart: $syncAutoStart, reminderShortcuts: $reminderShortcuts, highPrecisionNotification: $highPrecisionNotification, notificationIntensity: $notificationIntensity, linkPreviewApiKey: $linkPreviewApiKey, environment: $environment)';
+  return 'AppConfigState(proxyEnabled: $proxyEnabled, proxyHost: $proxyHost, proxyPort: $proxyPort, metaCacheTime: $metaCacheTime, titleEnabled: $titleEnabled, waterfallLayoutEnabled: $waterfallLayoutEnabled, syncAutoStart: $syncAutoStart, reminderShortcuts: $reminderShortcuts, highPrecisionNotification: $highPrecisionNotification, notificationIntensity: $notificationIntensity, linkPreviewApiKey: $linkPreviewApiKey, customDomain: $customDomain, environment: $environment)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $AppConfigStateCopyWith<$Res>  {
   factory $AppConfigStateCopyWith(AppConfigState value, $Res Function(AppConfigState) _then) = _$AppConfigStateCopyWithImpl;
 @useResult
 $Res call({
- bool proxyEnabled, String proxyHost, int proxyPort, int metaCacheTime, bool titleEnabled, bool waterfallLayoutEnabled, bool syncAutoStart, List<Map<String, String>> reminderShortcuts, bool highPrecisionNotification, int notificationIntensity, String linkPreviewApiKey, Environment environment
+ bool proxyEnabled, String proxyHost, int proxyPort, int metaCacheTime, bool titleEnabled, bool waterfallLayoutEnabled, bool syncAutoStart, List<Map<String, String>> reminderShortcuts, bool highPrecisionNotification, int notificationIntensity, String linkPreviewApiKey, String customDomain, Environment environment
 });
 
 
@@ -65,7 +65,7 @@ class _$AppConfigStateCopyWithImpl<$Res>
 
 /// Create a copy of AppConfigState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? proxyEnabled = null,Object? proxyHost = null,Object? proxyPort = null,Object? metaCacheTime = null,Object? titleEnabled = null,Object? waterfallLayoutEnabled = null,Object? syncAutoStart = null,Object? reminderShortcuts = null,Object? highPrecisionNotification = null,Object? notificationIntensity = null,Object? linkPreviewApiKey = null,Object? environment = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? proxyEnabled = null,Object? proxyHost = null,Object? proxyPort = null,Object? metaCacheTime = null,Object? titleEnabled = null,Object? waterfallLayoutEnabled = null,Object? syncAutoStart = null,Object? reminderShortcuts = null,Object? highPrecisionNotification = null,Object? notificationIntensity = null,Object? linkPreviewApiKey = null,Object? customDomain = null,Object? environment = null,}) {
   return _then(_self.copyWith(
 proxyEnabled: null == proxyEnabled ? _self.proxyEnabled : proxyEnabled // ignore: cast_nullable_to_non_nullable
 as bool,proxyHost: null == proxyHost ? _self.proxyHost : proxyHost // ignore: cast_nullable_to_non_nullable
@@ -78,6 +78,7 @@ as bool,reminderShortcuts: null == reminderShortcuts ? _self.reminderShortcuts :
 as List<Map<String, String>>,highPrecisionNotification: null == highPrecisionNotification ? _self.highPrecisionNotification : highPrecisionNotification // ignore: cast_nullable_to_non_nullable
 as bool,notificationIntensity: null == notificationIntensity ? _self.notificationIntensity : notificationIntensity // ignore: cast_nullable_to_non_nullable
 as int,linkPreviewApiKey: null == linkPreviewApiKey ? _self.linkPreviewApiKey : linkPreviewApiKey // ignore: cast_nullable_to_non_nullable
+as String,customDomain: null == customDomain ? _self.customDomain : customDomain // ignore: cast_nullable_to_non_nullable
 as String,environment: null == environment ? _self.environment : environment // ignore: cast_nullable_to_non_nullable
 as Environment,
   ));
@@ -164,10 +165,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( bool proxyEnabled,  String proxyHost,  int proxyPort,  int metaCacheTime,  bool titleEnabled,  bool waterfallLayoutEnabled,  bool syncAutoStart,  List<Map<String, String>> reminderShortcuts,  bool highPrecisionNotification,  int notificationIntensity,  String linkPreviewApiKey,  Environment environment)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( bool proxyEnabled,  String proxyHost,  int proxyPort,  int metaCacheTime,  bool titleEnabled,  bool waterfallLayoutEnabled,  bool syncAutoStart,  List<Map<String, String>> reminderShortcuts,  bool highPrecisionNotification,  int notificationIntensity,  String linkPreviewApiKey,  String customDomain,  Environment environment)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _AppConfigState() when $default != null:
-return $default(_that.proxyEnabled,_that.proxyHost,_that.proxyPort,_that.metaCacheTime,_that.titleEnabled,_that.waterfallLayoutEnabled,_that.syncAutoStart,_that.reminderShortcuts,_that.highPrecisionNotification,_that.notificationIntensity,_that.linkPreviewApiKey,_that.environment);case _:
+return $default(_that.proxyEnabled,_that.proxyHost,_that.proxyPort,_that.metaCacheTime,_that.titleEnabled,_that.waterfallLayoutEnabled,_that.syncAutoStart,_that.reminderShortcuts,_that.highPrecisionNotification,_that.notificationIntensity,_that.linkPreviewApiKey,_that.customDomain,_that.environment);case _:
   return orElse();
 
 }
@@ -185,10 +186,10 @@ return $default(_that.proxyEnabled,_that.proxyHost,_that.proxyPort,_that.metaCac
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( bool proxyEnabled,  String proxyHost,  int proxyPort,  int metaCacheTime,  bool titleEnabled,  bool waterfallLayoutEnabled,  bool syncAutoStart,  List<Map<String, String>> reminderShortcuts,  bool highPrecisionNotification,  int notificationIntensity,  String linkPreviewApiKey,  Environment environment)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( bool proxyEnabled,  String proxyHost,  int proxyPort,  int metaCacheTime,  bool titleEnabled,  bool waterfallLayoutEnabled,  bool syncAutoStart,  List<Map<String, String>> reminderShortcuts,  bool highPrecisionNotification,  int notificationIntensity,  String linkPreviewApiKey,  String customDomain,  Environment environment)  $default,) {final _that = this;
 switch (_that) {
 case _AppConfigState():
-return $default(_that.proxyEnabled,_that.proxyHost,_that.proxyPort,_that.metaCacheTime,_that.titleEnabled,_that.waterfallLayoutEnabled,_that.syncAutoStart,_that.reminderShortcuts,_that.highPrecisionNotification,_that.notificationIntensity,_that.linkPreviewApiKey,_that.environment);case _:
+return $default(_that.proxyEnabled,_that.proxyHost,_that.proxyPort,_that.metaCacheTime,_that.titleEnabled,_that.waterfallLayoutEnabled,_that.syncAutoStart,_that.reminderShortcuts,_that.highPrecisionNotification,_that.notificationIntensity,_that.linkPreviewApiKey,_that.customDomain,_that.environment);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -205,10 +206,10 @@ return $default(_that.proxyEnabled,_that.proxyHost,_that.proxyPort,_that.metaCac
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( bool proxyEnabled,  String proxyHost,  int proxyPort,  int metaCacheTime,  bool titleEnabled,  bool waterfallLayoutEnabled,  bool syncAutoStart,  List<Map<String, String>> reminderShortcuts,  bool highPrecisionNotification,  int notificationIntensity,  String linkPreviewApiKey,  Environment environment)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( bool proxyEnabled,  String proxyHost,  int proxyPort,  int metaCacheTime,  bool titleEnabled,  bool waterfallLayoutEnabled,  bool syncAutoStart,  List<Map<String, String>> reminderShortcuts,  bool highPrecisionNotification,  int notificationIntensity,  String linkPreviewApiKey,  String customDomain,  Environment environment)?  $default,) {final _that = this;
 switch (_that) {
 case _AppConfigState() when $default != null:
-return $default(_that.proxyEnabled,_that.proxyHost,_that.proxyPort,_that.metaCacheTime,_that.titleEnabled,_that.waterfallLayoutEnabled,_that.syncAutoStart,_that.reminderShortcuts,_that.highPrecisionNotification,_that.notificationIntensity,_that.linkPreviewApiKey,_that.environment);case _:
+return $default(_that.proxyEnabled,_that.proxyHost,_that.proxyPort,_that.metaCacheTime,_that.titleEnabled,_that.waterfallLayoutEnabled,_that.syncAutoStart,_that.reminderShortcuts,_that.highPrecisionNotification,_that.notificationIntensity,_that.linkPreviewApiKey,_that.customDomain,_that.environment);case _:
   return null;
 
 }
@@ -220,7 +221,7 @@ return $default(_that.proxyEnabled,_that.proxyHost,_that.proxyPort,_that.metaCac
 @JsonSerializable()
 
 class _AppConfigState extends AppConfigState {
-  const _AppConfigState({this.proxyEnabled = false, this.proxyHost = AppConstants.defaultProxyHost, this.proxyPort = AppConstants.defaultProxyPort, this.metaCacheTime = AppConstants.defaultMetaCacheTimeDays, this.titleEnabled = false, this.waterfallLayoutEnabled = true, this.syncAutoStart = false, final  List<Map<String, String>> reminderShortcuts = const [], this.highPrecisionNotification = false, this.notificationIntensity = AppConstants.defaultNotificationIntensity, this.linkPreviewApiKey = '', this.environment = Environment.development}): _reminderShortcuts = reminderShortcuts,super._();
+  const _AppConfigState({this.proxyEnabled = false, this.proxyHost = AppConstants.defaultProxyHost, this.proxyPort = AppConstants.defaultProxyPort, this.metaCacheTime = AppConstants.defaultMetaCacheTimeDays, this.titleEnabled = false, this.waterfallLayoutEnabled = true, this.syncAutoStart = false, final  List<Map<String, String>> reminderShortcuts = const [], this.highPrecisionNotification = false, this.notificationIntensity = AppConstants.defaultNotificationIntensity, this.linkPreviewApiKey = '', this.customDomain = '', this.environment = Environment.development}): _reminderShortcuts = reminderShortcuts,super._();
   factory _AppConfigState.fromJson(Map<String, dynamic> json) => _$AppConfigStateFromJson(json);
 
 @override@JsonKey() final  bool proxyEnabled;
@@ -240,6 +241,7 @@ class _AppConfigState extends AppConfigState {
 @override@JsonKey() final  bool highPrecisionNotification;
 @override@JsonKey() final  int notificationIntensity;
 @override@JsonKey() final  String linkPreviewApiKey;
+@override@JsonKey() final  String customDomain;
 @override@JsonKey() final  Environment environment;
 
 /// Create a copy of AppConfigState
@@ -255,16 +257,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AppConfigState&&(identical(other.proxyEnabled, proxyEnabled) || other.proxyEnabled == proxyEnabled)&&(identical(other.proxyHost, proxyHost) || other.proxyHost == proxyHost)&&(identical(other.proxyPort, proxyPort) || other.proxyPort == proxyPort)&&(identical(other.metaCacheTime, metaCacheTime) || other.metaCacheTime == metaCacheTime)&&(identical(other.titleEnabled, titleEnabled) || other.titleEnabled == titleEnabled)&&(identical(other.waterfallLayoutEnabled, waterfallLayoutEnabled) || other.waterfallLayoutEnabled == waterfallLayoutEnabled)&&(identical(other.syncAutoStart, syncAutoStart) || other.syncAutoStart == syncAutoStart)&&const DeepCollectionEquality().equals(other._reminderShortcuts, _reminderShortcuts)&&(identical(other.highPrecisionNotification, highPrecisionNotification) || other.highPrecisionNotification == highPrecisionNotification)&&(identical(other.notificationIntensity, notificationIntensity) || other.notificationIntensity == notificationIntensity)&&(identical(other.linkPreviewApiKey, linkPreviewApiKey) || other.linkPreviewApiKey == linkPreviewApiKey)&&(identical(other.environment, environment) || other.environment == environment));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AppConfigState&&(identical(other.proxyEnabled, proxyEnabled) || other.proxyEnabled == proxyEnabled)&&(identical(other.proxyHost, proxyHost) || other.proxyHost == proxyHost)&&(identical(other.proxyPort, proxyPort) || other.proxyPort == proxyPort)&&(identical(other.metaCacheTime, metaCacheTime) || other.metaCacheTime == metaCacheTime)&&(identical(other.titleEnabled, titleEnabled) || other.titleEnabled == titleEnabled)&&(identical(other.waterfallLayoutEnabled, waterfallLayoutEnabled) || other.waterfallLayoutEnabled == waterfallLayoutEnabled)&&(identical(other.syncAutoStart, syncAutoStart) || other.syncAutoStart == syncAutoStart)&&const DeepCollectionEquality().equals(other._reminderShortcuts, _reminderShortcuts)&&(identical(other.highPrecisionNotification, highPrecisionNotification) || other.highPrecisionNotification == highPrecisionNotification)&&(identical(other.notificationIntensity, notificationIntensity) || other.notificationIntensity == notificationIntensity)&&(identical(other.linkPreviewApiKey, linkPreviewApiKey) || other.linkPreviewApiKey == linkPreviewApiKey)&&(identical(other.customDomain, customDomain) || other.customDomain == customDomain)&&(identical(other.environment, environment) || other.environment == environment));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,proxyEnabled,proxyHost,proxyPort,metaCacheTime,titleEnabled,waterfallLayoutEnabled,syncAutoStart,const DeepCollectionEquality().hash(_reminderShortcuts),highPrecisionNotification,notificationIntensity,linkPreviewApiKey,environment);
+int get hashCode => Object.hash(runtimeType,proxyEnabled,proxyHost,proxyPort,metaCacheTime,titleEnabled,waterfallLayoutEnabled,syncAutoStart,const DeepCollectionEquality().hash(_reminderShortcuts),highPrecisionNotification,notificationIntensity,linkPreviewApiKey,customDomain,environment);
 
 @override
 String toString() {
-  return 'AppConfigState(proxyEnabled: $proxyEnabled, proxyHost: $proxyHost, proxyPort: $proxyPort, metaCacheTime: $metaCacheTime, titleEnabled: $titleEnabled, waterfallLayoutEnabled: $waterfallLayoutEnabled, syncAutoStart: $syncAutoStart, reminderShortcuts: $reminderShortcuts, highPrecisionNotification: $highPrecisionNotification, notificationIntensity: $notificationIntensity, linkPreviewApiKey: $linkPreviewApiKey, environment: $environment)';
+  return 'AppConfigState(proxyEnabled: $proxyEnabled, proxyHost: $proxyHost, proxyPort: $proxyPort, metaCacheTime: $metaCacheTime, titleEnabled: $titleEnabled, waterfallLayoutEnabled: $waterfallLayoutEnabled, syncAutoStart: $syncAutoStart, reminderShortcuts: $reminderShortcuts, highPrecisionNotification: $highPrecisionNotification, notificationIntensity: $notificationIntensity, linkPreviewApiKey: $linkPreviewApiKey, customDomain: $customDomain, environment: $environment)';
 }
 
 
@@ -275,7 +277,7 @@ abstract mixin class _$AppConfigStateCopyWith<$Res> implements $AppConfigStateCo
   factory _$AppConfigStateCopyWith(_AppConfigState value, $Res Function(_AppConfigState) _then) = __$AppConfigStateCopyWithImpl;
 @override @useResult
 $Res call({
- bool proxyEnabled, String proxyHost, int proxyPort, int metaCacheTime, bool titleEnabled, bool waterfallLayoutEnabled, bool syncAutoStart, List<Map<String, String>> reminderShortcuts, bool highPrecisionNotification, int notificationIntensity, String linkPreviewApiKey, Environment environment
+ bool proxyEnabled, String proxyHost, int proxyPort, int metaCacheTime, bool titleEnabled, bool waterfallLayoutEnabled, bool syncAutoStart, List<Map<String, String>> reminderShortcuts, bool highPrecisionNotification, int notificationIntensity, String linkPreviewApiKey, String customDomain, Environment environment
 });
 
 
@@ -292,7 +294,7 @@ class __$AppConfigStateCopyWithImpl<$Res>
 
 /// Create a copy of AppConfigState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? proxyEnabled = null,Object? proxyHost = null,Object? proxyPort = null,Object? metaCacheTime = null,Object? titleEnabled = null,Object? waterfallLayoutEnabled = null,Object? syncAutoStart = null,Object? reminderShortcuts = null,Object? highPrecisionNotification = null,Object? notificationIntensity = null,Object? linkPreviewApiKey = null,Object? environment = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? proxyEnabled = null,Object? proxyHost = null,Object? proxyPort = null,Object? metaCacheTime = null,Object? titleEnabled = null,Object? waterfallLayoutEnabled = null,Object? syncAutoStart = null,Object? reminderShortcuts = null,Object? highPrecisionNotification = null,Object? notificationIntensity = null,Object? linkPreviewApiKey = null,Object? customDomain = null,Object? environment = null,}) {
   return _then(_AppConfigState(
 proxyEnabled: null == proxyEnabled ? _self.proxyEnabled : proxyEnabled // ignore: cast_nullable_to_non_nullable
 as bool,proxyHost: null == proxyHost ? _self.proxyHost : proxyHost // ignore: cast_nullable_to_non_nullable
@@ -305,6 +307,7 @@ as bool,reminderShortcuts: null == reminderShortcuts ? _self._reminderShortcuts 
 as List<Map<String, String>>,highPrecisionNotification: null == highPrecisionNotification ? _self.highPrecisionNotification : highPrecisionNotification // ignore: cast_nullable_to_non_nullable
 as bool,notificationIntensity: null == notificationIntensity ? _self.notificationIntensity : notificationIntensity // ignore: cast_nullable_to_non_nullable
 as int,linkPreviewApiKey: null == linkPreviewApiKey ? _self.linkPreviewApiKey : linkPreviewApiKey // ignore: cast_nullable_to_non_nullable
+as String,customDomain: null == customDomain ? _self.customDomain : customDomain // ignore: cast_nullable_to_non_nullable
 as String,environment: null == environment ? _self.environment : environment // ignore: cast_nullable_to_non_nullable
 as Environment,
   ));

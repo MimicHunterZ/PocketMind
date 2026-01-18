@@ -1,9 +1,10 @@
+import 'package:pocketmind/util/platform_detector.dart';
+
 /// 链接预览配置
 class LinkPreviewConfig {
-  /// 智能判断是否使用 API 服务
+  /// 判断是否使用 LinkPreviewAPI 服务
   /// 
-  /// **X/Twitter/YouTube 使用 API**（稳定可靠，支持复杂网站）
-  /// **国内网站使用 any_link_preview**（效果好，有图片）
+  /// X/Twitter/YouTube 使用 LinkPreviewAPI
   static bool shouldUseApiService(String url) {
     final lowerUrl = url.toLowerCase();
     
@@ -24,9 +25,6 @@ class LinkPreviewConfig {
     return false;
   }
 
-  /// 调试模式：打印详细日志
-  static const bool debugMode = true;
-
   static bool shouldUseBackendService(String url) {
     final lowerUrl = url.toLowerCase();
     // X/Twitter 使用 API
@@ -36,5 +34,11 @@ class LinkPreviewConfig {
       return true;
     }
     return false;
+  }
+
+  static bool shouldUsePlatformScraper(String url){
+    final canHandle =
+        PlatformDetector.detectPlatform(url) != PlatformType.generic;
+    return canHandle;
   }
 }

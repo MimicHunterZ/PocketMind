@@ -19,12 +19,10 @@ class AuthSessionState {
 
   const AuthSessionState({this.userId, this.token, this.expiryTime});
 
-  bool get isLoggedIn {
-    if (token == null || token!.isEmpty) return false;
-    if (expiryTime != null && expiryTime!.isBefore(DateTime.now()))
-      return false;
-    return true;
-  }
+  bool get isLoggedIn =>
+      token != null &&
+      token!.isNotEmpty &&
+      (expiryTime == null || !expiryTime!.isBefore(DateTime.now()));
 
   AuthSessionState copyWith({
     String? userId,
@@ -41,6 +39,7 @@ class AuthSessionState {
 
 @Riverpod(keepAlive: true)
 class AuthController extends _$AuthController {
+  final String tag = 'AuthController';
   @override
   AuthSessionState build() {
     final prefs = ref.watch(sharedPreferencesProvider);
@@ -91,7 +90,6 @@ class AuthController extends _$AuthController {
     final expiryTime = DateTime.now().add(
       Duration(seconds: res.expiresInSeconds),
     );
-
     await prefs.setString(_keyAuthToken, res.token);
     await prefs.setString(_keyAuthUserId, res.userId);
     await prefs.setInt(_keyAuthExpiry, expiryTime.millisecondsSinceEpoch);

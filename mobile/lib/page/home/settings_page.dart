@@ -26,6 +26,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   final _meteCacheTimeController = TextEditingController();
   final _proxyHostController = TextEditingController();
   final _proxyPortController = TextEditingController();
+  final _customDomainController = TextEditingController();
   final _log = LogService();
 
   bool _proxyEnabled = false;
@@ -47,6 +48,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     _apiKeyController.dispose();
     _proxyHostController.dispose();
     _proxyPortController.dispose();
+    _customDomainController.dispose();
     _meteCacheTimeController.dispose();
     super.dispose();
   }
@@ -60,6 +62,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       _currentEnvironment = config.environment;
       _proxyHostController.text = config.proxyHost;
       _proxyPortController.text = config.proxyPort.toString();
+      _customDomainController.text = config.customDomain;
       _apiKeyController.text = config.linkPreviewApiKey;
       _meteCacheTimeController.text = config.metaCacheTime.toString();
       _isWaterfallLayout = config.waterfallLayoutEnabled;
@@ -87,6 +90,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     // 保存环境设置
     await notifier.setEnvironment(_currentEnvironment);
+
+    // 保存 Custom Domain
+    await notifier.setCustomDomain(_customDomainController.text);
 
     // 保存 API Key
     await notifier.setLinkPreviewApiKey(_apiKeyController.text);
@@ -162,6 +168,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           _buildNotificationCard(theme),
           SizedBox(height: 24.h),
 
+          // 平台账号
+          _buildSectionTitle('平台账号', theme),
+          _buildPlatformAccountsCard(theme),
+          SizedBox(height: 24.h),
+
           // 局域网同步设置
           _buildSectionTitle('数据同步', theme),
           _buildSyncSettingCard(theme),
@@ -173,10 +184,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           SizedBox(height: 24.h),
 
           // API 环境设置
-          // todo 暂且不需要
-          // _buildSectionTitle('API 环境', theme),
-          // _buildEnvironmentCard(theme),
-          // const SizedBox(height: 24),
+          _buildSectionTitle('服务器设置', theme),
+          _buildServerConfigCard(theme),
+          SizedBox(height: 24.h),
 
           // 网络代理设置
           _buildSectionTitle('网络代理', theme),
@@ -208,6 +218,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         subtitle: Text('未登录也可正常使用，本地功能不受影响', style: theme.textTheme.bodySmall),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: () => context.push(RoutePaths.auth),
+      ),
+    );
+  }
+
+  Widget _buildPlatformAccountsCard(ThemeData theme) {
+    return Card(
+      color: theme.cardColor,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+      ),
+      child: ListTile(
+        leading: const Icon(Icons.language_rounded),
+        title: Text('第三方平台', style: theme.textTheme.bodyLarge),
+        subtitle: Text('小红书等平台账号授权，用于获取链接内容', style: theme.textTheme.bodySmall),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () => context.push(RoutePaths.platformAccounts),
       ),
     );
   }
@@ -448,6 +476,41 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
       );
     }
+  }
+
+  Widget _buildServerConfigCard(ThemeData theme) {
+    return Card(
+      color: theme.cardColor,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        side: BorderSide(color: theme.dividerColor.withValues(alpha: 0.1)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(16.r),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('后端服务地址', style: theme.textTheme.bodyLarge),
+            SizedBox(height: 8.h),
+            Text('自定义后端 API 地址 (留空则使用默认配置)', style: theme.textTheme.bodySmall),
+            SizedBox(height: 16.h),
+            TextField(
+              controller: _customDomainController,
+              decoration: InputDecoration(
+                labelText: 'API 域名',
+                hintText: 'https://pocketmind.doublez-area.online',
+                prefixIcon: const Icon(Icons.cloud),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+              ),
+              maxLines: 1,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildProxyCard(ThemeData theme) {

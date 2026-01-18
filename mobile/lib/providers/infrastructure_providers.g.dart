@@ -105,3 +105,104 @@ final class NotificationServiceProvider
 
 String _$notificationServiceHash() =>
     r'58da87941dbfa08925105dcc4d74091ee38c8593';
+
+/// 平台爬虫服务 Provider - 全局单例
+
+@ProviderFor(platformScraperService)
+const platformScraperServiceProvider = PlatformScraperServiceProvider._();
+
+/// 平台爬虫服务 Provider - 全局单例
+
+final class PlatformScraperServiceProvider
+    extends
+        $FunctionalProvider<
+          PlatformScraperService,
+          PlatformScraperService,
+          PlatformScraperService
+        >
+    with $Provider<PlatformScraperService> {
+  /// 平台爬虫服务 Provider - 全局单例
+  const PlatformScraperServiceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'platformScraperServiceProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$platformScraperServiceHash();
+
+  @$internal
+  @override
+  $ProviderElement<PlatformScraperService> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  PlatformScraperService create(Ref ref) {
+    return platformScraperService(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(PlatformScraperService value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<PlatformScraperService>(value),
+    );
+  }
+}
+
+String _$platformScraperServiceHash() =>
+    r'9a7d088c334f0c23c8abbd9fb6d36a75358a8209';
+
+@ProviderFor(cookieManagerService)
+const cookieManagerServiceProvider = CookieManagerServiceProvider._();
+
+final class CookieManagerServiceProvider
+    extends
+        $FunctionalProvider<
+          CookieManagerService,
+          CookieManagerService,
+          CookieManagerService
+        >
+    with $Provider<CookieManagerService> {
+  const CookieManagerServiceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'cookieManagerServiceProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$cookieManagerServiceHash();
+
+  @$internal
+  @override
+  $ProviderElement<CookieManagerService> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  CookieManagerService create(Ref ref) {
+    return cookieManagerService(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(CookieManagerService value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<CookieManagerService>(value),
+    );
+  }
+}
+
+String _$cookieManagerServiceHash() =>
+    r'f7338b989719a0445e4f1237479232fe3e398dce';

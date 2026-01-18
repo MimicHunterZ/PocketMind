@@ -34,6 +34,7 @@ abstract class AppConfigState with _$AppConfigState {
     @Default(AppConstants.defaultNotificationIntensity)
     int notificationIntensity,
     @Default('') String linkPreviewApiKey,
+    @Default('') String customDomain,
     @Default(Environment.development) Environment environment,
   }) = _AppConfigState;
 
@@ -43,13 +44,16 @@ abstract class AppConfigState with _$AppConfigState {
 
   /// 获取 API 基础 URL
   String get baseUrl {
+    if (customDomain.isNotEmpty) {
+      return customDomain;
+    }
     switch (environment) {
       case Environment.development:
         return 'http://localhost:8080';
       case Environment.staging:
         return ''; // 预发布环境，可按需修改
       case Environment.production:
-        return ''; // 生产环境，可按需修改
+        return 'https://pocketmind.doublez-area.online';
     }
   }
 

@@ -27,3 +27,37 @@ Stream<List<Category>> allCategories(Ref ref) {
   final categoryService = ref.watch(categoryServiceProvider);
   return categoryService.watchAllCategories();
 }
+
+/// 分类操作 Notifier - 封装所有分类相关的业务操作
+///
+/// UI 层应通过此 Notifier 进行分类的增删改操作，
+/// 而不是直接调用 CategoryService
+@riverpod
+class CategoryActions extends _$CategoryActions {
+  @override
+  void build() {
+    // 无状态，仅提供方法
+  }
+
+  /// 添加新分类
+  ///
+  /// [name] 分类名称（必填）
+  /// [iconPath] 分类图标路径（可选）
+  /// 返回新创建分类的 ID
+  Future<int> addCategory({required String name, String? iconPath}) async {
+    final service = ref.read(categoryServiceProvider);
+    return await service.addCategory(name: name, iconPath: iconPath);
+  }
+
+  /// 删除分类
+  Future<void> deleteCategory(int categoryId) async {
+    final service = ref.read(categoryServiceProvider);
+    await service.deleteCategory(categoryId);
+  }
+
+  /// 获取分类详情
+  Future<Category?> getCategoryById(int categoryId) async {
+    final service = ref.read(categoryServiceProvider);
+    return await service.getCategoryById(categoryId);
+  }
+}

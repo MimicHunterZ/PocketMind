@@ -170,12 +170,14 @@ class DesktopHeader extends ConsumerWidget {
   final TextEditingController searchController;
   final FocusNode searchFocusNode;
   final VoidCallback? onSearchSubmit;
+  final VoidCallback? onClear;
 
   const DesktopHeader({
     super.key,
     required this.searchController,
     required this.searchFocusNode,
     this.onSearchSubmit,
+    this.onClear,
   });
 
   @override
@@ -203,6 +205,7 @@ class DesktopHeader extends ConsumerWidget {
                   controller: searchController,
                   focusNode: searchFocusNode,
                   onSubmitted: onSearchSubmit,
+                  onClear: onClear,
                 ),
               ),
             ),
@@ -236,11 +239,13 @@ class _DesktopSearchBar extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final VoidCallback? onSubmitted;
+  final VoidCallback? onClear;
 
   const _DesktopSearchBar({
     required this.controller,
     required this.focusNode,
     this.onSubmitted,
+    this.onClear,
   });
 
   @override
@@ -301,6 +306,7 @@ class _DesktopSearchBar extends StatelessWidget {
                 child: GestureDetector(
                   onTap: () {
                     controller.clear();
+                    onClear?.call();
                     focusNode.requestFocus();
                   },
                   child: MouseRegion(

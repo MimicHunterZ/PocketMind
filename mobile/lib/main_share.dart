@@ -1,4 +1,3 @@
-// 路径: lib/main_share.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,19 +11,24 @@ import 'package:pocketmind/page/widget/flowing_background.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/providers/auth_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
-import 'package:pocketmind/providers/pm_service_providers.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';
+import 'package:pocketmind/service/call_back_dispatcher.dart';
 import 'package:pocketmind/service/note_service.dart';
 import 'package:pocketmind/service/notification_service.dart';
+import 'package:pocketmind/service/scraper/scraper_queue_manager.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/util/proxy_config.dart';
 import 'package:pocketmind/util/theme_data.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pocketmind/util/url_helper.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workmanager/workmanager.dart';
+import 'api/note_api_service.dart';
 import 'util/logger_service.dart';
 import 'package:flutter_uri_to_file/flutter_uri_to_file.dart';
+import 'package:pocketmind/util/platform_detector.dart';
 
 late Isar isar;
 final String tag = 'main_share';
@@ -62,6 +66,9 @@ Future<void> mainShare() async {
 
   await ImageStorageHelper().init();
 
+  //开启后台进程
+  Workmanager().initialize(callbackDispatcher);
+
   // 4. 运行一个 只 包含分享 UI 的应用
   runApp(
     ProviderScope(
@@ -89,6 +96,7 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
   ShareUIState _currentState = ShareUIState.waiting;
   ShareData? _currentShare;
   int _noteId = -1;
+  String? url;
 
   late final NoteService noteService;
 
@@ -106,6 +114,55 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _notifyEngineReady();
     });
+  }
+
+  /// 初始化爬虫队列管理器
+  Future<void> _initScraperQueueManager() async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    final queueManager = ScraperQueueManager.instance;
+    await queueManager.init(prefs);
+
+    // 设置任务执行回调
+    queueManager.onExecuteTask = (task) async {
+      PMlog.d(tag, '执行爬取任务: noteId=${task.noteId}, url=${task.url}');
+
+      final scraperService = ref.read(platformScraperServiceProvider);
+      final metadata = await scraperService.scrape(task.url);
+
+      if (metadata == null) {
+        PMlog.e(tag, '爬取失败: 无法获取元数据');
+        return;
+      }
+
+      // 更新 Note
+      final note = await isar.notes.get(task.noteId);
+      if (note == null) {
+        PMlog.w(tag, '笔记不存在: noteId=${task.noteId}');
+        return;
+      }
+      ref
+          .read(noteServiceProvider)
+          .updateNote(
+            id: task.noteId,
+            previewTitle: metadata.title,
+            previewContent: metadata.previewContent,
+            previewDescription: metadata.previewDescription,
+            previewImageUrls: (metadata.imageUrls?.isNotEmpty ?? false)
+                ? metadata.imageUrls
+                : null,
+          );
+
+      // todo 不能放在这边
+      // 爬取成功后，从备份列表移除该 URL
+      final prefs = ref.read(sharedPreferencesProvider);
+      await prefs.reload();
+      final urls = prefs.getStringList('needCallBackUrl') ?? [];
+      urls.remove(task.url);
+      await prefs.setStringList('needCallBackUrl', urls);
+      PMlog.d(tag, '已从备份列表移除 URL: ${task.url}');
+    };
+
+    PMlog.d(tag, 'ScraperQueueManager 初始化完成');
   }
 
   // 通知原生端 Flutter 引擎已准备好
@@ -128,6 +185,19 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
       _currentShare = null;
       _noteId = -1;
     });
+
+    // 启动后台任务进行抓取数据
+    if (url != null) {
+      PMlog.d(tag, '后台开始处理 URLs: $url');
+      Workmanager().registerOneOffTask(
+        'url_scraper',
+        'scrapeAndSave',
+        inputData: {
+          'urls': [url]
+        },
+        initialDelay: Duration(seconds: 0),
+      );
+    }
 
     // 关闭 ShareActivity
     SystemNavigator.pop();
@@ -171,7 +241,7 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
         final args = call.arguments as Map;
         final title = args['title'] as String;
         final content = _contentWithoutUrl(args['content'] as String);
-        final url = await _extractedUrl(args['content'] as String);
+        url = await _extractedUrl(args['content'] as String);
 
         PMlog.d(tag, 'showShare: title=$title, url=$url, content= $url');
 
@@ -183,17 +253,15 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
             url: url,
           );
 
-          // 1.1 提交后端抓取请求,保存需要查询的 url
-          if (url != null) {
-            if (_sendBackUrl(url)) {
-              ref.read(resourcePmServiceProvider).submit(url: url);
-            }
+          if(url != null){
             final sharedPreferences = ref.read(sharedPreferencesProvider);
             await sharedPreferences.reload();
             var urls = sharedPreferences.getStringList('needCallBackUrl') ?? [];
-            urls.add(url);
-            await sharedPreferences.setStringList('needCallBackUrl', urls);
-            PMlog.d(tag, '已保存需要回调的 URL 列表: $urls');
+            if (!urls.contains(url)) {
+              urls.add(url!);
+              await sharedPreferences.setStringList('needCallBackUrl', urls);
+              PMlog.d(tag, '已保存到备份列表: needCallBackUrl');
+            }
           }
 
           // 2. 更新 UI 状态以显示 ShareSuccessPage
@@ -215,13 +283,6 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
           message: 'Unknown method ${call.method}',
         );
     }
-  }
-
-  bool _sendBackUrl(String url) {
-    final u = url.toLowerCase();
-    return u.contains('x.com') ||
-        u.contains('twitter.com') ||
-        u.contains('t.co');
   }
 
   @override

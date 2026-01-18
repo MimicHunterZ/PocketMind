@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/model/note.dart';
-import 'package:pocketmind/page/widget/hero_gallery.dart';
+import 'package:pocketmind/page/widget/note_detail/hero_gallery.dart';
+import 'package:pocketmind/page/widget/category_selector.dart';
+import 'package:pocketmind/page/widget/common/category_badge.dart';
+import 'package:pocketmind/page/widget/common/date_label.dart';
 import 'package:pocketmind/util/url_helper.dart';
 import 'note_link_content_section.dart';
 import 'note_source_link_card.dart';
@@ -10,7 +13,7 @@ class NoteOriginalDataSection extends StatelessWidget {
   final Note note;
   final TextEditingController titleController;
   final TextEditingController contentController;
-  final void Function(int) onCategoryPressed;
+  final ValueChanged<int> onCategorySelected;
   final String categoryName;
   final String formattedDate;
   final String? previewImageUrl;
@@ -27,7 +30,7 @@ class NoteOriginalDataSection extends StatelessWidget {
     required this.note,
     required this.titleController,
     required this.contentController,
-    required this.onCategoryPressed,
+    required this.onCategorySelected,
     required this.categoryName,
     required this.formattedDate,
     this.previewImageUrl,
@@ -59,10 +62,14 @@ class NoteOriginalDataSection extends StatelessWidget {
       displayImages.add(note.url!);
     }
 
-    // 如果是网络链接且预览图已加载，使用预览图
+    // 如果是网络链接且预览图已加载，使用预览图（优先使用多张，其次使用单张）
     if (isHttpsUrl && !isLocalImage) {
       isNetworkImage = true;
-      if (previewImageUrl != null && previewImageUrl!.isNotEmpty) {
+      // 优先使用 previewImageUrls（多张图片）
+      if (note.previewImageUrls.isNotEmpty) {
+        displayImages.addAll(note.previewImageUrls);
+      } else if (previewImageUrl != null && previewImageUrl!.isNotEmpty) {
+        // 备用：使用单张 previewImageUrl（参数传入的预览图）
         displayImages.add(previewImageUrl!);
       }
     }
@@ -79,7 +86,14 @@ class NoteOriginalDataSection extends StatelessWidget {
             title: hasTitle ? note.title! : '',
             isDesktop: isDesktop,
             showGradientFade: true,
-            categoryLabel: categoryName,
+            categoryBadge: CategorySelector(
+              selectedCategoryId: note.categoryId,
+              onCategorySelected: onCategorySelected,
+              builder: (context, category) => CategoryBadge(
+                categoryName: category.name,
+                style: CategoryBadgeStyle.onImage,
+              ),
+            ),
             dateLabel: formattedDate,
             overlayTitle: previewTitle ?? '',
           ),
@@ -110,60 +124,19 @@ class NoteOriginalDataSection extends StatelessWidget {
                 Row(
                   children: [
                     // 分类胶囊 - 可点击切换分类
-                    GestureDetector(
-                      onTap: () => onCategoryPressed(note.categoryId),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 12.w,
-                          vertical: 6.h,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.tertiary.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20.r),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              categoryName,
-                              style: TextStyle(
-                                fontSize: 11.sp,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5,
-                                color: colorScheme.tertiary,
-                              ),
-                            ),
-                            SizedBox(width: 4.w),
-                            Icon(
-                              Icons.expand_more_rounded,
-                              size: 14.sp,
-                              color: colorScheme.tertiary,
-                            ),
-                          ],
-                        ),
+                    CategorySelector(
+                      selectedCategoryId: note.categoryId,
+                      onCategorySelected: onCategorySelected,
+                      builder: (context, category) => CategoryBadge(
+                        categoryName: category.name,
+                        style: CategoryBadgeStyle.normal,
                       ),
                     ),
                     SizedBox(width: 12.w),
                     // 日期
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.access_time_rounded,
-                          size: 12.sp,
-                          color: colorScheme.secondary,
-                        ),
-                        SizedBox(width: 4.w),
-                        Text(
-                          formattedDate,
-                          style: TextStyle(
-                            fontSize: 11.sp,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.3,
-                            color: colorScheme.secondary,
-                          ),
-                        ),
-                      ],
+                    DateLabel(
+                      dateText: formattedDate,
+                      style: DateLabelStyle.normal,
                     ),
                   ],
                 ),
