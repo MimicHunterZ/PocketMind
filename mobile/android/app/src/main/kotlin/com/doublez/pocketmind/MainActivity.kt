@@ -4,7 +4,6 @@ import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import com.doublez.pocketmind.service.ScraperForegroundService
 
 class MainActivity : FlutterActivity() {
 
@@ -56,30 +55,6 @@ class MainActivity : FlutterActivity() {
 			}
 
 			result.success(null)
-		}
-
-		// 爬虫服务 Channel
-		MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SCRAPER_CHANNEL).setMethodCallHandler { call, result ->
-			when (call.method) {
-				"startForegroundService" -> {
-					val taskCount = call.argument<Int>("taskCount") ?: 0
-					ScraperForegroundService.start(this, taskCount)
-					Log.d("MainActivity", "启动爬虫前台服务, taskCount=$taskCount")
-					result.success(true)
-				}
-				"stopForegroundService" -> {
-					ScraperForegroundService.stop(this)
-					Log.d("MainActivity", "停止爬虫前台服务")
-					result.success(true)
-				}
-				"updateProgress" -> {
-					val currentUrl = call.argument<String>("currentUrl") ?: ""
-					val pendingCount = call.argument<Int>("pendingCount") ?: 0
-					ScraperForegroundService.updateProgress(this, currentUrl, pendingCount)
-					result.success(true)
-				}
-				else -> result.notImplemented()
-			}
 		}
 	}
 

@@ -15,20 +15,16 @@ import 'package:pocketmind/providers/shared_preferences_provider.dart';
 import 'package:pocketmind/service/call_back_dispatcher.dart';
 import 'package:pocketmind/service/note_service.dart';
 import 'package:pocketmind/service/notification_service.dart';
-import 'package:pocketmind/service/scraper/scraper_queue_manager.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/util/proxy_config.dart';
 import 'package:pocketmind/util/theme_data.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pocketmind/util/url_helper.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
-import 'api/note_api_service.dart';
 import 'util/logger_service.dart';
 import 'package:flutter_uri_to_file/flutter_uri_to_file.dart';
-import 'package:pocketmind/util/platform_detector.dart';
 
 late Isar isar;
 final String tag = 'main_share';
@@ -116,55 +112,6 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
     });
   }
 
-  /// 初始化爬虫队列管理器
-  Future<void> _initScraperQueueManager() async {
-    final prefs = ref.read(sharedPreferencesProvider);
-    final queueManager = ScraperQueueManager.instance;
-    await queueManager.init(prefs);
-
-    // 设置任务执行回调
-    queueManager.onExecuteTask = (task) async {
-      PMlog.d(tag, '执行爬取任务: noteId=${task.noteId}, url=${task.url}');
-
-      final scraperService = ref.read(platformScraperServiceProvider);
-      final metadata = await scraperService.scrape(task.url);
-
-      if (metadata == null) {
-        PMlog.e(tag, '爬取失败: 无法获取元数据');
-        return;
-      }
-
-      // 更新 Note
-      final note = await isar.notes.get(task.noteId);
-      if (note == null) {
-        PMlog.w(tag, '笔记不存在: noteId=${task.noteId}');
-        return;
-      }
-      ref
-          .read(noteServiceProvider)
-          .updateNote(
-            id: task.noteId,
-            previewTitle: metadata.title,
-            previewContent: metadata.previewContent,
-            previewDescription: metadata.previewDescription,
-            previewImageUrls: (metadata.imageUrls?.isNotEmpty ?? false)
-                ? metadata.imageUrls
-                : null,
-          );
-
-      // todo 不能放在这边
-      // 爬取成功后，从备份列表移除该 URL
-      final prefs = ref.read(sharedPreferencesProvider);
-      await prefs.reload();
-      final urls = prefs.getStringList('needCallBackUrl') ?? [];
-      urls.remove(task.url);
-      await prefs.setStringList('needCallBackUrl', urls);
-      PMlog.d(tag, '已从备份列表移除 URL: ${task.url}');
-    };
-
-    PMlog.d(tag, 'ScraperQueueManager 初始化完成');
-  }
-
   // 通知原生端 Flutter 引擎已准备好
   Future<void> _notifyEngineReady() async {
     try {
@@ -176,7 +123,7 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
   }
 
   // 隐藏 UI 并关闭 Activity
-  void _dismissUI() {
+  void _dismissUI([Map<String,String>? data]) {
     PMlog.d(tag, 'Dismissing UI...');
 
     // 重置状态机
@@ -185,7 +132,7 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
       _currentShare = null;
       _noteId = -1;
     });
-
+    final userQuestion = data?['uq'] ?? '';
     // 启动后台任务进行抓取数据
     if (url != null) {
       PMlog.d(tag, '后台开始处理 URLs: $url');
@@ -193,7 +140,8 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
         'url_scraper',
         'scrapeAndSave',
         inputData: {
-          'urls': [url]
+          'urls': [url],
+          'uq': userQuestion
         },
         initialDelay: Duration(seconds: 0),
       );

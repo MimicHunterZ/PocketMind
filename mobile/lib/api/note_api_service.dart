@@ -59,10 +59,11 @@ class AiAnalyzeResponse {
     return null;
   }
 
-  /// 获取标签列表（SUMMARY 模式）
+  /// 获取标签列表（SUMMARY 和 QA 模式）
   List<String> get tags {
-    if (!isSummaryMode || aiResponse == null) return [];
+    if (aiResponse == null) return [];
     if (aiResponse is Map<String, dynamic>) {
+      // 兼容 SUMMARY 和 QA 两种结构的 tags 字段
       final tagList = aiResponse['tags'];
       if (tagList is List) {
         return tagList.map((e) => e.toString()).toList();
@@ -73,9 +74,9 @@ class AiAnalyzeResponse {
 
   /// 获取问答回复（QA 模式）
   String? get qaAnswer {
-    if (!isQaMode) return null;
-    if (aiResponse is String) {
-      return aiResponse as String;
+    if (!isQaMode || aiResponse == null) return null;
+    if (aiResponse is Map<String, dynamic>) {
+       return aiResponse['answer'] as String?;
     }
     return null;
   }

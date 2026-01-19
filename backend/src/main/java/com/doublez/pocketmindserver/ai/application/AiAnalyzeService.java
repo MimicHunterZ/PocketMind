@@ -30,6 +30,9 @@ public class AiAnalyzeService {
     private final BeanOutputConverter<PocketMindSummary> summaryConverter =
             new BeanOutputConverter<>(PocketMindSummary.class);
 
+    private final BeanOutputConverter<PocketMindQA> qaConverter =
+            new BeanOutputConverter<>(PocketMindQA.class);
+
     @Value("classpath:prompts/ai/system_prompt.md")
     private Resource systemPersonaResource;
 
@@ -67,15 +70,25 @@ public class AiAnalyzeService {
     }
 
     /**
-     * 处理问答模式 (返回纯文本)
+     * 处理问答模式 (返回 PocketMindQA 对象)
      */
-    private String processQa(String content, String question) {
+    private PocketMindQA processQa(String content, String question) {
+        // 1. 获取 Format 指令
+        String formatInstructions = qaConverter.getFormat();
+
+        // 2. 构建 Prompt
         Prompt prompt = buildBasePrompt(qaPromptResource, Map.of(
                 "content", content,
-                "question", question
+                "question", question,
+                "format", formatInstructions
         ));
 
-        return chatClient.prompt(prompt).call().content();
+        // 3. 调用 AI 获取原始文本
+        String rawResponse = chatClient.prompt(prompt).call().content();
+        
+        // 4. 解析
+        log.info("AI QA Raw JSON: {}", rawResponse);
+        return qaConverter.convert(rawResponse);
     }
 
     /**
@@ -108,7 +121,12 @@ public class AiAnalyzeService {
         Message systemMessage = systemTemplate.createMessage();
 
         // User Message
-        PromptTemplate userTemplate = new PromptTemplate(userTemplateResource);
+    
+
+record PocketMindQA(
+        String answer,       // 回答内容
+        List<String> tags    // 推荐标签
+) {}    PromptTemplate userTemplate = new PromptTemplate(userTemplateResource);
         Message userMessage = userTemplate.createMessage(variables);
 
         return new Prompt(List.of(systemMessage, userMessage));
@@ -117,5 +135,10 @@ public class AiAnalyzeService {
 
 record PocketMindSummary(
         String summary,      // 一段表述（50字以内的核心价值）
+        List<String> tags    // 推荐标签
+) {}
+
+record PocketMindQA(
+        String answer,       // 回答内容
         List<String> tags    // 推荐标签
 ) {}

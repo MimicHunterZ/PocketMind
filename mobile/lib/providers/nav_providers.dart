@@ -1,6 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:pocketmind/model/nav_item.dart';
-import 'package:pocketmind/repository/isar_nav_item_repository.dart';
+import 'package:pocketmind/data/repositories/isar_nav_item_repository.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 
 part 'nav_providers.g.dart';

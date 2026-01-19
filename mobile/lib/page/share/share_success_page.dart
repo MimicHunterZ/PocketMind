@@ -65,7 +65,6 @@ class _ShareSuccessPageState extends ConsumerState<ShareSuccessPage>
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // Logo/Icon - 使用点睛色
         Lottie.asset(
           'assets/lottie/success.json',
           width: 200.w,

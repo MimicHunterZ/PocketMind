@@ -20,6 +20,7 @@ android/key.properties
 key.properties
 ios/ExportOptions.plist
 application-dev.yml
+application-prod.yml
 application.yml
 
 # 密钥库文件

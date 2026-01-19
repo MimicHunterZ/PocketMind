@@ -18,7 +18,7 @@ enum EditTab { title, content, tags, category, ai, reminder }
 class EditNotePage extends ConsumerStatefulWidget {
   final String? initialTitle;
   final String? initialContent;
-  final VoidCallback onDone;
+  final void Function(Map<String,String> data) onDone;
   final int id;
   final String? webUrl;
 
@@ -109,16 +109,11 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
       );
     }
 
-    if (_aiController.text.isNotEmpty) {
-      // 用户输入了 AI 问题，保存到 pendingAiQuestion 字段
-      // 等 processPendingUrls() 获取到 content 后再调用 AI 分析
-      await noteService.updateNote(
-        id: widget.id,
-        pendingAiQuestion: _aiController.text,
-        updateTimestamp: false,
-      );
-    }
-    widget.onDone();
+    Map<String, String> result = {
+      'uq': _aiController.text,
+    };
+
+    widget.onDone(result);
   }
 
   // 构建顶部导航栏
@@ -229,7 +224,7 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
             ? _titleController
             : _aiController,
         decoration: InputDecoration(
-          hintText: _currentTab == EditTab.ai ? '敬请期待' : '开始输入...',
+          hintText: '开始输入...',
           hintStyle: TextStyle(color: colorScheme.secondary, fontSize: 16.sp),
           border: InputBorder.none,
           isDense: true,

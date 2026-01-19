@@ -38,15 +38,15 @@ void callbackDispatcher(){
       overrides: [
         isarProvider.overrideWithValue(isar),
         sharedPreferencesProvider.overrideWithValue(prefs),
-        // 如果有 SharedPreferences 等其他依赖，也在这里 override
       ],
     );
 
     switch (task) {
       case 'scrapeAndSave':
         final urls = (inputData?['urls'] as List?)?.map((e) => e.toString()).toList() ?? [];
+        final userQuestion = inputData?['uq'];
         if(urls.isNotEmpty){
-            await scrapeAndSave(ref,urls);
+            await scrapeAndSave(ref,urls,userQuestion);
         }else{
          PMlog.e(tag, 'url 的 value 为空');
         }
@@ -68,7 +68,7 @@ void callbackDispatcher(){
   });
 }
 
-Future<void> scrapeAndSave(ProviderContainer ref, List<String> urls) async {
+Future<void> scrapeAndSave(ProviderContainer ref, List<String> urls,String? userQuestion) async {
   // 1. 批量获取元数据
   final metadataResults = await ref.read(metadataManagerProvider).fetchAndProcessMetadata(urls);
 
@@ -108,7 +108,7 @@ Future<void> scrapeAndSave(ProviderContainer ref, List<String> urls) async {
           uuid: note.uuid!,
           title: note.title,
           content: note.previewContent!,
-          userQuestion: note.pendingAiQuestion,
+          userQuestion: userQuestion,
         );
 
         // 根据模式保存结果
@@ -117,16 +117,27 @@ Future<void> scrapeAndSave(ProviderContainer ref, List<String> urls) async {
           if (aiResponse.summary != null) {
             note.aiSummary = aiResponse.summary;
           }
-          if (aiResponse.tags.isNotEmpty) {
-            // 处理标签追加逻辑
-            final existingTags = note.tag ?? '';
-            final newTags = aiResponse.tags.join(',');
-            note.tag = existingTags.isEmpty ? newTags : '$existingTags,$newTags';
-          }
         } else if (aiResponse.isQaMode) {
           // QA 模式
           final qaContent = 'Q: ${aiResponse.userQuestion ?? note.pendingAiQuestion}\n\nA: ${aiResponse.qaAnswer ?? ''}';
           note.aiSummary = qaContent;
+        }
+
+        // 统一处理标签追加逻辑 (支持 SUMMARY 和 QA 模式)
+        if (aiResponse.tags.isNotEmpty) {
+          final existingTags = note.tag ?? '';
+          final newTagsSet = aiResponse.tags.toSet();
+          
+          // 如果已有标签，避免重复
+          if (existingTags.isNotEmpty) {
+            final currentTagsList = existingTags.split(',');
+            newTagsSet.removeAll(currentTagsList);
+          }
+          
+          if (newTagsSet.isNotEmpty) {
+             final newTagsStr = newTagsSet.join(',');
+             note.tag = existingTags.isEmpty ? newTagsStr : '$existingTags,$newTagsStr';
+          }
         }
 
         PMlog.d(tag, '笔记 $url AI 分析完成，mode=${aiResponse.mode}');

@@ -10,6 +10,19 @@ class NoteAIInsightSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
+    // 解析 Q&A 格式
+    String? question;
+    String? answer;
+    
+    // 简单的解析逻辑：检查是否以 Q: 开头并包含 \n\nA: 
+    if (aiSummary.trim().startsWith('Q:') && aiSummary.contains('\n\nA:')) {
+      final parts = aiSummary.split('\n\nA:');
+      if (parts.length == 2) {
+        question = parts[0].substring(2).trim(); // Remove 'Q:'
+        answer = parts[1].trim();
+      }
+    }
+
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 24.w),
       child: Stack(
@@ -65,29 +78,66 @@ class NoteAIInsightSection extends StatelessWidget {
                   ],
                 ),
                 SizedBox(height: 16.h),
-                // 占位内容
+                // 内容区域
                 Container(
                   width: double.infinity,
-                  padding: EdgeInsets.symmetric(vertical: 24.h),
-                  child: Column(
-                    children: [
-                      Text(
-                        aiSummary,
-                        style: TextStyle(
-                          fontSize: 13.sp,
-                          color: colorScheme.secondary,
-                          height: 1.5,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
+                  padding: EdgeInsets.symmetric(vertical: 8.h), // Reduced padding
+                  child: question != null 
+                    ? _buildQaContent(context, colorScheme, question, answer!)
+                    : _buildSummaryContent(context, colorScheme, aiSummary),
                 ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSummaryContent(BuildContext context, ColorScheme colorScheme, String text) {
+     return Text(
+      text,
+      style: TextStyle(
+        fontSize: 13.sp,
+        color: colorScheme.secondary,
+        height: 1.5,
+      ),
+      textAlign: TextAlign.justify,
+    );
+  }
+
+  Widget _buildQaContent(BuildContext context, ColorScheme colorScheme, String question, String answer) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 问题部分
+        Container(
+          padding: EdgeInsets.only(left: 12.w, top: 4.h, bottom: 4.h),
+          decoration: BoxDecoration(
+             border: Border(left: BorderSide(color: colorScheme.tertiary, width: 3.w))
+          ),
+          child: Text(
+            question,
+            style: TextStyle(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurface,
+              height: 1.4,
+            ),
+          ),
+        ),
+        SizedBox(height: 16.h),
+        // 回答部分
+        Text(
+          answer,
+          style: TextStyle(
+            fontSize: 13.sp,
+            color: colorScheme.secondary,
+            height: 1.5,
+          ),
+           textAlign: TextAlign.justify,
+        ),
+      ],
     );
   }
 }

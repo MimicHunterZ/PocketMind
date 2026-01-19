@@ -140,7 +140,7 @@ class PlatformScraperService {
     } on CookieExpiredException catch (e) {
       // 标记 Cookie 过期
       await _cookieManager.markAsExpired(platformId);
-      PMlog.e(_tag, 'Cookie 已过�? ${e.message}');
+      PMlog.e(_tag, 'Cookie 已经过时? ${e.message}');
       rethrow;
     } catch (e) {
       PMlog.e(_tag, '爬取失败: $e');
