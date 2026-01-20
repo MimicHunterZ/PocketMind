@@ -112,7 +112,8 @@ https://github.com/user-attachments/assets/67c92ac7-dd09-41ac-a08a-35ee215b5ee4
 > 目前只支持 Android，win ，没有苹果设备无法适配😭
 
 ## 下载
-- 右侧 release 下载，目前仅发布最早的 0.1版本，0.2版本还在开发中
+- 右侧 release 下载，目前已经发布0.2版本，正在努力coding
+
 ## 计划
 - [x] 美化uxi
 - [x] 增加 win 的适配，处理数据的传输
@@ -128,11 +129,11 @@ https://github.com/user-attachments/assets/67c92ac7-dd09-41ac-a08a-35ee215b5ee4
 
 PocketMind 是我对自己数字生活的一次重构，一次不一样的尝试。
 
-目前项目还在早期开发阶段，AI 分析和任务提醒功能正在紧锣密鼓地施工中。如果你也厌倦了收藏夹的混乱和搜藏无用，欢迎 Star 关注，见证它的成长。
+目前项目还在早期开发阶段，相关功能正在紧锣密鼓地施工中。如果你也厌倦了收藏夹的混乱和搜藏无用，欢迎 Star 关注，见证它的成长。
 
-## 🛠️ 快速上手 (Get Started)
+## 🛠️ 快速上手
 
-PocketMind 包含移动端 (Mobile) 和 后端 (Backend) 两部分。
+PocketMind 包含 Mobile 和 Backend 两部分。
 
 ### 前置要求
 * **Flutter SDK**: `^3.8.1`
