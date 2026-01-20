@@ -79,11 +79,19 @@ https://github.com/user-attachments/assets/67c92ac7-dd09-41ac-a08a-35ee215b5ee4
 > 需要先在设置里面进行登录才能使用
 <img width="352" height="672" alt="image" src="https://github.com/user-attachments/assets/e0b96a3b-0804-40cd-a6a4-84ad5d766805" />
 
-### 样式
+### 局域网同步
+两台设备处于同一个局域网里面，并且开启允许接收的设置（手机app在前台，桌面端无要求）。两者之间就会进行实时的数据传输！确保都是最新的数据~
+
+### 定闹钟
+| 入口 | 晚上 | 傍晚 | 白天 |
+|:---:|:---:|:---:|:---:|
+| <img width="390" height="796" alt="image" src="https://github.com/user-attachments/assets/d76f34d9-ab87-4106-a1ca-a5a91d7dad5d" />|<img width="386" height="802" alt="image" src="https://github.com/user-attachments/assets/9c7973a2-a408-4e43-b2c3-90b903f112a0" />|<img width="382" height="795" alt="image" src="https://github.com/user-attachments/assets/6663c80e-4203-4ed2-bec9-c09a64efd587" /> | <img width="389" height="805" alt="image" src="https://github.com/user-attachments/assets/85248e06-9967-4fe1-92fa-65583bca32dc" /> |
+
+### 好看的ui嘻嘻
 手机端：
 | 瀑布流主页 | 搜索 | 详情 | 新增 |
 |:---:|:---:|:---:|:---:|
-| <img width="429" height="914" alt="image" src="https://github.com/user-attachments/assets/04a1b1f0-b6b5-4723-ba5f-6d0104e1705c" />|<img width="444" height="915" alt="image" src="https://github.com/user-attachments/assets/00035a73-17e3-48ee-9ba8-a29e8de1714a" /> | <img width="350" height="1878" alt="image" src="https://github.com/user-attachments/assets/61f57178-9871-4df3-b2ba-15551a1f502d" /> |<img width="444" height="900" alt="image" src="https://github.com/user-attachments/assets/d79d2c16-5b06-4263-96c1-7de87383d045" />|
+| <img width="429" height="914" alt="image" src="https://github.com/user-attachments/assets/04a1b1f0-b6b5-4723-ba5f-6d0104e1705c" />|<img width="444" height="915" alt="image" src="https://github.com/user-attachments/assets/00035a73-17e3-48ee-9ba8-a29e8de1714a" /> | <img width="350" height="1878" alt="image" src="https://github.com/user-attachments/assets/61f57178-9871-4df3-b2ba-15551a1f502d" /> | <img width="444" height="900" alt="image" src="https://github.com/user-attachments/assets/d79d2c16-5b06-4263-96c1-7de87383d045" /> |
 
 电脑端：
 | 瀑布流主页 | 搜索 |
