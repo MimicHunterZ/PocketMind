@@ -29,24 +29,33 @@ Your Second Brain, One Tap Away.
 
 ---
 
-## ✨ 核心魔法
-
-### 🚀 1. 极致的无感记录
-不需要复制链接，不需要打开 PocketMind。
-在任何 App (Bilibili, 小红书, X...) 中点击 **“分享”** -> 选择 **PocketMind**。
+## ✨ 核心魔法 
+### 🚀 1. 极速无感：四层智能降级抓取
+不需要复制文本，不需要打开 PocketMind。在任何 App (Bilibili, 小红书, X...) 中点击 **“分享”** -> 选择 **PocketMind**。
 这就是全部。在后台，PocketMind已经为您解析了标题、封面和摘要。
-
 > *⚡️ Be lazy. Just share it.*
 
-### 🎨 2. 赏心悦目的记忆流
-告别枯燥的列表。PocketMind 采用**瀑布流** 设计。
-您的每一次收藏都以精美的图文卡片呈现，浏览笔记不再是查找资料，而是一种视觉享受。
+### 🎨 2. 视觉进化：赏心悦目的“记忆画廊”
+告别文档式的枯燥列表。我们用瀑布流 (Waterfall Flow) 重塑了笔记的呈现方式：
 
-### 🧠 3. AI 驱动的第二大脑 (Coming Soon)
-*这不仅仅是一个存储容器。* 我们正在构建基于 **Spring AI Alibaba** 的智能后端：
-* **自动摘要**：太长不看？AI 帮你总结核心要点。
-* **智能关联**：自动发现你笔记之间的隐形联系。
-* **主动提醒**：基于你的喜好，在合适的时间唤醒沉睡的记忆。
+图文卡片：每一条记录都被打造成精美的视觉卡片，让回顾不再是翻找资料，而是一次赏心悦目的灵感漫游。
+原生美学：精心调教的毛玻璃效果与动态交互，让 Android 与 Windows 端都拥有丝滑的审美体验。
+### 🧠 3. AI 深度赋能：不仅是存储，更是思考
+PocketMind 正在接入AI，让你的第二大脑真正“动起来”：
+
+智能总结 (Summary)：千言万语，AI 瞬息间为你提炼核心要点。
+深度问答 (QA)：你可以直接针对收藏的内容提问，AI 是你最懂这份笔记的助理。
+自动标签 (Auto-Tag)：无需手动分类，AI 根据内容语义自动生成标签，让检索得心应手。
+### 🌊 4. 实时流转：局域网“无感同步”
+数据隐私与效率的完美平衡：
+
+秒级互传：无需复杂的云端中转，只要手机与电脑处于同一局域网，数据便如流水般实时流传。
+多端联动：在手机上随手抓取的灵感，放下手机，它已经端端正正地出现在你的电脑屏幕上。
+### ⏱️ 5. 记忆唤醒：对抗遗忘的最后防线
+收藏不等于拥有，回顾才是：
+
+定时通知：保存瞬间即可预约提醒。无论是在今晚的闲暇时刻，还是明早的通勤路上，PocketMind 会准时唤醒那些沉睡的灵感。
+主动触达：将“被动吃灰”转变为“主动内化”。
 
 ---
 
@@ -79,11 +88,19 @@ https://github.com/user-attachments/assets/67c92ac7-dd09-41ac-a08a-35ee215b5ee4
 > 需要先在设置里面进行登录才能使用
 <img width="352" height="672" alt="image" src="https://github.com/user-attachments/assets/e0b96a3b-0804-40cd-a6a4-84ad5d766805" />
 
-### 样式
+### 局域网同步
+两台设备处于同一个局域网里面，并且开启允许接收的设置（手机app在前台，桌面端无要求）。两者之间就会进行实时的数据传输！确保都是最新的数据~
+
+### 定闹钟
+| 入口 | 晚上 | 傍晚 | 白天 |
+|:---:|:---:|:---:|:---:|
+| <img width="390" height="796" alt="image" src="https://github.com/user-attachments/assets/d76f34d9-ab87-4106-a1ca-a5a91d7dad5d" />|<img width="386" height="802" alt="image" src="https://github.com/user-attachments/assets/9c7973a2-a408-4e43-b2c3-90b903f112a0" />|<img width="382" height="795" alt="image" src="https://github.com/user-attachments/assets/6663c80e-4203-4ed2-bec9-c09a64efd587" /> | <img width="389" height="805" alt="image" src="https://github.com/user-attachments/assets/85248e06-9967-4fe1-92fa-65583bca32dc" /> |
+
+### 好看的ui嘻嘻
 手机端：
 | 瀑布流主页 | 搜索 | 详情 | 新增 |
 |:---:|:---:|:---:|:---:|
-| <img width="429" height="914" alt="image" src="https://github.com/user-attachments/assets/04a1b1f0-b6b5-4723-ba5f-6d0104e1705c" />|<img width="444" height="915" alt="image" src="https://github.com/user-attachments/assets/00035a73-17e3-48ee-9ba8-a29e8de1714a" /> | <img width="350" height="1878" alt="image" src="https://github.com/user-attachments/assets/61f57178-9871-4df3-b2ba-15551a1f502d" /> |<img width="444" height="900" alt="image" src="https://github.com/user-attachments/assets/d79d2c16-5b06-4263-96c1-7de87383d045" />|
+| <img width="429" height="914" alt="image" src="https://github.com/user-attachments/assets/04a1b1f0-b6b5-4723-ba5f-6d0104e1705c" />|<img width="444" height="915" alt="image" src="https://github.com/user-attachments/assets/00035a73-17e3-48ee-9ba8-a29e8de1714a" /> | <img width="350" height="1878" alt="image" src="https://github.com/user-attachments/assets/61f57178-9871-4df3-b2ba-15551a1f502d" /> | <img width="444" height="900" alt="image" src="https://github.com/user-attachments/assets/d79d2c16-5b06-4263-96c1-7de87383d045" /> |
 
 电脑端：
 | 瀑布流主页 | 搜索 |
@@ -95,7 +112,8 @@ https://github.com/user-attachments/assets/67c92ac7-dd09-41ac-a08a-35ee215b5ee4
 > 目前只支持 Android，win ，没有苹果设备无法适配😭
 
 ## 下载
-- 右侧 release 下载，目前仅发布最早的 0.1版本，0.2版本还在开发中
+- 右侧 release 下载，目前已经发布0.2版本，正在努力coding
+
 ## 计划
 - [x] 美化uxi
 - [x] 增加 win 的适配，处理数据的传输
@@ -111,11 +129,11 @@ https://github.com/user-attachments/assets/67c92ac7-dd09-41ac-a08a-35ee215b5ee4
 
 PocketMind 是我对自己数字生活的一次重构，一次不一样的尝试。
 
-目前项目还在早期开发阶段，AI 分析和任务提醒功能正在紧锣密鼓地施工中。如果你也厌倦了收藏夹的混乱和搜藏无用，欢迎 Star 关注，见证它的成长。
+目前项目还在早期开发阶段，相关功能正在紧锣密鼓地施工中。如果你也厌倦了收藏夹的混乱和搜藏无用，欢迎 Star 关注，见证它的成长。
 
-## 🛠️ 快速上手 (Get Started)
+## 🛠️ 快速上手
 
-PocketMind 包含移动端 (Mobile) 和 后端 (Backend) 两部分。
+PocketMind 包含 Mobile 和 Backend 两部分。
 
 ### 前置要求
 * **Flutter SDK**: `^3.8.1`
