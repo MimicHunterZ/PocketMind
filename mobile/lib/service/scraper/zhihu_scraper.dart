@@ -288,7 +288,7 @@ class ZhihuScraper implements IPlatformScraper {
     InAppWebViewController controller,
     ZhihuContentType contentType,
   ) async {
-    // 调试日志：打印 js-initialData 的结构
+    // 调试：打印数据结构，用于排查平台变更
     final debugJs = '''
 (function() {
   try {
@@ -446,10 +446,12 @@ class ZhihuScraper implements IPlatformScraper {
     }
   }
 
-  /// 去除 HTML 标签
+  /// 去除 HTML 标签，保留换行
   String _stripHtmlTags(String html) {
     if (html.isEmpty) return '';
     return html
+        .replaceAll(RegExp(r'<br\s*/?>'), '\n')
+        .replaceAll(RegExp(r'</p>'), '\n\n')
         .replaceAll(RegExp(r'<[^>]*>'), '')
         .replaceAll('&nbsp;', ' ')
         .replaceAll('&lt;', '<')
@@ -457,7 +459,8 @@ class ZhihuScraper implements IPlatformScraper {
         .replaceAll('&amp;', '&')
         .replaceAll('&quot;', '"')
         .replaceAll('&#39;', "'")
-        .replaceAll(RegExp(r'\s+'), ' ')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .replaceAll(RegExp(r' +'), ' ')
         .trim();
   }
 

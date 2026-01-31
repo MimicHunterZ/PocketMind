@@ -325,18 +325,31 @@ class XhsScraper implements IPlatformScraper {
     InAppWebViewController controller,
     String url,
   ) async {
-    // 调试日志：打印 __INITIAL_STATE__ 的结构
+    // 调试：打印数据结构，用于排查平台变更
     final debugJs = '''
 (function() {
   try {
     var state = window.__INITIAL_STATE__;
     if (!state) return 'STATE_NOT_FOUND';
     var keys = Object.keys(state);
-    if (state.note && state.note.noteDetailMap) {
-      var noteKeys = Object.keys(state.note.noteDetailMap);
-      return JSON.stringify({keys: keys, noteKeys: noteKeys});
+    var result = {keys: keys};
+    
+    // 检查 note 路径
+    if (state.note) {
+      result.noteKeys = Object.keys(state.note);
+      if (state.note.noteDetailMap) {
+        result.noteDetailMapKeys = Object.keys(state.note.noteDetailMap);
+      }
+      if (state.note.firstNoteId) {
+        result.firstNoteId = state.note.firstNoteId;
+      }
     }
-    return JSON.stringify({keys: keys});
+    
+    // 检查其他可能的路径
+    if (state.noteData) result.hasNoteData = true;
+    if (state.noteDetail) result.hasNoteDetail = true;
+    
+    return JSON.stringify(result);
   } catch (e) {
     return 'ERROR: ' + e.message;
   }
@@ -345,46 +358,59 @@ class XhsScraper implements IPlatformScraper {
     final debugResult = await controller.evaluateJavascript(source: debugJs);
     PMlog.d(_tag, '__INITIAL_STATE__ structure: $debugResult');
 
-    PMlog.d(_tag, 'url: $url');
-    // 提取笔记 ID
-    final noteId = _extractNoteId(url);
-    if (noteId == null) {
-      PMlog.w(_tag, '无法从 URL 提取笔记 ID');
-      return null;
-    }
-
-    PMlog.d(_tag, '提取到笔记 ID: $noteId');
-
     // 执行 JS 提取 __INITIAL_STATE__
-    final extractJs =
-        '''
+    // 不再依赖 URL 提取笔记 ID，直接从 state 中获取
+    final extractJs = '''
       (function() {
         try {
           if (typeof window.__INITIAL_STATE__ === 'undefined') {
-            return null;
+            return JSON.stringify({error: 'STATE_UNDEFINED'});
           }
           
           var state = window.__INITIAL_STATE__;
-          if (!state || !state.note || !state.note.noteDetailMap) {
-            return null;
+          if (!state) {
+            return JSON.stringify({error: 'STATE_NULL'});
           }
           
-          var noteId = '$noteId';
-          var noteData = state.note.noteDetailMap[noteId];
+          var note = null;
           
-          if (!noteData || !noteData.note) {
-            // 尝试遍历查找
-            var keys = Object.keys(state.note.noteDetailMap);
-            if (keys.length > 0) {
-              noteData = state.note.noteDetailMap[keys[0]];
+          // 从 state 中获取笔记 ID（不依赖 URL）
+          var noteId = null;
+          if (state.note) {
+            // 方法1: 从 firstNoteId 获取
+            if (state.note.firstNoteId) {
+              var firstId = state.note.firstNoteId;
+              // firstNoteId 可能是 Vue ref 对象
+              noteId = firstId._value || firstId;
+            }
+            // 方法2: 从 currentNoteId 获取
+            if (!noteId && state.note.currentNoteId) {
+              noteId = state.note.currentNoteId;
+            }
+            // 方法3: 从 noteDetailMap 的第一个 key 获取
+            if (!noteId && state.note.noteDetailMap) {
+              var keys = Object.keys(state.note.noteDetailMap);
+              if (keys.length > 0) {
+                noteId = keys[0];
+              }
             }
           }
           
-          if (!noteData || !noteData.note) {
-            return null;
+          if (!noteId) {
+            return JSON.stringify({error: 'NOTE_ID_NOT_FOUND', stateKeys: Object.keys(state)});
           }
           
-          var note = noteData.note;
+          // 获取笔记数据
+          if (state.note && state.note.noteDetailMap && state.note.noteDetailMap[noteId]) {
+            var noteData = state.note.noteDetailMap[noteId];
+            if (noteData && noteData.note) {
+              note = noteData.note;
+            }
+          }
+          
+          if (!note) {
+            return JSON.stringify({error: 'NOTE_DATA_NOT_FOUND', noteId: noteId});
+          }
           
           // 提取图片列表
           var images = [];
@@ -398,14 +424,17 @@ class XhsScraper implements IPlatformScraper {
             });
           }
           
+          // 处理描述中的换行
+          var desc = note.desc || '';
+          
           return JSON.stringify({
             title: note.title || '',
-            desc: note.desc || '',
+            desc: desc,
             images: images,
             type: note.type || 'normal'
           });
         } catch (e) {
-          return null;
+          return JSON.stringify({error: 'EXCEPTION', message: e.message});
         }
       })()
     ''';
@@ -414,10 +443,20 @@ class XhsScraper implements IPlatformScraper {
       final result = await controller.evaluateJavascript(source: extractJs);
 
       if (result == null || result == 'null') {
+        PMlog.w(_tag, '__INITIAL_STATE__ JS 返回 null');
         return null;
       }
 
       final data = jsonDecode(result as String);
+
+      // 检查是否有错误
+      if (data['error'] != null) {
+        PMlog.w(
+          _tag,
+          '__INITIAL_STATE__ 错误: ${data['error']}, ${data['message'] ?? data['stateKeys']}',
+        );
+        return null;
+      }
 
       // 规范化图片 URL（去重、HTTP 转 HTTPS）
       final rawImages = List<String>.from(data['images'] ?? []);
@@ -545,32 +584,5 @@ class XhsScraper implements IPlatformScraper {
     }
 
     return result;
-  }
-
-  /// 从 URL 提取笔记 ID
-  String? _extractNoteId(String url) {
-    // 小红书笔记 URL 格式：
-    // https://www.xiaohongshu.com/explore/xxxxx
-    // https://www.xiaohongshu.com/discovery/item/xxxxx
-    // https://xhslink.com/xxxxx
-
-    // 尝试匹配 explore/xxxxx 格式
-    PMlog.d(_tag, 'url: $url');
-    final exploreMatch = RegExp(r'/explore/([a-zA-Z0-9]+)').firstMatch(url);
-    if (exploreMatch != null) {
-      return exploreMatch.group(1);
-    }
-
-    // 尝试匹配 discovery/item/xxxxx 格式
-    final discoveryMatch = RegExp(
-      r'/discovery/item/([a-zA-Z0-9]+)',
-    ).firstMatch(url);
-    if (discoveryMatch != null) {
-      return discoveryMatch.group(1);
-    }
-
-    // 短链接需要先解析真实 URL，这里暂时返回 null
-    // 实际使用时 WebView 会自动跳转到真实 URL
-    return null;
   }
 }
