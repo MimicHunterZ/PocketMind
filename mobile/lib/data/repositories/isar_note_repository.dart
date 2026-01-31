@@ -85,18 +85,14 @@ class IsarNoteRepository {
           }
 
           // 删除预览图片文件（如果有且是本地的）
-          if (note.previewImageUrl != null &&
-              note.previewImageUrl!.startsWith(
-                AppConstants.localImagePathPrefix,
-              )) {
-            try {
-              await ImageStorageHelper().deleteImage(note.previewImageUrl!);
-              PMlog.d(_tag, 'Deleted preview image: ${note.previewImageUrl}');
-            } catch (e) {
-              PMlog.w(
-                _tag,
-                'Failed to delete preview image ${note.previewImageUrl}: $e',
-              );
+          for (final previewUrl in note.previewImageUrls) {
+            if (previewUrl.startsWith(AppConstants.localImagePathPrefix)) {
+              try {
+                await ImageStorageHelper().deleteImage(previewUrl);
+                PMlog.d(_tag, 'Deleted preview image: $previewUrl');
+              } catch (e) {
+                PMlog.w(_tag, 'Failed to delete preview image $previewUrl: $e');
+              }
             }
           }
 
@@ -252,6 +248,7 @@ class IsarNoteRepository {
       rethrow;
     }
   }
+
   Future<List<Note>> findByUrls(List<String> urls) async {
     try {
       final notes = await _isar.notes
@@ -259,12 +256,9 @@ class IsarNoteRepository {
           .isDeletedEqualTo(false)
           .and()
           .group((q) {
-          return q.anyOf(
-            urls, 
-            (q, String url) => q.urlEqualTo(url)
-          );
-        })
-        .findAll();
+            return q.anyOf(urls, (q, String url) => q.urlEqualTo(url));
+          })
+          .findAll();
       return notes;
     } catch (e, stackTrace) {
       PMlog.e(_tag, 'Error while finding notes by url: $e\n$stackTrace');
@@ -291,13 +285,13 @@ class IsarNoteRepository {
                 .or()
                 .contentContains(query, caseSensitive: false)
                 .or()
-                .previewContentContains(query,caseSensitive: false)
+                .previewContentContains(query, caseSensitive: false)
                 .or()
-                .previewTitleContains(query,caseSensitive: false)
+                .previewTitleContains(query, caseSensitive: false)
                 .or()
-                .tagContains(query,caseSensitive: false)
+                .tagContains(query, caseSensitive: false)
                 .or()
-                .aiSummaryContains(query,caseSensitive: false)
+                .aiSummaryContains(query, caseSensitive: false),
           )
           .sortByTimeDesc()
           .watch(fireImmediately: true);

@@ -69,7 +69,7 @@ class PlatformScraperService {
       for (var url in platformUrls) {
         try {
           final metadata = await scrape(url);
-          if(metadata != null){
+          if (metadata != null) {
             results.add(metadata);
           }
         } on CookieExpiredException {
@@ -126,7 +126,6 @@ class PlatformScraperService {
         title: scrapedData.title,
         previewDescription: scrapedData.description,
         previewContent: scrapedData.content,
-        imageUrl: localizedImages.isNotEmpty ? localizedImages.first : null,
         imageUrls: localizedImages,
         url: url,
       );

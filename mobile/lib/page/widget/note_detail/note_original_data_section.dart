@@ -16,7 +16,6 @@ class NoteOriginalDataSection extends StatelessWidget {
   final ValueChanged<int> onCategorySelected;
   final String categoryName;
   final String formattedDate;
-  final String? previewImageUrl;
   final String? previewTitle;
   final String? previewContent;
   final bool isLoadingPreview;
@@ -33,7 +32,6 @@ class NoteOriginalDataSection extends StatelessWidget {
     required this.onCategorySelected,
     required this.categoryName,
     required this.formattedDate,
-    this.previewImageUrl,
     this.previewTitle,
     this.previewContent,
     required this.isLoadingPreview,
@@ -62,15 +60,12 @@ class NoteOriginalDataSection extends StatelessWidget {
       displayImages.add(note.url!);
     }
 
-    // 如果是网络链接且预览图已加载，使用预览图（优先使用多张，其次使用单张）
+    // 如果是网络链接且预览图已加载，使用预览图
     if (isHttpsUrl && !isLocalImage) {
       isNetworkImage = true;
-      // 优先使用 previewImageUrls（多张图片）
+      // 使用 previewImageUrls（多张图片）
       if (note.previewImageUrls.isNotEmpty) {
         displayImages.addAll(note.previewImageUrls);
-      } else if (previewImageUrl != null && previewImageUrl!.isNotEmpty) {
-        // 备用：使用单张 previewImageUrl（参数传入的预览图）
-        displayImages.add(previewImageUrl!);
       }
     }
 

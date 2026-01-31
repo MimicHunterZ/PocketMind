@@ -162,7 +162,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                   .updateCategory(id),
               categoryName: _getCategoryName(state.note.categoryId),
               formattedDate: DateFormatter.formatChinese(state.note.time),
-              previewImageUrl: state.note.previewImageUrl,
+
               previewTitle: state.note.previewTitle,
               previewContent:
                   state.note.previewContent ?? state.note.previewDescription,
@@ -240,7 +240,6 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                 .updateCategory(id),
             categoryName: _getCategoryName(state.note.categoryId),
             formattedDate: DateFormatter.formatChinese(state.note.time),
-            previewImageUrl: state.note.previewImageUrl,
             previewTitle: state.note.previewTitle,
             previewContent:
                 state.note.previewContent ?? state.note.previewDescription,
@@ -256,9 +255,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
 
           // 2. AI 洞察区
           if (state.note.aiSummary != null && state.note.aiSummary!.isNotEmpty)
-            NoteAIInsightSection(
-              aiSummary: state.note.aiSummary!,
-            ), //
+            NoteAIInsightSection(aiSummary: state.note.aiSummary!), //
 
           SizedBox(height: 32.h),
 

@@ -201,7 +201,6 @@ class NoteDetail extends _$NoteDetail {
             url: state.note.url,
             categoryId: state.note.categoryId,
             tag: state.note.tag,
-            previewImageUrl: state.note.previewImageUrl,
             previewTitle: state.note.previewTitle,
             previewDescription: state.note.previewDescription,
             updatedAt: state.note.updatedAt,

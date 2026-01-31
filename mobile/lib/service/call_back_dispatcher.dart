@@ -100,7 +100,6 @@ Future<void> scrapeAndSave(
       note.previewContent =
           metaDataNote?.previewContent ?? metaDataNote?.previewDescription;
       note.previewTitle = metaDataNote?.title;
-      note.previewImageUrl = metaDataNote?.imageUrl;
       note.previewImageUrls = metaDataNote?.imageUrls ?? note.previewImageUrls;
 
       await noteRepo.save(note);

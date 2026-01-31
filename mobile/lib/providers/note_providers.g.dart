@@ -545,7 +545,7 @@ final class NoteDetailProvider
   }
 }
 
-String _$noteDetailHash() => r'1f39d787e319f977f54fcd0a30aa9430d46148d8';
+String _$noteDetailHash() => r'd143dac11c30d468d3ce9eee353451030391e96b';
 
 final class NoteDetailFamily extends $Family
     with

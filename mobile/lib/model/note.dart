@@ -36,10 +36,8 @@ class Note {
 
   String? tag;
 
-  /// 链接预览图片URL（网络链接笔记用）
-  String? previewImageUrl;
-
-  /// 链接预览图片列表（多图支持，如小红书笔记）
+  /// 链接预览图片列表（多图支持）
+  /// 首页预览取第一张图展示
   List<String> previewImageUrls = [];
 
   /// 链接预览标题
@@ -73,7 +71,6 @@ class Note {
     bool? isDeleted,
     int? categoryId,
     String? tag,
-    String? previewImageUrl,
     List<String>? previewImageUrls,
     String? previewTitle,
     String? previewDescription,
@@ -93,7 +90,6 @@ class Note {
       ..isDeleted = isDeleted ?? this.isDeleted
       ..categoryId = categoryId ?? this.categoryId
       ..tag = tag ?? this.tag
-      ..previewImageUrl = previewImageUrl ?? this.previewImageUrl
       ..previewImageUrls = previewImageUrls ?? this.previewImageUrls
       ..previewTitle = previewTitle ?? this.previewTitle
       ..previewDescription = previewDescription ?? this.previewDescription

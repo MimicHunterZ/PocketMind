@@ -48,36 +48,31 @@ const NoteSchema = CollectionSchema(
       name: r'previewDescription',
       type: IsarType.string,
     ),
-    r'previewImageUrl': PropertySchema(
-      id: 7,
-      name: r'previewImageUrl',
-      type: IsarType.string,
-    ),
     r'previewImageUrls': PropertySchema(
-      id: 8,
+      id: 7,
       name: r'previewImageUrls',
       type: IsarType.stringList,
     ),
     r'previewTitle': PropertySchema(
-      id: 9,
+      id: 8,
       name: r'previewTitle',
       type: IsarType.string,
     ),
     r'resourceStatus': PropertySchema(
-      id: 10,
+      id: 9,
       name: r'resourceStatus',
       type: IsarType.string,
     ),
-    r'tag': PropertySchema(id: 11, name: r'tag', type: IsarType.string),
-    r'time': PropertySchema(id: 12, name: r'time', type: IsarType.dateTime),
-    r'title': PropertySchema(id: 13, name: r'title', type: IsarType.string),
+    r'tag': PropertySchema(id: 10, name: r'tag', type: IsarType.string),
+    r'time': PropertySchema(id: 11, name: r'time', type: IsarType.dateTime),
+    r'title': PropertySchema(id: 12, name: r'title', type: IsarType.string),
     r'updatedAt': PropertySchema(
-      id: 14,
+      id: 13,
       name: r'updatedAt',
       type: IsarType.long,
     ),
-    r'url': PropertySchema(id: 15, name: r'url', type: IsarType.string),
-    r'uuid': PropertySchema(id: 16, name: r'uuid', type: IsarType.string),
+    r'url': PropertySchema(id: 14, name: r'url', type: IsarType.string),
+    r'uuid': PropertySchema(id: 15, name: r'uuid', type: IsarType.string),
   },
 
   estimateSize: _noteEstimateSize,
@@ -178,12 +173,6 @@ int _noteEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
-  {
-    final value = object.previewImageUrl;
-    if (value != null) {
-      bytesCount += 3 + value.length * 3;
-    }
-  }
   bytesCount += 3 + object.previewImageUrls.length * 3;
   {
     for (var i = 0; i < object.previewImageUrls.length; i++) {
@@ -243,16 +232,15 @@ void _noteSerialize(
   writer.writeString(offsets[4], object.pendingAiQuestion);
   writer.writeString(offsets[5], object.previewContent);
   writer.writeString(offsets[6], object.previewDescription);
-  writer.writeString(offsets[7], object.previewImageUrl);
-  writer.writeStringList(offsets[8], object.previewImageUrls);
-  writer.writeString(offsets[9], object.previewTitle);
-  writer.writeString(offsets[10], object.resourceStatus);
-  writer.writeString(offsets[11], object.tag);
-  writer.writeDateTime(offsets[12], object.time);
-  writer.writeString(offsets[13], object.title);
-  writer.writeLong(offsets[14], object.updatedAt);
-  writer.writeString(offsets[15], object.url);
-  writer.writeString(offsets[16], object.uuid);
+  writer.writeStringList(offsets[7], object.previewImageUrls);
+  writer.writeString(offsets[8], object.previewTitle);
+  writer.writeString(offsets[9], object.resourceStatus);
+  writer.writeString(offsets[10], object.tag);
+  writer.writeDateTime(offsets[11], object.time);
+  writer.writeString(offsets[12], object.title);
+  writer.writeLong(offsets[13], object.updatedAt);
+  writer.writeString(offsets[14], object.url);
+  writer.writeString(offsets[15], object.uuid);
 }
 
 Note _noteDeserialize(
@@ -270,16 +258,15 @@ Note _noteDeserialize(
   object.pendingAiQuestion = reader.readStringOrNull(offsets[4]);
   object.previewContent = reader.readStringOrNull(offsets[5]);
   object.previewDescription = reader.readStringOrNull(offsets[6]);
-  object.previewImageUrl = reader.readStringOrNull(offsets[7]);
-  object.previewImageUrls = reader.readStringList(offsets[8]) ?? [];
-  object.previewTitle = reader.readStringOrNull(offsets[9]);
-  object.resourceStatus = reader.readStringOrNull(offsets[10]);
-  object.tag = reader.readStringOrNull(offsets[11]);
-  object.time = reader.readDateTimeOrNull(offsets[12]);
-  object.title = reader.readStringOrNull(offsets[13]);
-  object.updatedAt = reader.readLong(offsets[14]);
-  object.url = reader.readStringOrNull(offsets[15]);
-  object.uuid = reader.readStringOrNull(offsets[16]);
+  object.previewImageUrls = reader.readStringList(offsets[7]) ?? [];
+  object.previewTitle = reader.readStringOrNull(offsets[8]);
+  object.resourceStatus = reader.readStringOrNull(offsets[9]);
+  object.tag = reader.readStringOrNull(offsets[10]);
+  object.time = reader.readDateTimeOrNull(offsets[11]);
+  object.title = reader.readStringOrNull(offsets[12]);
+  object.updatedAt = reader.readLong(offsets[13]);
+  object.url = reader.readStringOrNull(offsets[14]);
+  object.uuid = reader.readStringOrNull(offsets[15]);
   return object;
 }
 
@@ -305,24 +292,22 @@ P _noteDeserializeProp<P>(
     case 6:
       return (reader.readStringOrNull(offset)) as P;
     case 7:
-      return (reader.readStringOrNull(offset)) as P;
-    case 8:
       return (reader.readStringList(offset) ?? []) as P;
+    case 8:
+      return (reader.readStringOrNull(offset)) as P;
     case 9:
       return (reader.readStringOrNull(offset)) as P;
     case 10:
       return (reader.readStringOrNull(offset)) as P;
     case 11:
-      return (reader.readStringOrNull(offset)) as P;
-    case 12:
       return (reader.readDateTimeOrNull(offset)) as P;
+    case 12:
+      return (reader.readStringOrNull(offset)) as P;
     case 13:
-      return (reader.readStringOrNull(offset)) as P;
-    case 14:
       return (reader.readLong(offset)) as P;
-    case 15:
+    case 14:
       return (reader.readStringOrNull(offset)) as P;
-    case 16:
+    case 15:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1675,168 +1660,6 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.greaterThan(property: r'previewDescription', value: ''),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlIsNull() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        const FilterCondition.isNull(property: r'previewImageUrl'),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlIsNotNull() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        const FilterCondition.isNotNull(property: r'previewImageUrl'),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlEqualTo(
-    String? value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.equalTo(
-          property: r'previewImageUrl',
-          value: value,
-          caseSensitive: caseSensitive,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlGreaterThan(
-    String? value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.greaterThan(
-          include: include,
-          property: r'previewImageUrl',
-          value: value,
-          caseSensitive: caseSensitive,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlLessThan(
-    String? value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.lessThan(
-          include: include,
-          property: r'previewImageUrl',
-          value: value,
-          caseSensitive: caseSensitive,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlBetween(
-    String? lower,
-    String? upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.between(
-          property: r'previewImageUrl',
-          lower: lower,
-          includeLower: includeLower,
-          upper: upper,
-          includeUpper: includeUpper,
-          caseSensitive: caseSensitive,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlStartsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.startsWith(
-          property: r'previewImageUrl',
-          value: value,
-          caseSensitive: caseSensitive,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlEndsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.endsWith(
-          property: r'previewImageUrl',
-          value: value,
-          caseSensitive: caseSensitive,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlContains(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.contains(
-          property: r'previewImageUrl',
-          value: value,
-          caseSensitive: caseSensitive,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlMatches(
-    String pattern, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.matches(
-          property: r'previewImageUrl',
-          wildcard: pattern,
-          caseSensitive: caseSensitive,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlIsEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.equalTo(property: r'previewImageUrl', value: ''),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlIsNotEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.greaterThan(property: r'previewImageUrl', value: ''),
       );
     });
   }
@@ -3245,18 +3068,6 @@ extension NoteQuerySortBy on QueryBuilder<Note, Note, QSortBy> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterSortBy> sortByPreviewImageUrl() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'previewImageUrl', Sort.asc);
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterSortBy> sortByPreviewImageUrlDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'previewImageUrl', Sort.desc);
-    });
-  }
-
   QueryBuilder<Note, Note, QAfterSortBy> sortByPreviewTitle() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'previewTitle', Sort.asc);
@@ -3451,18 +3262,6 @@ extension NoteQuerySortThenBy on QueryBuilder<Note, Note, QSortThenBy> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterSortBy> thenByPreviewImageUrl() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'previewImageUrl', Sort.asc);
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterSortBy> thenByPreviewImageUrlDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'previewImageUrl', Sort.desc);
-    });
-  }
-
   QueryBuilder<Note, Note, QAfterSortBy> thenByPreviewTitle() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'previewTitle', Sort.asc);
@@ -3622,17 +3421,6 @@ extension NoteQueryWhereDistinct on QueryBuilder<Note, Note, QDistinct> {
     });
   }
 
-  QueryBuilder<Note, Note, QDistinct> distinctByPreviewImageUrl({
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(
-        r'previewImageUrl',
-        caseSensitive: caseSensitive,
-      );
-    });
-  }
-
   QueryBuilder<Note, Note, QDistinct> distinctByPreviewImageUrls() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'previewImageUrls');
@@ -3749,12 +3537,6 @@ extension NoteQueryProperty on QueryBuilder<Note, Note, QQueryProperty> {
   QueryBuilder<Note, String?, QQueryOperations> previewDescriptionProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'previewDescription');
-    });
-  }
-
-  QueryBuilder<Note, String?, QQueryOperations> previewImageUrlProperty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'previewImageUrl');
     });
   }
 

@@ -8,6 +8,7 @@ import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/util/link_preview_config.dart';
 import 'package:pocketmind/util/logger_service.dart';
 import 'package:pocketmind/util/url_helper.dart';
+
 /// 元数据管理服务
 ///
 /// 负责处理链接预览数据的获取、加工和本地化。
@@ -31,8 +32,7 @@ class MetadataManager {
     PlatformScraperService? platformScraperService,
   }) : _linkPreviewApi = linkPreviewApi,
        _resourceService = resourceService,
-       _platformScraperService =
-           platformScraperService;
+       _platformScraperService = platformScraperService;
 
   /// 获取并处理链接元数据
   ///
@@ -56,7 +56,7 @@ class MetadataManager {
       final scraperUrls = urls
           .where((u) => LinkPreviewConfig.shouldUsePlatformScraper(u))
           .toList();
-      if(scraperUrls.isNotEmpty){
+      if (scraperUrls.isNotEmpty) {
         final ScraperMetaDatas = await _fetchFromPlatformScraper(scraperUrls);
         results.addAll(ScraperMetaDatas);
         // 移除已成功获取的
@@ -172,7 +172,9 @@ class MetadataManager {
       previewDescription: processedMetadata.desc, // 来自 LinkPreview 的描述
       previewContent: null, // 本地解析没有正文内容
       aiSummary: null,
-      imageUrl: processedMetadata.image, // 本地化后的图片路径
+      imageUrls: processedMetadata.image != null
+          ? [processedMetadata.image!]
+          : [], // 本地化后的图片路径
       url: processedMetadata.url ?? '',
       resourceStatus: null,
     );
@@ -271,8 +273,10 @@ class MetadataManager {
     return original;
   }
 
-  Future<Map<String,NoteMetadata>> _fetchFromPlatformScraper(List<String> scraperUrls) async {
-    if(_platformScraperService == null) return {};
+  Future<Map<String, NoteMetadata>> _fetchFromPlatformScraper(
+    List<String> scraperUrls,
+  ) async {
+    if (_platformScraperService == null) return {};
     PMlog.d(_tag, '策略0: 尝试平台爬虫处理 ${scraperUrls.length} 个链接');
     try {
       final platformResults = await _platformScraperService.scrapeBatch(

@@ -92,7 +92,9 @@ mixin NoteEditorLogicMixin on ConsumerState<NoteEditorSheet> {
         content: content,
         categoryId: selectedCategoryId,
         tag: tags.isNotEmpty ? tags.join(',') : null,
-        previewImageUrl: uploadedImageUrl ?? localImagePath,
+        previewImageUrls: (uploadedImageUrl ?? localImagePath) != null
+            ? [uploadedImageUrl ?? localImagePath!]
+            : null,
       );
 
       if (!mounted) return;

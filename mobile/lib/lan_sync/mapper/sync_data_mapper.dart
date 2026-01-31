@@ -28,7 +28,7 @@ class SyncDataMapper {
       'isDeleted': note.isDeleted,
       'categoryId': note.categoryId,
       'tag': note.tag,
-      'previewImageUrl': note.previewImageUrl,
+      'previewImageUrls': note.previewImageUrls,
       'previewTitle': note.previewTitle,
       'previewDescription': note.previewDescription,
       'previewImageUrls': note.previewImageUrls,
@@ -53,14 +53,13 @@ class SyncDataMapper {
       ..url = json['url'] as String?
       ..categoryId = json['categoryId'] as int? ?? 1
       ..tag = json['tag'] as String?
-      ..previewImageUrl = json['previewImageUrl'] as String?
-      ..previewTitle = json['previewTitle'] as String?
-      ..previewDescription = json['previewDescription'] as String?
       ..previewImageUrls =
           (json['previewImageUrls'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           []
+      ..previewTitle = json['previewTitle'] as String?
+      ..previewDescription = json['previewDescription'] as String?
       ..previewContent = json['previewContent'] as String?
       ..resourceStatus = json['resourceStatus'] as String?
       ..aiSummary = json['aiSummary'] as String?

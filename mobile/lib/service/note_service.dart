@@ -34,7 +34,7 @@ class NoteService {
     String? url,
     int categoryId = AppConstants.homeCategoryId,
     String? tag,
-    String? previewImageUrl,
+    List<String>? previewImageUrls,
     String? previewTitle,
     String? previewDescription,
     String? aiSummary,
@@ -52,7 +52,7 @@ class NoteService {
       ..categoryId = categoryId
       ..time = DateTime.now()
       ..tag = tag
-      ..previewImageUrl = previewImageUrl
+      ..previewImageUrls = previewImageUrls ?? []
       ..previewTitle = previewTitle
       ..previewDescription = previewDescription
       ..aiSummary = aiSummary
@@ -89,7 +89,6 @@ class NoteService {
     String? url,
     int? categoryId,
     String? tag,
-    String? previewImageUrl,
     List<String>? previewImageUrls,
     String? previewTitle,
     String? previewContent,
@@ -115,8 +114,6 @@ class NoteService {
     existingNote.url = url ?? existingNote.url;
     existingNote.categoryId = categoryId ?? existingNote.categoryId;
     existingNote.tag = tag ?? existingNote.tag;
-    existingNote.previewImageUrl =
-        previewImageUrl ?? existingNote.previewImageUrl;
     existingNote.previewImageUrls =
         previewImageUrls ?? existingNote.previewImageUrls;
     existingNote.previewTitle = previewTitle ?? existingNote.previewTitle;
@@ -172,11 +169,11 @@ class NoteService {
       await _imageHelper.deleteImage(url);
     }
 
-    final previewUrl = note.previewImageUrl;
-    if (previewUrl != null &&
-        previewUrl.isNotEmpty &&
-        _isLocalImage(previewUrl)) {
-      await _imageHelper.deleteImage(previewUrl);
+    // 删除所有本地预览图片
+    for (final previewUrl in note.previewImageUrls) {
+      if (_isLocalImage(previewUrl)) {
+        await _imageHelper.deleteImage(previewUrl);
+      }
     }
 
     // 2. 从数据库删除

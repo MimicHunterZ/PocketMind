@@ -12,14 +12,11 @@ class NoteMetadata {
   /// 正文内容
   final String? previewContent;
 
-  /// AI摘要（
+  /// AI摘要
   final String? aiSummary;
 
-  /// 预览图片URL
-  final String? imageUrl;
-
   /// 预览图片URL列表
-  final List<String>? imageUrls;
+  final List<String> imageUrls;
 
   /// 原始URL
   final String url;
@@ -32,17 +29,14 @@ class NoteMetadata {
     this.previewDescription,
     this.previewContent,
     this.aiSummary,
-    this.imageUrl,
-    this.imageUrls,
+    List<String>? imageUrls,
     required this.url,
     this.resourceStatus,
-  });
+  }) : imageUrls = imageUrls ?? [];
 
   /// 是否有效（至少有标题或图片）
   bool get isValid =>
-      (title != null && title!.isNotEmpty) ||
-      (imageUrl != null && imageUrl!.isNotEmpty) ||
-      (imageUrls != null && imageUrls!.isNotEmpty);
+      (title != null && title!.isNotEmpty) || imageUrls.isNotEmpty;
 
   /// 获取展示用的描述（优先使用 previewContent）
   String? get displayDescription {
@@ -52,22 +46,6 @@ class NoteMetadata {
     return previewDescription;
   }
 
-  /// 获取首图（兼容多图和单图场景）
-  String? get firstImage {
-    if (imageUrls != null && imageUrls!.isNotEmpty) {
-      return imageUrls!.first;
-    }
-    return imageUrl;
-  }
-
-  /// 获取所有图片列表
-  List<String> get allImages {
-    if (imageUrls != null && imageUrls!.isNotEmpty) {
-      return imageUrls!;
-    }
-    if (imageUrl != null && imageUrl!.isNotEmpty) {
-      return [imageUrl!];
-    }
-    return [];
-  }
+  /// 获取首图
+  String? get firstImage => imageUrls.isNotEmpty ? imageUrls.first : null;
 }

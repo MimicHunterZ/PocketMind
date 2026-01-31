@@ -43,14 +43,20 @@ class LinkPreviewCard extends ConsumerWidget {
     final metadata = Metadata();
     metadata.title = note.previewTitle;
     metadata.desc = note.previewContent ?? note.previewDescription;
-    metadata.image = note.previewImageUrl;
+    metadata.image = note.previewImageUrls.isNotEmpty
+        ? note.previewImageUrls.first
+        : null;
     metadata.url = note.url;
+
+    final firstImageUrl = note.previewImageUrls.isNotEmpty
+        ? note.previewImageUrls.first
+        : null;
 
     return isVertical
         ? _VerticalPreviewCard(
             url: note.url ?? '',
             metadata: metadata,
-            imageUrl: note.previewImageUrl,
+            imageUrl: firstImageUrl,
             hasContent: hasContent,
             onTap: onTap,
             isDesktop: isDesktop,
@@ -61,7 +67,7 @@ class LinkPreviewCard extends ConsumerWidget {
         : _HorizontalPreviewCard(
             url: note.url ?? '',
             metadata: metadata,
-            imageUrl: note.previewImageUrl,
+            imageUrl: firstImageUrl,
             onTap: onTap,
             publishDate: publishDate,
             titleEnabled: titleEnabled,
