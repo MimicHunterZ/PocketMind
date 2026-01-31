@@ -31,6 +31,11 @@ class SyncDataMapper {
       'previewImageUrl': note.previewImageUrl,
       'previewTitle': note.previewTitle,
       'previewDescription': note.previewDescription,
+      'previewImageUrls': note.previewImageUrls,
+      'previewContent': note.previewContent,
+      'resourceStatus': note.resourceStatus,
+      'aiSummary': note.aiSummary,
+      'pendingAiQuestion': note.pendingAiQuestion,
     };
   }
 
@@ -51,6 +56,15 @@ class SyncDataMapper {
       ..previewImageUrl = json['previewImageUrl'] as String?
       ..previewTitle = json['previewTitle'] as String?
       ..previewDescription = json['previewDescription'] as String?
+      ..previewImageUrls =
+          (json['previewImageUrls'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          []
+      ..previewContent = json['previewContent'] as String?
+      ..resourceStatus = json['resourceStatus'] as String?
+      ..aiSummary = json['aiSummary'] as String?
+      ..pendingAiQuestion = json['pendingAiQuestion'] as String?
       ..updatedAt = json['updatedAt'] as int? ?? 0
       ..isDeleted = json['isDeleted'] as bool? ?? false;
 

@@ -76,7 +76,7 @@ class AiAnalyzeResponse {
   String? get qaAnswer {
     if (!isQaMode || aiResponse == null) return null;
     if (aiResponse is Map<String, dynamic>) {
-       return aiResponse['answer'] as String?;
+      return aiResponse['answer'] as String?;
     }
     return null;
   }

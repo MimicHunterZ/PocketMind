@@ -289,7 +289,15 @@ class IsarNoteRepository {
             (q) => q
                 .titleContains(query, caseSensitive: false)
                 .or()
-                .contentContains(query, caseSensitive: false),
+                .contentContains(query, caseSensitive: false)
+                .or()
+                .previewContentContains(query,caseSensitive: false)
+                .or()
+                .previewTitleContains(query,caseSensitive: false)
+                .or()
+                .tagContains(query,caseSensitive: false)
+                .or()
+                .aiSummaryContains(query,caseSensitive: false)
           )
           .sortByTimeDesc()
           .watch(fireImmediately: true);

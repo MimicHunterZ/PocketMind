@@ -4,7 +4,7 @@ import 'package:pocketmind/page/widget/creative_toast.dart';
 
 class NoteAIInsightSection extends StatelessWidget {
   String aiSummary;
-  NoteAIInsightSection({super.key,required this.aiSummary});
+  NoteAIInsightSection({super.key, required this.aiSummary});
 
   @override
   Widget build(BuildContext context) {
@@ -13,8 +13,8 @@ class NoteAIInsightSection extends StatelessWidget {
     // 解析 Q&A 格式
     String? question;
     String? answer;
-    
-    // 简单的解析逻辑：检查是否以 Q: 开头并包含 \n\nA: 
+
+    // 简单的解析逻辑：检查是否以 Q: 开头并包含 \n\nA:
     if (aiSummary.trim().startsWith('Q:') && aiSummary.contains('\n\nA:')) {
       final parts = aiSummary.split('\n\nA:');
       if (parts.length == 2) {
@@ -81,10 +81,12 @@ class NoteAIInsightSection extends StatelessWidget {
                 // 内容区域
                 Container(
                   width: double.infinity,
-                  padding: EdgeInsets.symmetric(vertical: 8.h), // Reduced padding
-                  child: question != null 
-                    ? _buildQaContent(context, colorScheme, question, answer!)
-                    : _buildSummaryContent(context, colorScheme, aiSummary),
+                  padding: EdgeInsets.symmetric(
+                    vertical: 8.h,
+                  ), // Reduced padding
+                  child: question != null
+                      ? _buildQaContent(context, colorScheme, question, answer!)
+                      : _buildSummaryContent(context, colorScheme, aiSummary),
                 ),
               ],
             ),
@@ -94,8 +96,12 @@ class NoteAIInsightSection extends StatelessWidget {
     );
   }
 
-  Widget _buildSummaryContent(BuildContext context, ColorScheme colorScheme, String text) {
-     return Text(
+  Widget _buildSummaryContent(
+    BuildContext context,
+    ColorScheme colorScheme,
+    String text,
+  ) {
+    return Text(
       text,
       style: TextStyle(
         fontSize: 13.sp,
@@ -106,7 +112,12 @@ class NoteAIInsightSection extends StatelessWidget {
     );
   }
 
-  Widget _buildQaContent(BuildContext context, ColorScheme colorScheme, String question, String answer) {
+  Widget _buildQaContent(
+    BuildContext context,
+    ColorScheme colorScheme,
+    String question,
+    String answer,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -114,7 +125,9 @@ class NoteAIInsightSection extends StatelessWidget {
         Container(
           padding: EdgeInsets.only(left: 12.w, top: 4.h, bottom: 4.h),
           decoration: BoxDecoration(
-             border: Border(left: BorderSide(color: colorScheme.tertiary, width: 3.w))
+            border: Border(
+              left: BorderSide(color: colorScheme.tertiary, width: 3.w),
+            ),
           ),
           child: Text(
             question,
@@ -135,7 +148,7 @@ class NoteAIInsightSection extends StatelessWidget {
             color: colorScheme.secondary,
             height: 1.5,
           ),
-           textAlign: TextAlign.justify,
+          textAlign: TextAlign.justify,
         ),
       ],
     );
