@@ -135,10 +135,7 @@ class ZhihuScraper implements IPlatformScraper {
       await headlessWebView.run();
 
       await controller?.loadUrl(
-        urlRequest: URLRequest(
-          url: WebUri(cleanUrl),
-          headers: _requestHeaders,
-        ),
+        urlRequest: URLRequest(url: WebUri(cleanUrl), headers: _requestHeaders),
       );
 
       // 等待加载完成（带超时）
@@ -291,6 +288,25 @@ class ZhihuScraper implements IPlatformScraper {
     InAppWebViewController controller,
     ZhihuContentType contentType,
   ) async {
+    // 调试日志：打印 js-initialData 的结构
+    final debugJs = '''
+(function() {
+  try {
+    var el = document.getElementById('js-initialData');
+    if (!el) return 'ELEMENT_NOT_FOUND';
+    var data = JSON.parse(el.textContent);
+    if (!data || !data.initialState) return 'NO_INITIAL_STATE';
+    var entities = data.initialState.entities;
+    if (!entities) return 'NO_ENTITIES';
+    return JSON.stringify(Object.keys(entities));
+  } catch (e) {
+    return 'ERROR: ' + e.message;
+  }
+})()
+''';
+    final debugResult = await controller.evaluateJavascript(source: debugJs);
+    PMlog.d(_tag, 'js-initialData entities: $debugResult');
+
     final extractJs =
         '''
 (function() {

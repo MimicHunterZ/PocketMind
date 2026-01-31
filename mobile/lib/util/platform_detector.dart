@@ -1,4 +1,5 @@
 import '../service/scraper/platform_scraper_interface.dart';
+import '../service/scraper/bilibili_scraper.dart';
 import '../service/scraper/xhs_scraper.dart';
 import '../service/scraper/zhihu_scraper.dart';
 
@@ -11,6 +12,9 @@ enum PlatformType {
 
   /// 知乎
   zhihu('知乎', 'zhihu'),
+
+  /// B站
+  bilibili('B站', 'bilibili'),
 
   /// 通用平台（使用默认策略）
   generic('通用', 'generic');
@@ -43,6 +47,13 @@ class PlatformDetector {
     caseSensitive: false,
   );
 
+  /// B站 URL 匹配正则
+  /// 支持：bilibili.com, b23.tv (短链接)
+  static final RegExp _bilibiliPattern = RegExp(
+    r'(bilibili\.com|b23\.tv)',
+    caseSensitive: false,
+  );
+
   /// 检测 URL 对应的平台类型
   ///
   /// [url] 目标链接
@@ -62,6 +73,11 @@ class PlatformDetector {
       return PlatformType.zhihu;
     }
 
+    // B站检测
+    if (_bilibiliPattern.hasMatch(url)) {
+      return PlatformType.bilibili;
+    }
+
     // 未匹配到特定平台，返回通用类型
     return PlatformType.generic;
   }
@@ -77,6 +93,8 @@ class PlatformDetector {
         return XhsScraper();
       case PlatformType.zhihu:
         return ZhihuScraper();
+      case PlatformType.bilibili:
+        return BilibiliScraper();
       case PlatformType.generic:
         return null; // 通用平台使用其他策略
     }

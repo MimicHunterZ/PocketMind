@@ -15,52 +15,56 @@ import '../util/logger_service.dart';
 
 String tag = 'BackgroundWorker';
 @pragma('vm:entry-point')
-void callbackDispatcher(){
+void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     PMlog.d(tag, '后台任务启动: $task');
     try {
-    // 1. 基础环境初始化
-    WidgetsFlutterBinding.ensureInitialized();
+      // 1. 基础环境初始化
+      WidgetsFlutterBinding.ensureInitialized();
 
-    // 2. 重新初始化 Isar (因为在新的 Isolate 中)
-    // 注意：这里不能依赖 main() 里的全局 isar 变量
-    final dir = await getApplicationDocumentsDirectory();
-    final isar = await Isar.open(
-      [NoteSchema, CategorySchema],
-      directory: dir.path,
-    );
+      // 2. 重新初始化 Isar (因为在新的 Isolate 中)
+      // 注意：这里不能依赖 main() 里的全局 isar 变量
+      final dir = await getApplicationDocumentsDirectory();
+      final isar = await Isar.open([
+        NoteSchema,
+        CategorySchema,
+      ], directory: dir.path);
 
-    final prefs = await SharedPreferences.getInstance();
+      final prefs = await SharedPreferences.getInstance();
 
-    // 3. 构建 Riverpod 容器 (Container)
-    // 后台没有 Widget 树，所以没有 ProviderScope，需要手动创建一个 Container
-    final ref = ProviderContainer(
-      overrides: [
-        isarProvider.overrideWithValue(isar),
-        sharedPreferencesProvider.overrideWithValue(prefs),
-      ],
-    );
+      // 3. 构建 Riverpod 容器 (Container)
+      // 后台没有 Widget 树，所以没有 ProviderScope，需要手动创建一个 Container
+      final ref = ProviderContainer(
+        overrides: [
+          isarProvider.overrideWithValue(isar),
+          sharedPreferencesProvider.overrideWithValue(prefs),
+        ],
+      );
 
-    switch (task) {
-      case 'scrapeAndSave':
-        final urls = (inputData?['urls'] as List?)?.map((e) => e.toString()).toList() ?? [];
-        final userQuestion = inputData?['uq'];
-        if(urls.isNotEmpty){
-            await scrapeAndSave(ref,urls,userQuestion);
-        }else{
-         PMlog.e(tag, 'url 的 value 为空');
-        }
-        break;
-      default:
-      // Handle unknown task types
-        break;
-    }
+      switch (task) {
+        case 'scrapeAndSave':
+          final urls =
+              (inputData?['urls'] as List?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              [];
+          final userQuestion = inputData?['uq'];
+          if (urls.isNotEmpty) {
+            await scrapeAndSave(ref, urls, userQuestion);
+          } else {
+            PMlog.e(tag, 'url 的 value 为空');
+          }
+          break;
+        default:
+          // Handle unknown task types
+          break;
+      }
 
-    return Future.value(true);
+      return Future.value(true);
     } catch (e, stack) {
       // 【修改 2】: 捕获所有异常，防止 Worker 报红 FAILURE
-      PMlog.e(tag,'❌ 任务执行发生严重错误: $e');
-      PMlog.e(tag,'堆栈: $stack');
+      PMlog.e(tag, '❌ 任务执行发生严重错误: $e');
+      PMlog.e(tag, '堆栈: $stack');
 
       // 返回 false 表示任务失败，WorkManager 配置了策略的话可能会重试
       return Future.value(false);
@@ -68,9 +72,15 @@ void callbackDispatcher(){
   });
 }
 
-Future<void> scrapeAndSave(ProviderContainer ref, List<String> urls,String? userQuestion) async {
+Future<void> scrapeAndSave(
+  ProviderContainer ref,
+  List<String> urls,
+  String? userQuestion,
+) async {
   // 1. 批量获取元数据
-  final metadataResults = await ref.read(metadataManagerProvider).fetchAndProcessMetadata(urls);
+  final metadataResults = await ref
+      .read(metadataManagerProvider)
+      .fetchAndProcessMetadata(urls);
 
   // 2. 批量查找数据库中的笔记
   final notes = await ref.read(noteServiceProvider).findNotesWithUrls(urls);
@@ -87,10 +97,11 @@ Future<void> scrapeAndSave(ProviderContainer ref, List<String> urls,String? user
       final metaDataNote = metadataResults[url];
 
       // 更新基础元数据
-      note.previewContent = metaDataNote?.previewContent ?? metaDataNote?.previewDescription;
+      note.previewContent =
+          metaDataNote?.previewContent ?? metaDataNote?.previewDescription;
       note.previewTitle = metaDataNote?.title;
       note.previewImageUrl = metaDataNote?.imageUrl;
-      note.previewImageUrls =  metaDataNote?.imageUrls ?? note.previewImageUrls;
+      note.previewImageUrls = metaDataNote?.imageUrls ?? note.previewImageUrls;
 
       await noteRepo.save(note);
       needCleanUrls.add(url);
@@ -119,7 +130,8 @@ Future<void> scrapeAndSave(ProviderContainer ref, List<String> urls,String? user
           }
         } else if (aiResponse.isQaMode) {
           // QA 模式
-          final qaContent = 'Q: ${aiResponse.userQuestion ?? note.pendingAiQuestion}\n\nA: ${aiResponse.qaAnswer ?? ''}';
+          final qaContent =
+              'Q: ${aiResponse.userQuestion ?? note.pendingAiQuestion}\n\nA: ${aiResponse.qaAnswer ?? ''}';
           note.aiSummary = qaContent;
         }
 
@@ -127,16 +139,18 @@ Future<void> scrapeAndSave(ProviderContainer ref, List<String> urls,String? user
         if (aiResponse.tags.isNotEmpty) {
           final existingTags = note.tag ?? '';
           final newTagsSet = aiResponse.tags.toSet();
-          
+
           // 如果已有标签，避免重复
           if (existingTags.isNotEmpty) {
             final currentTagsList = existingTags.split(',');
             newTagsSet.removeAll(currentTagsList);
           }
-          
+
           if (newTagsSet.isNotEmpty) {
-             final newTagsStr = newTagsSet.join(',');
-             note.tag = existingTags.isEmpty ? newTagsStr : '$existingTags,$newTagsStr';
+            final newTagsStr = newTagsSet.join(',');
+            note.tag = existingTags.isEmpty
+                ? newTagsStr
+                : '$existingTags,$newTagsStr';
           }
         }
 
@@ -144,7 +158,6 @@ Future<void> scrapeAndSave(ProviderContainer ref, List<String> urls,String? user
 
         // AI 分析完成后再次保存
         await noteRepo.save(note);
-
       } catch (e) {
         // AI 分析失败静默处理，不阻塞其他笔记的处理
         PMlog.e(tag, '笔记 $url AI 分析失败: $e');
@@ -162,8 +175,5 @@ Future<void> scrapeAndSave(ProviderContainer ref, List<String> urls,String? user
     currentUrls.remove(url);
   }
   await prefs.setStringList('needCallBackUrl', currentUrls);
-  PMlog.d(
-    tag,
-    'Pending URLs processed and cleared. Remaining: $currentUrls',
-  );
+  PMlog.d(tag, 'Pending URLs processed and cleared. Remaining: $currentUrls');
 }

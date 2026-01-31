@@ -325,6 +325,26 @@ class XhsScraper implements IPlatformScraper {
     InAppWebViewController controller,
     String url,
   ) async {
+    // 调试日志：打印 __INITIAL_STATE__ 的结构
+    final debugJs = '''
+(function() {
+  try {
+    var state = window.__INITIAL_STATE__;
+    if (!state) return 'STATE_NOT_FOUND';
+    var keys = Object.keys(state);
+    if (state.note && state.note.noteDetailMap) {
+      var noteKeys = Object.keys(state.note.noteDetailMap);
+      return JSON.stringify({keys: keys, noteKeys: noteKeys});
+    }
+    return JSON.stringify({keys: keys});
+  } catch (e) {
+    return 'ERROR: ' + e.message;
+  }
+})()
+''';
+    final debugResult = await controller.evaluateJavascript(source: debugJs);
+    PMlog.d(_tag, '__INITIAL_STATE__ structure: $debugResult');
+
     PMlog.d(_tag, 'url: $url');
     // 提取笔记 ID
     final noteId = _extractNoteId(url);

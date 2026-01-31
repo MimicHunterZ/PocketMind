@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/service/cookie_manager_service.dart';
+import 'package:pocketmind/page/settings/bilibili_login_page.dart';
 import 'package:pocketmind/page/settings/xhs_login_page.dart';
 import 'package:pocketmind/page/settings/zhihu_login_page.dart';
 import 'package:pocketmind/util/logger_service.dart';
@@ -75,6 +76,9 @@ class _PlatformAccountsPageState extends ConsumerState<PlatformAccountsPage> {
         break;
       case 'zhihu':
         loginPage = const ZhihuLoginPage();
+        break;
+      case 'bilibili':
+        loginPage = const BilibiliLoginPage();
         break;
       default:
         ScaffoldMessenger.of(
@@ -189,6 +193,10 @@ class _PlatformAccountsPageState extends ConsumerState<PlatformAccountsPage> {
       case 'zhihu':
         iconData = Icons.question_answer;
         iconColor = Colors.blue;
+        break;
+      case 'bilibili':
+        iconData = Icons.play_circle_fill;
+        iconColor = Colors.pink;
         break;
       default:
         iconData = Icons.language;

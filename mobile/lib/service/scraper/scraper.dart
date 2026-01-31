@@ -2,6 +2,7 @@
 //
 // 包含平台爬虫、队列管理、Cookie 管理等功能
 
+export 'bilibili_scraper.dart';
 export 'platform_scraper_interface.dart';
 export 'platform_scraper_service.dart';
 export 'scraper_task.dart';
