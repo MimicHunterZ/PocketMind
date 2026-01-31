@@ -31,8 +31,6 @@ abstract class AppConfigState with _$AppConfigState {
     @Default(false) bool syncAutoStart,
     @Default([]) List<Map<String, String>> reminderShortcuts,
     @Default(false) bool highPrecisionNotification,
-    @Default(AppConstants.defaultNotificationIntensity)
-    int notificationIntensity,
     @Default('') String linkPreviewApiKey,
     @Default('') String customDomain,
     @Default(Environment.development) Environment environment,

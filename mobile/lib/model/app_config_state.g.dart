@@ -25,9 +25,6 @@ _AppConfigState _$AppConfigStateFromJson(Map<String, dynamic> json) =>
           const [],
       highPrecisionNotification:
           json['highPrecisionNotification'] as bool? ?? false,
-      notificationIntensity:
-          (json['notificationIntensity'] as num?)?.toInt() ??
-          AppConstants.defaultNotificationIntensity,
       linkPreviewApiKey: json['linkPreviewApiKey'] as String? ?? '',
       customDomain: json['customDomain'] as String? ?? '',
       environment:
@@ -46,7 +43,6 @@ Map<String, dynamic> _$AppConfigStateToJson(_AppConfigState instance) =>
       'syncAutoStart': instance.syncAutoStart,
       'reminderShortcuts': instance.reminderShortcuts,
       'highPrecisionNotification': instance.highPrecisionNotification,
-      'notificationIntensity': instance.notificationIntensity,
       'linkPreviewApiKey': instance.linkPreviewApiKey,
       'customDomain': instance.customDomain,
       'environment': _$EnvironmentEnumMap[instance.environment]!,

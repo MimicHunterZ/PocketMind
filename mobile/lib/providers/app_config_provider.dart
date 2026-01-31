@@ -20,7 +20,6 @@ class AppConfig extends _$AppConfig {
   static const String _keyReminderShortcuts = 'reminder_shortcuts';
   static const String _keyHighPrecisionNotification =
       'high_precision_notification';
-  static const String _keyNotificationIntensity = 'notification_intensity';
   static const String _keyCustomDomain = 'custom_domain';
 
   @override
@@ -63,7 +62,6 @@ class AppConfig extends _$AppConfig {
       reminderShortcuts: reminderShortcuts,
       highPrecisionNotification:
           prefs.getBool(_keyHighPrecisionNotification) ?? false,
-      notificationIntensity: prefs.getInt(_keyNotificationIntensity) ?? 2,
       linkPreviewApiKey: prefs.getString(_keyLinkPreviewApiKey) ?? '',
       customDomain: prefs.getString(_keyCustomDomain) ?? '',
       environment: environment,
@@ -118,13 +116,6 @@ class AppConfig extends _$AppConfig {
         .read(sharedPreferencesProvider)
         .setBool(_keyHighPrecisionNotification, enabled);
     state = state.copyWith(highPrecisionNotification: enabled);
-  }
-
-  Future<void> setNotificationIntensity(int level) async {
-    await ref
-        .read(sharedPreferencesProvider)
-        .setInt(_keyNotificationIntensity, level);
-    state = state.copyWith(notificationIntensity: level);
   }
 
   Future<void> setLinkPreviewApiKey(String apiKey) async {

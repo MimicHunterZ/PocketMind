@@ -18,7 +18,7 @@ enum EditTab { title, content, tags, category, ai, reminder }
 class EditNotePage extends ConsumerStatefulWidget {
   final String? initialTitle;
   final String? initialContent;
-  final void Function(Map<String,String> data) onDone;
+  final void Function(Map<String, String> data) onDone;
   final int id;
   final String? webUrl;
 
@@ -105,13 +105,10 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
             : '您有一条笔记提醒。',
         scheduledDate: _scheduledTime!,
         highPrecision: config.highPrecisionNotification,
-        intensity: config.notificationIntensity,
       );
     }
 
-    Map<String, String> result = {
-      'uq': _aiController.text,
-    };
+    Map<String, String> result = {'uq': _aiController.text};
 
     widget.onDone(result);
   }

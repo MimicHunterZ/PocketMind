@@ -105,7 +105,6 @@ class NotificationService {
     required String body,
     required DateTime scheduledDate,
     bool highPrecision = false,
-    int intensity = 2,
   }) async {
     // 0. 先检测权限检查与请求
     PermissionStatus status = await Permission.notification.status;
@@ -129,77 +128,27 @@ class NotificationService {
     // 1. 将输入的 DateTime (本地时间) 转换为 tz.local 时区下的 TZDateTime
     tz.TZDateTime tzDate = tz.TZDateTime.from(scheduledDate, tz.local);
 
-    // 定义 Android 变量
-    fln.Importance androidImportance;
-    fln.Priority androidPriority;
+    // 固定使用最高级别通知配置（用户可在系统层面调整）
+    // Android: 强行弹窗、最大声音
+    const fln.Importance androidImportance = fln.Importance.max;
+    const fln.Priority androidPriority = fln.Priority.high;
 
-    // 定义 iOS/macOS 变量
-    bool iosPresentSound;
-    bool iosPresentBadge;
-    bool iosPresentAlert;
-    fln.InterruptionLevel iosInterruptionLevel;
+    // iOS/macOS: 时效性通知 (TimeSensitive)，可突破专注模式
+    const bool iosPresentSound = true;
+    const bool iosPresentBadge = true;
+    const bool iosPresentAlert = true;
+    const fln.InterruptionLevel iosInterruptionLevel =
+        fln.InterruptionLevel.timeSensitive;
 
-    // 定义 win 变量
-    fln.WindowsNotificationDetails? windowsDetails;
-
-    switch (intensity) {
-      case 0: // 低
-        // Android: 无声、无弹窗、仅状态栏
-        androidImportance = fln.Importance.low;
-        androidPriority = fln.Priority.low;
-
-        // iOS/macOS: 仅添加进列表、不亮屏、不响铃 (Passive)
-        iosPresentSound = false;
-        iosPresentBadge = true; // 角标还是更新一下比较好
-        iosPresentAlert = false; // 不弹窗
-        iosInterruptionLevel = fln.InterruptionLevel.passive;
-
-        // Windows
-        windowsDetails = fln.WindowsNotificationDetails(
-          audio: fln.WindowsNotificationAudio.silent(),
-          duration: fln.WindowsNotificationDuration.short,
-        );
-        break;
-      case 1: // 中
-        // Android: 有声、根据系统状态决定是否弹窗
-        androidImportance = fln.Importance.defaultImportance;
-        androidPriority = fln.Priority.defaultPriority;
-
-        // iOS/macOS: 标准通知 (Active)
-        iosPresentSound = true;
-        iosPresentBadge = true;
-        iosPresentAlert = true;
-        iosInterruptionLevel = fln.InterruptionLevel.active;
-
-        // win
-        windowsDetails = const fln.WindowsNotificationDetails();
-        break;
-      case 2: // 高
-      default:
-        // Android: 强行弹窗、最大声音
-        androidImportance = fln.Importance.max;
-        androidPriority = fln.Priority.high;
-
-        // iOS/macOS: 时效性通知 (TimeSensitive)，可突破专注模式
-        iosPresentSound = true;
-        iosPresentBadge = true;
-        iosPresentAlert = true;
-        iosInterruptionLevel = fln.InterruptionLevel.timeSensitive;
-
-        // win
-        windowsDetails = fln.WindowsNotificationDetails(
+    // Windows: 闹钟模式
+    final fln.WindowsNotificationDetails windowsDetails =
+        fln.WindowsNotificationDetails(
           scenario: fln.WindowsNotificationScenario.alarm,
           duration: fln.WindowsNotificationDuration.long,
         );
-        break;
-    }
-    String androidChannelId = 'reminder_channel_level_$intensity';
-    String androidChannelName =
-        '${intensity == 0
-            ? "低"
-            : intensity == 1
-            ? "中"
-            : "高"} 强度提醒';
+
+    const String androidChannelId = 'reminder_channel_high';
+    const String androidChannelName = '提醒通知';
 
     try {
       await flutterLocalNotificationsPlugin.zonedSchedule(

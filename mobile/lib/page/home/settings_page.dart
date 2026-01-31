@@ -34,7 +34,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _isWaterfallLayout = true;
   bool _isLoading = true;
   bool _highPrecisionNotification = false;
-  int _notificationIntensity = 2;
   Environment _currentEnvironment = Environment.development;
 
   @override
@@ -67,7 +66,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       _meteCacheTimeController.text = config.metaCacheTime.toString();
       _isWaterfallLayout = config.waterfallLayoutEnabled;
       _highPrecisionNotification = config.highPrecisionNotification;
-      _notificationIntensity = config.notificationIntensity;
       _isLoading = false;
     });
   }
@@ -104,7 +102,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     // 保存通知设置
     await notifier.setHighPrecisionNotification(_highPrecisionNotification);
-    await notifier.setNotificationIntensity(_notificationIntensity);
 
     // 应用代理设置
     _applyProxySettings();
@@ -317,31 +314,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 setState(() => _highPrecisionNotification = value);
               },
             ),
-            Divider(height: 24.h),
-            Text('提醒强度', style: theme.textTheme.bodyMedium),
-            SizedBox(height: 12.h),
-            _buildIntensityOption(
-              theme,
-              2,
-              '强提醒',
-              '弹窗 + 声音 + 震动',
-              Icons.notifications_active,
-            ),
             SizedBox(height: 8.h),
-            _buildIntensityOption(
-              theme,
-              1,
-              '标准',
-              '声音 + 状态栏',
-              Icons.notifications,
-            ),
-            SizedBox(height: 8.h),
-            _buildIntensityOption(
-              theme,
-              0,
-              '静音',
-              '仅状态栏显示',
-              Icons.notifications_off,
+            Text(
+              '提醒强度由系统设置控制，请在系统通知设置中调整',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.hintColor,
+              ),
             ),
           ],
         ),
@@ -689,77 +667,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         SizedBox(height: 4.h),
         Text(content, style: theme.textTheme.bodySmall),
       ],
-    );
-  }
-
-  Widget _buildIntensityOption(
-    ThemeData theme,
-    int value,
-    String title,
-    String subtitle,
-    IconData icon,
-  ) {
-    final isSelected = _notificationIntensity == value;
-    final colorScheme = theme.colorScheme;
-
-    return InkWell(
-      onTap: () => setState(() => _notificationIntensity = value),
-      borderRadius: BorderRadius.circular(8.r),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? colorScheme.primaryContainer.withValues(alpha: 0.4)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8.r),
-          border: Border.all(
-            color: isSelected
-                ? colorScheme.primary
-                : theme.dividerColor.withValues(alpha: 0.2),
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: isSelected
-                  ? colorScheme.primary
-                  : theme.iconTheme.color?.withValues(alpha: 0.7),
-              size: 20.sp,
-            ),
-            SizedBox(width: 12.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                      color: isSelected ? colorScheme.primary : null,
-                    ),
-                  ),
-                  if (subtitle.isNotEmpty) ...[
-                    SizedBox(height: 2.h),
-                    Text(
-                      subtitle,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: isSelected
-                            ? colorScheme.primary.withValues(alpha: 0.8)
-                            : null,
-                        fontSize: 11.sp,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

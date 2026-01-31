@@ -114,9 +114,6 @@ class AppConstants {
   /// 默认元数据缓存时间（天）
   static const int defaultMetaCacheTimeDays = 10;
 
-  /// 默认通知强度
-  static const int defaultNotificationIntensity = 2;
-
   /// 最大提醒快捷方式数量
   static const int maxReminderShortcuts = 5;
 }
