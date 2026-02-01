@@ -33,7 +33,6 @@ import 'package:pocketmind/main_share.dart';
 
 late Isar isar;
 
-
 Future<void> main() async {
   // 确保 flutter 绑定初始化了
   WidgetsFlutterBinding.ensureInitialized();
@@ -68,6 +67,15 @@ Future<void> main() async {
   await ImageStorageHelper().init();
   final notificationSvc = NotificationService();
   await notificationSvc.init();
+
+  // 设置通知点击回调（前台时，用于点击通知本身，非 action 按钮）
+  // action 按钮点击已在 NotificationService 内部处理
+  notificationSvc.onNotificationTap = (payload, actionId) {
+    // 仅处理点击通知本身的情况
+    if (actionId == null && payload != null) {
+      PMlog.d('Main', '通知被点击: $payload');
+    }
+  };
 
   //开启后台进程
   Workmanager().initialize(callbackDispatcher);
@@ -106,8 +114,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
     // 启动时检查是否有待处理的 URL 回调
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(noteServiceProvider).
-      processPendingUrls();
+      ref.read(noteServiceProvider).processPendingUrls();
     });
   }
 

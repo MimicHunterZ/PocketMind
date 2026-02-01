@@ -7,26 +7,39 @@ import '../service/scraper/zhihu_scraper.dart';
 ///
 /// 用于标识不同的内容平台，以便选择对应的爬虫策略
 enum PlatformType {
-  /// 小红书
-  xhs('小红书', 'xhs'),
+  /// 小红书（本地无头浏览器）
+  xhs('小红书', 'xhs', false),
 
-  /// 知乎
-  zhihu('知乎', 'zhihu'),
+  /// 知乎（本地无头浏览器）
+  zhihu('知乎', 'zhihu', false),
 
-  /// B站
-  bilibili('B站', 'bilibili'),
+  /// B站（本地无头浏览器）
+  bilibili('B站', 'bilibili', false),
+
+  /// X/Twitter（走后端服务）
+  x('X', 'x', true),
 
   /// 通用平台（使用默认策略）
-  generic('通用', 'generic');
+  generic('通用', 'generic', false);
 
   final String displayName;
   final String identifier;
 
-  const PlatformType(this.displayName, this.identifier);
+  /// 是否只走后端服务（不使用本地爬虫）
+  final bool isBackendOnly;
+
+  const PlatformType(this.displayName, this.identifier, this.isBackendOnly);
 
   // 直接在枚举内部定义静态 getter
   static List<PlatformType> get getSupportedPlatforms {
     return PlatformType.values.where((p) => p != PlatformType.generic).toList();
+  }
+
+  /// 获取需要本地爬虫的平台
+  static List<PlatformType> get localScraperPlatforms {
+    return PlatformType.values
+        .where((p) => !p.isBackendOnly && p != PlatformType.generic)
+        .toList();
   }
 }
 
@@ -54,6 +67,13 @@ class PlatformDetector {
     caseSensitive: false,
   );
 
+  /// X/Twitter URL 匹配正则
+  /// 支持：x.com, twitter.com
+  static final RegExp _xPattern = RegExp(
+    r'(x\.com|twitter\.com)',
+    caseSensitive: false,
+  );
+
   /// 检测 URL 对应的平台类型
   ///
   /// [url] 目标链接
@@ -78,6 +98,11 @@ class PlatformDetector {
       return PlatformType.bilibili;
     }
 
+    // X/Twitter 检测
+    if (_xPattern.hasMatch(url)) {
+      return PlatformType.x;
+    }
+
     // 未匹配到特定平台，返回通用类型
     return PlatformType.generic;
   }
@@ -95,6 +120,8 @@ class PlatformDetector {
         return ZhihuScraper();
       case PlatformType.bilibili:
         return BilibiliScraper();
+      case PlatformType.x:
+        return null; // X/Twitter 使用后端服务
       case PlatformType.generic:
         return null; // 通用平台使用其他策略
     }

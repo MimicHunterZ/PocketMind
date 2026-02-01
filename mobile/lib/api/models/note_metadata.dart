@@ -1,3 +1,22 @@
+/// 元数据来源
+///
+/// 用于区分抓取渠道，判定失败时使用:
+/// - [platformScraper] 和 [backend] 失败才算真正的失败
+/// - [linkPreviewApi] 和 [localParser] 只是兜底，不算失败
+enum MetadataSource {
+  /// 平台专用爬虫（小红书等，本地无头浏览器）
+  platformScraper,
+
+  /// 后端服务
+  backend,
+
+  /// LinkPreview API（公共服务，兜底）
+  linkPreviewApi,
+
+  /// 本地解析库（AnyLinkPreview，兜底）
+  localParser,
+}
+
 /// 统一的 note 元数据返回结构
 ///
 /// 整合后端和本地LinkPreview两种数据源的返回数据
@@ -24,6 +43,9 @@ class NoteMetadata {
   /// 资源状态
   final String? resourceStatus;
 
+  /// 元数据来源
+  final MetadataSource? source;
+
   NoteMetadata({
     this.title,
     this.previewDescription,
@@ -32,7 +54,18 @@ class NoteMetadata {
     List<String>? imageUrls,
     required this.url,
     this.resourceStatus,
+    this.source,
   }) : imageUrls = imageUrls ?? [];
+
+  /// 是否来自主要抓取渠道
+  bool get isFromPrimarySource =>
+      source == MetadataSource.platformScraper ||
+      source == MetadataSource.backend;
+
+  /// 是否来自兜底渠道
+  bool get isFromFallbackSource =>
+      source == MetadataSource.linkPreviewApi ||
+      source == MetadataSource.localParser;
 
   /// 是否有效（至少有标题或图片）
   bool get isValid =>

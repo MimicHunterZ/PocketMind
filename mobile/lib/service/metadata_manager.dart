@@ -89,7 +89,10 @@ class MetadataManager {
           if (LinkPreviewConfig.shouldUseApiService(url)) {
             final apiMetadata = await _fetchFromLinkPreviewApi(url);
             if (apiMetadata != null) {
-              result = await _convertMetadataToNote(apiMetadata);
+              result = await _convertMetadataToNote(
+                apiMetadata,
+                MetadataSource.linkPreviewApi,
+              );
               PMlog.d(_tag, '从 LinkPreview API 成功获取元数据: $url');
             }
           }
@@ -98,7 +101,10 @@ class MetadataManager {
           if (result == null) {
             final localMetadata = await _fetchFromLocalParser(url);
             if (localMetadata != null) {
-              result = await _convertMetadataToNote(localMetadata);
+              result = await _convertMetadataToNote(
+                localMetadata,
+                MetadataSource.localParser,
+              );
               PMlog.d(_tag, '从本地 AnyLinkPreview 库 解析成功获取元数据: $url');
             }
           }
@@ -149,6 +155,7 @@ class MetadataManager {
           aiSummary: item.aiSummary,
           url: item.url,
           resourceStatus: item.status,
+          source: MetadataSource.backend,
         );
         noteMetadatas.add(metadata);
       }
@@ -160,7 +167,10 @@ class MetadataManager {
   }
 
   /// 将 Metadata 对象转换为 NoteMetadata
-  Future<NoteMetadata> _convertMetadataToNote(Metadata metadata) async {
+  Future<NoteMetadata> _convertMetadataToNote(
+    Metadata metadata,
+    MetadataSource source,
+  ) async {
     // 数据清洗
     _sanitizeMetadata(metadata, metadata.url ?? '');
 
@@ -177,6 +187,7 @@ class MetadataManager {
           : [], // 本地化后的图片路径
       url: processedMetadata.url ?? '',
       resourceStatus: null,
+      source: source,
     );
   }
 
@@ -282,7 +293,20 @@ class MetadataManager {
       final platformResults = await _platformScraperService.scrapeBatch(
         scraperUrls,
       );
-      return {for (var item in platformResults) item.url: item};
+      // 标记来源为平台爬虫
+      return {
+        for (var item in platformResults)
+          item.url: NoteMetadata(
+            title: item.title,
+            previewDescription: item.previewDescription,
+            previewContent: item.previewContent,
+            aiSummary: item.aiSummary,
+            imageUrls: item.imageUrls,
+            url: item.url,
+            resourceStatus: item.resourceStatus,
+            source: MetadataSource.platformScraper,
+          ),
+      };
     } on CookieExpiredException catch (e) {
       PMlog.w(_tag, '平台 Cookie 过期: ${e.message}');
       return {};

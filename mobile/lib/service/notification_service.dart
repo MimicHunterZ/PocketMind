@@ -5,12 +5,91 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:pocketmind/service/call_back_dispatcher.dart';
 import 'package:pocketmind/util/logger_service.dart';
+import 'package:workmanager/workmanager.dart';
 import 'dart:io';
+import 'dart:convert';
+
+/// 抓取结果类型
+enum ScrapeResultType {
+  success,
+  partialSuccess,
+  failed,
+}
+
+/// Action ID 常量
+class NotificationActionIds {
+  static const String retry = 'retry_scrape';
+  static const String dismiss = 'dismiss';
+}
+
+/// 后台通知响应处理
+@pragma('vm:entry-point')
+void onBackgroundNotificationResponse(fln.NotificationResponse response) {
+  PMlog.d('NotificationService', '后台通知响应: actionId=${response.actionId}, payload=${response.payload}');
+
+  // 处理重试 action
+  if (response.actionId == NotificationActionIds.retry && response.payload != null) {
+    _handleRetryAction(response.payload!);
+  }
+  // 忽略按钮：cancelNotification: true 已经自动关闭通知，无需额外处理
+}
+
+/// 处理重试 action（从 payload 中解析 URL 并触发重试任务）
+void _handleRetryAction(String payload) async {
+  try {
+    final data = json.decode(payload) as Map<String, dynamic>;
+    final failedUrls = (data['failedUrls'] as List?)
+        ?.map((e) => e.toString())
+        .toList() ?? [];
+
+    if (failedUrls.isNotEmpty) {
+      PMlog.d('NotificationService', '触发重试任务: $failedUrls');
+
+      // 后台 Isolate 中需要重新初始化 WorkManager
+      // 注意：initialize 内部会检查是否已初始化，重复调用是安全的
+      Workmanager().initialize(
+        callbackDispatcher,
+        isInDebugMode: false,
+      );
+
+      // 使用 WorkManager 注册重试任务
+      await Workmanager().registerOneOffTask(
+        'url_scraper_retry_${DateTime.now().millisecondsSinceEpoch}',
+        'scrapeAndSave',
+        inputData: {
+          'urls': failedUrls,
+          'uq': null,
+        },
+        initialDelay: const Duration(seconds: 1),
+      );
+      
+      PMlog.d('NotificationService', '重试任务已注册');
+    }
+  } catch (e) {
+    PMlog.e('NotificationService', '解析重试 payload 失败: $e');
+  }
+}
+
+/// 通知回调类型
+typedef NotificationCallback = void Function(String? payload, String? actionId);
 
 class NotificationService {
+  static const String _tag = 'NotificationService';
+
   final fln.FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       fln.FlutterLocalNotificationsPlugin();
+
+  /// 通知点击回调（前台）
+  NotificationCallback? onNotificationTap;
+
+  /// 抓取结果通知通道 ID
+  static const String _scrapeChannelId = 'scrape_result_channel';
+  static const String _scrapeChannelName = '抓取结果通知';
+
+  /// 通知 ID 生成器（使用时间戳避免冲突）
+  int _generateNotificationId() => DateTime.now().millisecondsSinceEpoch % 100000;
 
   Future<void> init() async {
     tz.initializeTimeZones();
@@ -66,11 +145,23 @@ class NotificationService {
 
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
-      onDidReceiveNotificationResponse:
-          (fln.NotificationResponse notificationResponse) async {
-            // Handle notification tap
-          },
+      onDidReceiveNotificationResponse: _handleNotificationResponse,
+      onDidReceiveBackgroundNotificationResponse: onBackgroundNotificationResponse,
     );
+  }
+
+  /// 处理通知响应（点击通知或 action 按钮）- 前台
+  void _handleNotificationResponse(fln.NotificationResponse response) {
+    PMlog.d(_tag, '前台通知响应: actionId=${response.actionId}, payload=${response.payload}');
+
+    // 如果点击的是重试按钮，直接处理
+    if (response.actionId == NotificationActionIds.retry && response.payload != null) {
+      _handleRetryAction(response.payload!);
+      return;
+    }
+
+    // 其他情况调用外部回调
+    onNotificationTap?.call(response.payload, response.actionId);
   }
 
   Future<void> requestPermissions() async {
@@ -198,6 +289,150 @@ class NotificationService {
         gravity: ToastGravity.CENTER,
       );
       PMlog.e('NotificationService', '调度通知失败: $e');
+    }
+  }
+
+  /// 显示抓取结果通知
+  ///
+  /// [resultType] 抓取结果类型
+  /// [successCount] 成功数量
+  /// [failedCount] 失败数量
+  /// [failedUrls] 失败的 URL 列表（用于重试）
+  /// [errorMessage] 错误信息
+  /// [contentPreviews] 内容预览列表（显示平台和内容前几个字）
+  Future<void> showScrapeResultNotification({
+    required ScrapeResultType resultType,
+    int successCount = 0,
+    int failedCount = 0,
+    List<String>? failedUrls,
+    String? errorMessage,
+    List<String>? contentPreviews,
+  }) async {
+    String title;
+    String body;
+
+    switch (resultType) {
+      case ScrapeResultType.success:
+        title = '内容抓取成功';
+        if (contentPreviews != null && contentPreviews.isNotEmpty) {
+          body = contentPreviews.join('\n');
+        } else {
+          body = successCount > 1
+              ? '成功抓取 $successCount 条内容'
+              : '内容已成功抓取并保存';
+        }
+        break;
+      case ScrapeResultType.partialSuccess:
+        title = '部分内容抓取成功';
+        body = '成功 $successCount 条，失败 $failedCount 条';
+        if (contentPreviews != null && contentPreviews.isNotEmpty) {
+          body += '\n' + contentPreviews.join('\n');
+        }
+        if (errorMessage != null) {
+          body += '\n$errorMessage';
+        }
+        break;
+      case ScrapeResultType.failed:
+        title = '内容抓取失败';
+        if (contentPreviews != null && contentPreviews.isNotEmpty) {
+          body = contentPreviews.join('\n');
+          if (errorMessage != null) {
+            body += '\n$errorMessage';
+          }
+        } else {
+          body = errorMessage ?? '抓取过程中发生错误，请检查网络连接后重试';
+        }
+        break;
+    }
+
+    // 构建 payload（用于点击通知时处理重试）
+    final payload = json.encode({
+      'type': 'scrape_result',
+      'resultType': resultType.name,
+      'failedUrls': failedUrls ?? [],
+      'canRetry': failedUrls != null && failedUrls.isNotEmpty,
+    });
+
+    await _showInstantNotification(
+      id: _generateNotificationId(),
+      title: title,
+      body: body,
+      channelId: _scrapeChannelId,
+      channelName: _scrapeChannelName,
+      payload: payload,
+      // 失败时显示重试 action
+      showRetryAction: resultType != ScrapeResultType.success &&
+          failedUrls != null &&
+          failedUrls.isNotEmpty,
+    );
+  }
+
+  /// 发送即时通知（非定时）
+  Future<void> _showInstantNotification({
+    required int id,
+    required String title,
+    required String body,
+    required String channelId,
+    required String channelName,
+    String? payload,
+    bool showRetryAction = false,
+  }) async {
+    try {
+      // Android actions（重试按钮和忽略按钮）
+      List<fln.AndroidNotificationAction>? androidActions;
+      if (showRetryAction && Platform.isAndroid) {
+        androidActions = [
+          const fln.AndroidNotificationAction(
+            NotificationActionIds.retry,
+            '🔄 重试',
+            // false = 不打开应用，在后台触发 onDidReceiveBackgroundNotificationResponse
+            showsUserInterface: false,
+            cancelNotification: true, // 点击后关闭通知
+          ),
+          const fln.AndroidNotificationAction(
+            NotificationActionIds.dismiss,
+            '忽略',
+            showsUserInterface: false,
+            cancelNotification: true, // 点击后关闭通知
+          ),
+        ];
+      }
+
+      final notificationDetails = fln.NotificationDetails(
+        android: fln.AndroidNotificationDetails(
+          channelId,
+          channelName,
+          channelDescription: '显示内容抓取的结果通知',
+          importance: fln.Importance.high,
+          priority: fln.Priority.high,
+          actions: androidActions,
+        ),
+        iOS: fln.DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+          categoryIdentifier: showRetryAction ? 'scrape_retry' : null,
+        ),
+        macOS: fln.DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+          categoryIdentifier: showRetryAction ? 'scrape_retry' : null,
+        ),
+        windows: const fln.WindowsNotificationDetails(),
+      );
+
+      await flutterLocalNotificationsPlugin.show(
+        id,
+        title,
+        body,
+        notificationDetails,
+        payload: payload,
+      );
+
+      PMlog.d(_tag, '抓取结果通知已发送: $title');
+    } catch (e) {
+      PMlog.e(_tag, '发送抓取结果通知失败: $e');
     }
   }
 
