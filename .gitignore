@@ -31,3 +31,7 @@ application.yml
 
 # 混淆符号文件
 /debug-info/
+
+document/
+build/
+MediaCrawler-main/
