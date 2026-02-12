@@ -9,7 +9,6 @@ import com.doublez.pocketmindserver.auth.infra.persistence.UserAccountRepository
 import com.doublez.pocketmindserver.shared.security.JwtTokenService;
 import com.doublez.pocketmindserver.shared.web.ApiCode;
 import com.doublez.pocketmindserver.shared.web.BusinessException;
-import com.doublez.pocketmindserver.shared.web.UnauthorizedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;

@@ -3,7 +3,7 @@ package com.doublez.pocketmindserver.ai.application;
 import com.doublez.pocketmindserver.ai.api.dto.AiAnalyzeRequest;
 import com.doublez.pocketmindserver.ai.api.dto.AiAnalyzeResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.poi.ss.formula.functions.T;
+
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -46,7 +46,7 @@ public class AiAnalyzeService {
         this.chatClient = chatClient;
     }
 
-    public AiAnalyzeResponse<T> analyze(AiAnalyzeRequest request, String userId) {
+    public <T> AiAnalyzeResponse<T> analyze(AiAnalyzeRequest request, String userId) {
         String mode = request.isQaMode() ? MODE_QA : MODE_SUMMARY;
         log.info("开始 AI 分析 - userId: {}, mode: {}", userId, mode);
 

@@ -5,7 +5,7 @@ import com.doublez.pocketmindserver.resource.infra.mq.CrawlerMqConstants;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,7 +18,6 @@ import org.springframework.context.annotation.Primary;
 @Configuration
 public class RabbitMQConfig {
 
-    // MQ 常量集中在 CrawlerMqConstants，避免散落硬编码
 
     @Bean
     public Queue crawlerQueue() {
@@ -52,7 +51,7 @@ public class RabbitMQConfig {
 
     @Bean
     public MessageConverter messageConverter() {
-        return new Jackson2JsonMessageConverter();
+        return new JacksonJsonMessageConverter();
     }
 
     @Bean
@@ -85,7 +84,7 @@ public class RabbitMQConfig {
         factory.setErrorHandler(new ConditionalRejectingErrorHandler());
         factory.setAdviceChain(
                 RetryInterceptorBuilder.stateless()
-                        .maxAttempts(3)
+                        .maxRetries(3)
                         .recoverer(crawlerRepublishRecoverer)
                         .build()
         );
