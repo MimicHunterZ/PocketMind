@@ -1,6 +1,7 @@
 package com.doublez.pocketmindserver.ai.config;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +20,7 @@ public class AiConfiguration {
     @Bean
     public ChatClient openAiChatClient(OpenAiChatModel chatModel) {
         return ChatClient.builder(chatModel)
+                .defaultAdvisors(new SimpleLoggerAdvisor())
                 .build();
     }
 }

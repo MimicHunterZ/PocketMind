@@ -3,7 +3,6 @@ package com.doublez.pocketmindserver.ai.application;
 import com.doublez.pocketmindserver.ai.api.dto.AiAnalyzeRequest;
 import com.doublez.pocketmindserver.ai.api.dto.AiAnalyzeResponse;
 import lombok.extern.slf4j.Slf4j;
-
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -46,26 +45,19 @@ public class AiAnalyzeService {
         this.chatClient = chatClient;
     }
 
-    public <T> AiAnalyzeResponse<T> analyze(AiAnalyzeRequest request, String userId) {
+    public AiAnalyzeResponse<?> analyze(AiAnalyzeRequest request, String userId) {
         String mode = request.isQaMode() ? MODE_QA : MODE_SUMMARY;
         log.info("开始 AI 分析 - userId: {}, mode: {}", userId, mode);
 
         try {
-            String content = request.content();
+            Object finalResult = MODE_QA.equals(mode)
+                    ? processQa(request.content(), request.userQuestion())
+                    : processSummary(request.content());
 
-            Object finalResult;
-
-            if (MODE_QA.equals(mode)) {
-                finalResult = processQa(content, request.userQuestion());
-            } else {
-                finalResult = processSummary(content);
-            }
-
-            return new AiAnalyzeResponse(mode, request.userQuestion(), finalResult);
-
+            return new AiAnalyzeResponse<>(mode, request.userQuestion(), finalResult);
         } catch (Exception e) {
-            log.error("AI 分析服务异常", e);
-            throw new RuntimeException("AI 分析服务暂时不可用: " + e.getMessage());
+            log.error("AI 分析服务异常 - userId: {}, mode: {}", userId, mode, e);
+            throw new RuntimeException("AI 分析服务暂时不可用: " + e.getMessage(), e);
         }
     }
 
@@ -85,9 +77,7 @@ public class AiAnalyzeService {
 
         // 3. 调用 AI 获取原始文本
         String rawResponse = chatClient.prompt(prompt).call().content();
-        
-        // 4. 解析
-        log.info("AI QA Raw JSON: {}", rawResponse);
+        log.info("AI QA 完成 - responseLength: {}", rawResponse == null ? 0 : rawResponse.length());
         return qaConverter.convert(rawResponse);
     }
 
@@ -120,13 +110,7 @@ public class AiAnalyzeService {
         SystemPromptTemplate systemTemplate = new SystemPromptTemplate(systemPersonaResource);
         Message systemMessage = systemTemplate.createMessage();
 
-        // User Message
-    
-
-record PocketMindQA(
-        String answer,       // 回答内容
-        List<String> tags    // 推荐标签
-) {}    PromptTemplate userTemplate = new PromptTemplate(userTemplateResource);
+        PromptTemplate userTemplate = new PromptTemplate(userTemplateResource);
         Message userMessage = userTemplate.createMessage(variables);
 
         return new Prompt(List.of(systemMessage, userMessage));
@@ -134,11 +118,13 @@ record PocketMindQA(
 }
 
 record PocketMindSummary(
-        String summary,      // 一段表述（50字以内的核心价值）
-        List<String> tags    // 推荐标签
-) {}
+        String summary,
+        List<String> tags
+) {
+}
 
 record PocketMindQA(
-        String answer,       // 回答内容
-        List<String> tags    // 推荐标签
-) {}
+        String answer,
+        List<String> tags
+) {
+}
