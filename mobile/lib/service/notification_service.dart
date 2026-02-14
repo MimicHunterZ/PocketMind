@@ -8,15 +8,14 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:pocketmind/service/call_back_dispatcher.dart';
 import 'package:pocketmind/util/logger_service.dart';
 import 'package:workmanager/workmanager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'dart:convert';
 
+import 'package:pocketmind/core/constants.dart';
+
 /// 抓取结果类型
-enum ScrapeResultType {
-  success,
-  partialSuccess,
-  failed,
-}
+enum ScrapeResultType { success, partialSuccess, failed }
 
 /// Action ID 常量
 class NotificationActionIds {
@@ -27,48 +26,97 @@ class NotificationActionIds {
 /// 后台通知响应处理
 @pragma('vm:entry-point')
 void onBackgroundNotificationResponse(fln.NotificationResponse response) {
-  PMlog.d('NotificationService', '后台通知响应: actionId=${response.actionId}, payload=${response.payload}');
+  PMlog.d(
+    'NotificationService',
+    '后台通知响应: actionId=${response.actionId}, payload=${response.payload}',
+  );
 
   // 处理重试 action
-  if (response.actionId == NotificationActionIds.retry && response.payload != null) {
+  if (response.actionId == NotificationActionIds.retry &&
+      response.payload != null) {
     _handleRetryAction(response.payload!);
+    return;
   }
-  // 忽略按钮：cancelNotification: true 已经自动关闭通知，无需额外处理
+
+  // 处理忽略 action
+  if (response.actionId == NotificationActionIds.dismiss &&
+      response.payload != null) {
+    _handleDismissAction(response.payload!);
+  }
 }
 
-/// 处理重试 action（从 payload 中解析 URL 并触发重试任务）
+/// 处理重试 action
 void _handleRetryAction(String payload) async {
   try {
-    final data = json.decode(payload) as Map<String, dynamic>;
-    final failedUrls = (data['failedUrls'] as List?)
-        ?.map((e) => e.toString())
-        .toList() ?? [];
+    final failedUrls = _extractFailedUrls(payload);
+    if (failedUrls.isEmpty) return;
 
-    if (failedUrls.isNotEmpty) {
-      PMlog.d('NotificationService', '触发重试任务: $failedUrls');
+    PMlog.d('NotificationService', '触发重试任务（策略校验由后台统一处理）: $failedUrls');
 
-      // 后台 Isolate 中需要重新初始化 WorkManager
-      // 注意：initialize 内部会检查是否已初始化，重复调用是安全的
-      Workmanager().initialize(
-        callbackDispatcher,
-        isInDebugMode: false,
-      );
+    Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
 
-      // 使用 WorkManager 注册重试任务
-      await Workmanager().registerOneOffTask(
-        'url_scraper_retry_${DateTime.now().millisecondsSinceEpoch}',
-        'scrapeAndSave',
-        inputData: {
-          'urls': failedUrls,
-          'uq': null,
-        },
-        initialDelay: const Duration(seconds: 1),
-      );
-      
-      PMlog.d('NotificationService', '重试任务已注册');
-    }
+    await Workmanager().registerOneOffTask(
+      'url_scraper_retry_policy_${DateTime.now().millisecondsSinceEpoch}',
+      'retryUrlsWithPolicy',
+      inputData: {'urls': failedUrls},
+      initialDelay: const Duration(seconds: 1),
+    );
+
+    PMlog.d('NotificationService', '重试任务已注册');
   } catch (e) {
     PMlog.e('NotificationService', '解析重试 payload 失败: $e');
+  }
+}
+
+List<String> _extractFailedUrls(String payload) {
+  final data = json.decode(payload) as Map<String, dynamic>;
+  return (data['failedUrls'] as List?)
+          ?.map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toSet()
+          .toList() ??
+      [];
+}
+
+/// 处理忽略 action（取消重试并标记失败）
+void _handleDismissAction(String payload) async {
+  try {
+    final data = json.decode(payload) as Map<String, dynamic>;
+    final failedUrls =
+        (data['failedUrls'] as List?)
+            ?.map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toSet()
+            .toList() ??
+        [];
+
+    if (failedUrls.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+
+    final currentUrls =
+        (prefs.getStringList(AppConstants.keyNeedCallbackUrl) ?? [])
+            .where((url) => url.trim().isNotEmpty)
+            .toSet();
+    currentUrls.removeAll(failedUrls);
+    await prefs.setStringList(
+      AppConstants.keyNeedCallbackUrl,
+      currentUrls.toList(),
+    );
+
+    Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
+
+    await Workmanager().registerOneOffTask(
+      'url_scraper_dismiss_${DateTime.now().millisecondsSinceEpoch}',
+      'markDismissedUrlsFailed',
+      inputData: {'urls': failedUrls},
+      initialDelay: const Duration(seconds: 0),
+    );
+
+    PMlog.d('NotificationService', '已忽略并停止重试: $failedUrls');
+  } catch (e) {
+    PMlog.e('NotificationService', '处理忽略 action 失败: $e');
   }
 }
 
@@ -89,7 +137,8 @@ class NotificationService {
   static const String _scrapeChannelName = '抓取结果通知';
 
   /// 通知 ID 生成器（使用时间戳避免冲突）
-  int _generateNotificationId() => DateTime.now().millisecondsSinceEpoch % 100000;
+  int _generateNotificationId() =>
+      DateTime.now().millisecondsSinceEpoch % 100000;
 
   Future<void> init() async {
     tz.initializeTimeZones();
@@ -146,17 +195,28 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: _handleNotificationResponse,
-      onDidReceiveBackgroundNotificationResponse: onBackgroundNotificationResponse,
+      onDidReceiveBackgroundNotificationResponse:
+          onBackgroundNotificationResponse,
     );
   }
 
   /// 处理通知响应（点击通知或 action 按钮）- 前台
   void _handleNotificationResponse(fln.NotificationResponse response) {
-    PMlog.d(_tag, '前台通知响应: actionId=${response.actionId}, payload=${response.payload}');
+    PMlog.d(
+      _tag,
+      '前台通知响应: actionId=${response.actionId}, payload=${response.payload}',
+    );
 
     // 如果点击的是重试按钮，直接处理
-    if (response.actionId == NotificationActionIds.retry && response.payload != null) {
+    if (response.actionId == NotificationActionIds.retry &&
+        response.payload != null) {
       _handleRetryAction(response.payload!);
+      return;
+    }
+
+    if (response.actionId == NotificationActionIds.dismiss &&
+        response.payload != null) {
+      _handleDismissAction(response.payload!);
       return;
     }
 
@@ -317,9 +377,7 @@ class NotificationService {
         if (contentPreviews != null && contentPreviews.isNotEmpty) {
           body = contentPreviews.join('\n');
         } else {
-          body = successCount > 1
-              ? '成功抓取 $successCount 条内容'
-              : '内容已成功抓取并保存';
+          body = successCount > 1 ? '成功抓取 $successCount 条内容' : '内容已成功抓取并保存';
         }
         break;
       case ScrapeResultType.partialSuccess:
@@ -361,7 +419,8 @@ class NotificationService {
       channelName: _scrapeChannelName,
       payload: payload,
       // 失败时显示重试 action
-      showRetryAction: resultType != ScrapeResultType.success &&
+      showRetryAction:
+          resultType != ScrapeResultType.success &&
           failedUrls != null &&
           failedUrls.isNotEmpty,
     );

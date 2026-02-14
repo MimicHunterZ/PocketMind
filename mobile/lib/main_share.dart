@@ -123,7 +123,7 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
   }
 
   // 隐藏 UI 并关闭 Activity
-  void _dismissUI([Map<String,String>? data]) {
+  void _dismissUI([Map<String, String>? data]) {
     PMlog.d(tag, 'Dismissing UI...');
 
     // 重置状态机
@@ -132,20 +132,9 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
       _currentShare = null;
       _noteId = -1;
     });
-    final userQuestion = data?['uq'] ?? '';
-    // 启动后台任务进行抓取数据
-    if (url != null) {
-      PMlog.d(tag, '后台开始处理 URLs: $url');
-      Workmanager().registerOneOffTask(
-        'url_scraper',
-        'scrapeAndSave',
-        inputData: {
-          'urls': [url],
-          'uq': userQuestion
-        },
-        initialDelay: Duration(seconds: 0),
-      );
-    }
+    final userQuestion = data?['uq'];
+    // 统一入口：分享场景与 App 回前台场景都通过 NoteService.processPendingUrls 调度
+    noteService.processPendingUrls(userQuestion: userQuestion);
 
     // 关闭 ShareActivity
     SystemNavigator.pop();
@@ -201,13 +190,9 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
             url: url,
           );
 
-          if(url != null){
-            final sharedPreferences = ref.read(sharedPreferencesProvider);
-            await sharedPreferences.reload();
-            var urls = sharedPreferences.getStringList('needCallBackUrl') ?? [];
-            if (!urls.contains(url)) {
-              urls.add(url!);
-              await sharedPreferences.setStringList('needCallBackUrl', urls);
+          if (url != null) {
+            final added = await noteService.enqueuePendingUrlIfAbsent(url!);
+            if (added) {
               PMlog.d(tag, '已保存到备份列表: needCallBackUrl');
             }
           }

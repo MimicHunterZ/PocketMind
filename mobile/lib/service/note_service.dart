@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/data/repositories/isar_note_repository.dart';
@@ -10,6 +12,16 @@ import 'package:workmanager/workmanager.dart';
 
 final String noteServiceTag = 'NoteService';
 
+class RetryEligibilityResult {
+  final List<String> retryableUrls;
+  final List<String> reachedMaxRetryUrls;
+
+  const RetryEligibilityResult({
+    required this.retryableUrls,
+    required this.reachedMaxRetryUrls,
+  });
+}
+
 /// 本地 Note 业务服务层
 class NoteService {
   final IsarNoteRepository _noteRepository;
@@ -17,6 +29,8 @@ class NoteService {
   final SharedPreferences _prefs;
   final NoteApiService? _noteApiService;
   final ImageStorageHelper _imageHelper = ImageStorageHelper();
+
+  static const String _resourceStatusFailed = 'FAILED';
 
   NoteService(
     this._noteRepository,
@@ -218,7 +232,7 @@ class NoteService {
     return _noteRepository.findByQuery(query);
   }
 
-  /// 根据 tag 查询笔记
+  /// 根据 url 查询笔记
   Future<List<Note>> findNotesWithUrls(List<String> urls) async {
     return await _noteRepository.findByUrls(urls);
   }
@@ -311,23 +325,277 @@ class NoteService {
   /// 检查 SharedPreferences 中的 needCallBackUrl 列表
   /// 对每个 URL 尝试查找对应的 Note 并向后端资源内容
   /// 如果笔记有待处理的 AI 问题，获取 content 成功后会调用 AI 分析
-  Future<void> processPendingUrls() async {
+  /// 统一的待处理 URL 调度入口（分享后触发、App 启动/回前台触发都走这里）
+  ///
+  /// [userQuestion] 为可选参数：分享页带问题进入时透传给后台抓取任务；
+  /// 主应用恢复流程可不传，保持默认抓取行为。
+  Future<void> processPendingUrls({String? userQuestion}) async {
     // 重新获取 SharedPreferences 实例，确保数据是最新的
     // 因为 Android 的 SharedPreferences 在不同进程（主应用和分享扩展）之间不会自动同步内存缓存。
     await _prefs.reload();
-    final urls = _prefs.getStringList('needCallBackUrl') ?? [];
+    final urls = (_prefs.getStringList(AppConstants.keyNeedCallbackUrl) ?? [])
+        .where((url) => url.trim().isNotEmpty)
+        .toSet()
+        .toList();
+
+    if (urls.length !=
+        (_prefs.getStringList(AppConstants.keyNeedCallbackUrl) ?? []).length) {
+      await _prefs.setStringList(AppConstants.keyNeedCallbackUrl, urls);
+    }
+
     if (urls.isEmpty) {
       PMlog.d(noteServiceTag, 'urls 为空不处理');
       return;
     }
 
-    PMlog.d(noteServiceTag, '后台开始处理 URLs: $urls');
+    final eligibility = await evaluateRetryEligibility(urls);
+    final permanentlyFailedUrls = eligibility.reachedMaxRetryUrls;
+    final retryableUrls = eligibility.retryableUrls;
+
+    if (permanentlyFailedUrls.isNotEmpty) {
+      await markUrlsAsFailedAndStopRetry(permanentlyFailedUrls);
+      Workmanager().registerOneOffTask(
+        'url_scraper_retry_exhausted_${DateTime.now().millisecondsSinceEpoch}',
+        'notifyRetryExhausted',
+        inputData: {'urls': permanentlyFailedUrls},
+        initialDelay: Duration(seconds: 0),
+      );
+      PMlog.w(
+        noteServiceTag,
+        '检测到超过重试上限 URL，已直接标记失败并停止重试: $permanentlyFailedUrls',
+      );
+    }
+
+    if (retryableUrls.isEmpty) {
+      PMlog.d(noteServiceTag, '无可重试 URL，跳过任务注册');
+      return;
+    }
+
+    PMlog.d(noteServiceTag, '后台开始处理 URLs: $retryableUrls');
     Workmanager().registerOneOffTask(
       'url_scraper',
       'scrapeAndSave',
-      inputData: {'urls': urls},
+      inputData: {'urls': retryableUrls, 'uq': userQuestion},
       initialDelay: Duration(seconds: 0),
       constraints: Constraints(networkType: NetworkType.connected),
+    );
+  }
+
+  /// 评估候选 URL 的重试资格。
+  ///
+  /// 规则：
+  /// 1. 仅 `needCallBackUrl` 中仍待处理的 URL 才有资格重试；
+  /// 2. 达到最大重试次数的 URL 归入 `reachedMaxRetryUrls`；
+  /// 3. 其余 URL 归入 `retryableUrls`。
+  Future<RetryEligibilityResult> evaluateRetryEligibility(
+    Iterable<String> candidateUrls,
+  ) async {
+    await _prefs.reload();
+
+    final pendingUrls =
+        (_prefs.getStringList(AppConstants.keyNeedCallbackUrl) ?? [])
+            .map((url) => url.trim())
+            .where((url) => url.isNotEmpty)
+            .toSet();
+
+    final retryCountMap = await _loadRetryCountMap();
+    final reachedMaxRetryUrls = <String>[];
+    final retryableUrls = <String>[];
+
+    final normalizedCandidates = candidateUrls
+        .map((url) => url.trim())
+        .where((url) => url.isNotEmpty)
+        .toSet();
+
+    for (final url in normalizedCandidates) {
+      if (!pendingUrls.contains(url)) {
+        continue;
+      }
+
+      final retryCount = retryCountMap[url] ?? 0;
+      if (retryCount >= AppConstants.maxShareUrlRetryCount) {
+        reachedMaxRetryUrls.add(url);
+      } else {
+        retryableUrls.add(url);
+      }
+    }
+
+    return RetryEligibilityResult(
+      retryableUrls: retryableUrls,
+      reachedMaxRetryUrls: reachedMaxRetryUrls,
+    );
+  }
+
+  /// 将 URL 放入待处理队列（幂等去重）。
+  ///
+  /// 返回值：
+  /// - `true`: 本次是首次加入；
+  /// - `false`: 队列中已存在该 URL（忽略重复分享）。
+  Future<bool> enqueuePendingUrlIfAbsent(String url) async {
+    final normalizedUrl = url.trim();
+    if (normalizedUrl.isEmpty) return false;
+
+    await _prefs.reload();
+    final urls = (_prefs.getStringList(AppConstants.keyNeedCallbackUrl) ?? [])
+        .where((item) => item.trim().isNotEmpty)
+        .toSet();
+
+    final hasExisting = urls.contains(normalizedUrl);
+    if (!hasExisting) {
+      urls.add(normalizedUrl);
+      await _prefs.setStringList(
+        AppConstants.keyNeedCallbackUrl,
+        urls.toList(),
+      );
+      PMlog.d(noteServiceTag, 'URL 已加入待处理队列: $normalizedUrl');
+    } else {
+      PMlog.d(noteServiceTag, 'URL 已存在待处理队列，忽略重复加入: $normalizedUrl');
+    }
+
+    return !hasExisting;
+  }
+
+  /// 从待处理队列移除 URL，并同步清理对应重试计数。
+  ///
+  /// 用于：
+  /// - 抓取成功后清理；
+  /// - 手动忽略/终态失败后清理。
+  Future<void> removePendingUrls(Iterable<String> urls) async {
+    final normalizedToRemove = urls
+        .map((url) => url.trim())
+        .where((url) => url.isNotEmpty)
+        .toSet();
+    if (normalizedToRemove.isEmpty) return;
+
+    await _prefs.reload();
+    final currentUrls =
+        (_prefs.getStringList(AppConstants.keyNeedCallbackUrl) ?? [])
+            .where((url) => url.trim().isNotEmpty)
+            .toSet();
+    currentUrls.removeAll(normalizedToRemove);
+    await _prefs.setStringList(
+      AppConstants.keyNeedCallbackUrl,
+      currentUrls.toList(),
+    );
+
+    await clearRetryCountForUrls(normalizedToRemove);
+  }
+
+  /// 失败 URL 的重试次数 +1，并返回“本次达到上限”的 URL 列表。
+  ///
+  /// 该方法只负责计数，不负责落库失败状态。
+  Future<List<String>> increaseRetryCountForUrls(Iterable<String> urls) async {
+    final normalizedUrls = urls
+        .map((url) => url.trim())
+        .where((url) => url.isNotEmpty)
+        .toSet()
+        .toList();
+    if (normalizedUrls.isEmpty) return [];
+
+    final retryCountMap = await _loadRetryCountMap();
+    final reachedMaxUrls = <String>[];
+
+    for (final url in normalizedUrls) {
+      final current = retryCountMap[url] ?? 0;
+      final next = current + 1;
+      retryCountMap[url] = next;
+      if (next >= AppConstants.maxShareUrlRetryCount) {
+        reachedMaxUrls.add(url);
+      }
+    }
+
+    await _saveRetryCountMap(retryCountMap);
+    return reachedMaxUrls;
+  }
+
+  /// 清理指定 URL 的重试计数。
+  ///
+  /// 当 URL 成功、取消或进入终态失败后调用，防止历史计数污染。
+  Future<void> clearRetryCountForUrls(Iterable<String> urls) async {
+    final normalizedUrls = urls
+        .map((url) => url.trim())
+        .where((url) => url.isNotEmpty)
+        .toSet();
+    if (normalizedUrls.isEmpty) return;
+
+    final retryCountMap = await _loadRetryCountMap();
+    var changed = false;
+    for (final url in normalizedUrls) {
+      changed = retryCountMap.remove(url) != null || changed;
+    }
+    if (changed) {
+      await _saveRetryCountMap(retryCountMap);
+    }
+  }
+
+  /// 将 URL 对应的 Note 标记为 `FAILED`，并停止后续重试。
+  ///
+  /// 执行内容：
+  /// 1. 落库 `resourceStatus=FAILED`；
+  /// 2. 从待处理队列移除；
+  /// 3. 清理重试计数。
+  Future<void> markUrlsAsFailedAndStopRetry(Iterable<String> urls) async {
+    final normalizedUrls = urls
+        .map((url) => url.trim())
+        .where((url) => url.isNotEmpty)
+        .toSet()
+        .toList();
+
+    if (normalizedUrls.isEmpty) return;
+
+    final notes = await findNotesWithUrls(normalizedUrls);
+    for (final note in notes) {
+      note.resourceStatus = _resourceStatusFailed;
+      await _noteRepository.save(note);
+    }
+
+    await removePendingUrls(normalizedUrls);
+    await clearRetryCountForUrls(normalizedUrls);
+  }
+
+  /// 读取 URL 重试计数字典（SharedPreferences JSON）。
+  ///
+  /// 返回格式：`Map<url, retryCount>`。
+  Future<Map<String, int>> _loadRetryCountMap() async {
+    final rawJson = _prefs.getString(AppConstants.keyShareUrlRetryCountMap);
+    if (rawJson == null || rawJson.isEmpty) {
+      return <String, int>{};
+    }
+
+    try {
+      final decoded = json.decode(rawJson);
+      if (decoded is! Map<String, dynamic>) {
+        return <String, int>{};
+      }
+
+      final result = <String, int>{};
+      decoded.forEach((key, value) {
+        final normalizedUrl = key.trim();
+        if (normalizedUrl.isEmpty) return;
+        if (value is int) {
+          result[normalizedUrl] = value;
+        } else if (value is num) {
+          result[normalizedUrl] = value.toInt();
+        }
+      });
+      return result;
+    } catch (e) {
+      PMlog.e(noteServiceTag, '解析重试计数失败，已回退为空: $e');
+      return <String, int>{};
+    }
+  }
+
+  /// 持久化 URL 重试计数字典。
+  ///
+  /// 当字典为空时删除对应 key，避免无意义存储。
+  Future<void> _saveRetryCountMap(Map<String, int> retryCountMap) async {
+    if (retryCountMap.isEmpty) {
+      await _prefs.remove(AppConstants.keyShareUrlRetryCountMap);
+      return;
+    }
+    await _prefs.setString(
+      AppConstants.keyShareUrlRetryCountMap,
+      json.encode(retryCountMap),
     );
   }
 }

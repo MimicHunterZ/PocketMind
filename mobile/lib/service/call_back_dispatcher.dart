@@ -69,6 +69,39 @@ void callbackDispatcher() {
             );
           }
           break;
+        case 'retryUrlsWithPolicy':
+          final urls =
+              (inputData?['urls'] as List?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              [];
+          if (urls.isNotEmpty) {
+            await retryUrlsWithPolicy(ref, urls, notificationService);
+          }
+          break;
+        case 'notifyRetryExhausted':
+          final urls =
+              (inputData?['urls'] as List?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              [];
+          if (urls.isNotEmpty) {
+            await notifyRetryExhausted(notificationService, urls);
+          }
+          break;
+        case 'markDismissedUrlsFailed':
+          final urls =
+              (inputData?['urls'] as List?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              [];
+          if (urls.isNotEmpty) {
+            await ref
+                .read(noteServiceProvider)
+                .markUrlsAsFailedAndStopRetry(urls);
+            PMlog.d(tag, '已处理忽略动作，URL 标记失败并停止重试: $urls');
+          }
+          break;
         default:
           // Handle unknown task types
           break;
@@ -111,17 +144,19 @@ Future<void> scrapeAndSave(
   String? lastErrorMessage;
 
   try {
+    final noteService = ref.read(noteServiceProvider);
+
     // 1. 批量获取元数据
     final metadataResults = await ref
         .read(metadataManagerProvider)
         .fetchAndProcessMetadata(urls);
 
     // 2. 批量查找数据库中的笔记
-    final notes = await ref.read(noteServiceProvider).findNotesWithUrls(urls);
+    final notes = await noteService.findNotesWithUrls(urls);
 
     final noteRepo = ref.read(noteRepositoryProvider);
     final noteApiService = ref.read(noteApiServiceProvider);
-    final needCleanUrls = [];
+    final needCleanUrls = <String>[];
 
     // 3. 遍历找到的笔记进行处理
     for (final note in notes) {
@@ -139,7 +174,6 @@ Future<void> scrapeAndSave(
             metaDataNote?.imageUrls ?? note.previewImageUrls;
 
         await noteRepo.save(note);
-        needCleanUrls.add(url);
 
         // 生成内容预览字符串：[平台] 内容前15个字...
         final platform = _getPlatformName(url, metaDataNote?.source);
@@ -157,6 +191,7 @@ Future<void> scrapeAndSave(
           // 来自主要渠道（平台爬虫/后端），算作成功
           successUrls.add(url);
           successPreviews.add(preview);
+          needCleanUrls.add(url);
           PMlog.d(tag, '笔记 $url 从主要渠道成功获取元数据');
         } else {
           // 来自兜底渠道（LinkPreview API/本地解析）
@@ -248,15 +283,31 @@ Future<void> scrapeAndSave(
       '抓取结果统计: 主要渠道成功=${successUrls.length}, 兜底成功=${fallbackUrls.length}, 失败=${failedUrls.length}',
     );
 
-    // 再次刷新，防止在处理过程中有新的 URL 加入
+    // 将“兜底成功（但主链路失败）+ 真正失败”统一计入失败重试次数
+    final retryFailedUrls = {...fallbackUrls, ...failedUrls}.toList();
+
+    // 失败 URL 增加失败计数，达到上限后直接标记 FAILED 并从待处理队列移除
+    final reachedMaxRetryUrls = await noteService.increaseRetryCountForUrls(
+      retryFailedUrls,
+    );
+    if (reachedMaxRetryUrls.isNotEmpty) {
+      await noteService.markUrlsAsFailedAndStopRetry(reachedMaxRetryUrls);
+      fallbackUrls.removeWhere(reachedMaxRetryUrls.contains);
+      failedUrls.removeWhere(reachedMaxRetryUrls.contains);
+      await notifyRetryExhausted(notificationService, reachedMaxRetryUrls);
+      PMlog.w(tag, 'URL 达到最大重试次数，已标记失败并停止重试: $reachedMaxRetryUrls');
+    }
+
+    // 仅清理本次主要渠道成功 URL；失败 URL/兜底 URL 保留在待处理队列，直到达到上限或用户忽略
+    await noteService.removePendingUrls(needCleanUrls);
+
     final prefs = ref.read(sharedPreferencesProvider);
     await prefs.reload();
-    final currentUrls = prefs.getStringList('needCallBackUrl') ?? [];
-    for (var url in needCleanUrls) {
-      currentUrls.remove(url);
-    }
-    await prefs.setStringList('needCallBackUrl', currentUrls);
-    PMlog.d(tag, 'Pending URLs processed and cleared. Remaining: $currentUrls');
+    final remainingUrls = prefs.getStringList('needCallBackUrl') ?? [];
+    PMlog.d(
+      tag,
+      'Pending URLs processed and cleared. Remaining: $remainingUrls',
+    );
 
     // 发送抓取结果通知
     // 逻辑：
@@ -307,6 +358,51 @@ Future<void> scrapeAndSave(
           '抓取过程中发生错误: ${e.toString().length > 50 ? e.toString().substring(0, 50) : e.toString()}',
     );
   }
+}
+
+Future<void> retryUrlsWithPolicy(
+  ProviderContainer ref,
+  List<String> requestedUrls,
+  NotificationService notificationService,
+) async {
+  final noteService = ref.read(noteServiceProvider);
+  final eligibility = await noteService.evaluateRetryEligibility(requestedUrls);
+
+  if (eligibility.reachedMaxRetryUrls.isNotEmpty) {
+    await noteService.markUrlsAsFailedAndStopRetry(
+      eligibility.reachedMaxRetryUrls,
+    );
+    await notifyRetryExhausted(
+      notificationService,
+      eligibility.reachedMaxRetryUrls,
+    );
+    PMlog.w(tag, '通知重试被拦截：已达上限并标记失败: ${eligibility.reachedMaxRetryUrls}');
+  }
+
+  if (eligibility.retryableUrls.isEmpty) {
+    PMlog.d(tag, '无可重试 URL（可能已取消、已成功或已达上限）');
+    return;
+  }
+
+  PMlog.d(tag, '触发重试任务: ${eligibility.retryableUrls}');
+  await Workmanager().registerOneOffTask(
+    'url_scraper_retry_${DateTime.now().millisecondsSinceEpoch}',
+    'scrapeAndSave',
+    inputData: {'urls': eligibility.retryableUrls, 'uq': null},
+    initialDelay: const Duration(seconds: 1),
+  );
+}
+
+Future<void> notifyRetryExhausted(
+  NotificationService notificationService,
+  List<String> urls,
+) async {
+  if (urls.isEmpty) return;
+  await notificationService.showScrapeResultNotification(
+    resultType: ScrapeResultType.failed,
+    failedCount: urls.length,
+    errorMessage: '已尝试3次抓取均失败，对应网页目前无法正常爬取~',
+  );
 }
 
 /// 根据 URL 和元数据来源获取平台显示名称

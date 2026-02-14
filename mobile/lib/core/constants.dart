@@ -43,6 +43,9 @@ class AppConstants {
   /// 同步重试次数
   static const int syncRetryCount = 3;
 
+  /// 分享 URL 抓取最大重试次数
+  static const int maxShareUrlRetryCount = 3;
+
   // ==================== UI 相关常量 ====================
 
   /// 桌面端断点宽度（像素）
@@ -108,6 +111,12 @@ class AppConstants {
 
   /// 局域网同步设备名称键
   static const String keyLanSyncDeviceName = 'lan_sync_device_name';
+
+  /// 分享待处理 URL 列表键
+  static const String keyNeedCallbackUrl = 'needCallBackUrl';
+
+  /// 分享 URL 重试计数字典键（JSON Map<String,int>）
+  static const String keyShareUrlRetryCountMap = 'share_url_retry_count_map';
 
   // ==================== 默认值 ====================
 
