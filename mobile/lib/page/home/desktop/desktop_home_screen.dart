@@ -266,7 +266,7 @@ class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
                 child: NoteItem(
                   note: note,
                   noteService: noteService,
-                  isGridMode: true,
+                  isWaterfall: true,
                   isDesktop: true,
                   key: ValueKey('desktop_note_${note.id}'),
                 ),
@@ -292,7 +292,7 @@ class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
                       child: NoteItem(
                         note: note,
                         noteService: noteService,
-                        isGridMode: false,
+                        isWaterfall: false,
                         isDesktop: true,
                         key: ValueKey('desktop_note_${note.id}'),
                       ),

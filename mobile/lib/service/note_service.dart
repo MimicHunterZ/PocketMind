@@ -30,8 +30,6 @@ class NoteService {
   final NoteApiService? _noteApiService;
   final ImageStorageHelper _imageHelper = ImageStorageHelper();
 
-  static const String _resourceStatusFailed = 'FAILED';
-
   NoteService(
     this._noteRepository,
     this._metadataManager,
@@ -356,8 +354,8 @@ class NoteService {
       await markUrlsAsFailedAndStopRetry(permanentlyFailedUrls);
       Workmanager().registerOneOffTask(
         'url_scraper_retry_exhausted_${DateTime.now().millisecondsSinceEpoch}',
-        'notifyRetryExhausted',
-        inputData: {'urls': permanentlyFailedUrls},
+        AppConstants.taskNotifyRetryExhausted,
+        inputData: {AppConstants.taskInputUrls: permanentlyFailedUrls},
         initialDelay: Duration(seconds: 0),
       );
       PMlog.w(
@@ -371,12 +369,35 @@ class NoteService {
       return;
     }
 
+    await markUrlsAsScraping(retryableUrls);
+
     PMlog.d(noteServiceTag, '后台开始处理 URLs: $retryableUrls');
-    Workmanager().registerOneOffTask(
-      'url_scraper',
-      'scrapeAndSave',
-      inputData: {'urls': retryableUrls, 'uq': userQuestion},
-      initialDelay: Duration(seconds: 0),
+    await scheduleScrapeTask(
+      urls: retryableUrls,
+      userQuestion: userQuestion,
+      taskUniqueName: 'url_scraper',
+      initialDelay: Duration.zero,
+    );
+  }
+
+  /// 统一注册抓取后台任务。
+  ///
+  /// 该方法是所有 URL 抓取任务的唯一调度入口，避免多处直接注册 `scrapeAndSave`。
+  Future<void> scheduleScrapeTask({
+    required List<String> urls,
+    required String taskUniqueName,
+    String? userQuestion,
+    Duration initialDelay = Duration.zero,
+  }) async {
+    if (urls.isEmpty) return;
+    await Workmanager().registerOneOffTask(
+      taskUniqueName,
+      AppConstants.taskScrapeAndSave,
+      inputData: {
+        AppConstants.taskInputUrls: urls,
+        AppConstants.taskInputUserQuestion: userQuestion,
+      },
+      initialDelay: initialDelay,
       constraints: Constraints(networkType: NetworkType.connected),
     );
   }
@@ -508,6 +529,31 @@ class NoteService {
     return reachedMaxUrls;
   }
 
+  /// 统一写入资源抓取状态并持久化。
+  ///
+  /// 作为 `resourceStatus` 变更的单一入口，避免各层重复直接写字段。
+  Future<void> persistResourceStatus(Note note, String status) async {
+    note.resourceStatus = status;
+    await _noteRepository.save(note);
+  }
+
+  /// 将 URL 对应笔记显式标记为抓取中。
+  ///
+  /// 用于在后台任务真正执行前先更新 UI，避免短暂显示为普通卡片。
+  Future<void> markUrlsAsScraping(Iterable<String> urls) async {
+    final normalizedUrls = urls
+        .map((url) => url.trim())
+        .where((url) => url.isNotEmpty)
+        .toSet()
+        .toList();
+    if (normalizedUrls.isEmpty) return;
+
+    final notes = await findNotesWithUrls(normalizedUrls);
+    for (final note in notes) {
+      await persistResourceStatus(note, AppConstants.resourceStatusScraping);
+    }
+  }
+
   /// 清理指定 URL 的重试计数。
   ///
   /// 当 URL 成功、取消或进入终态失败后调用，防止历史计数污染。
@@ -545,8 +591,7 @@ class NoteService {
 
     final notes = await findNotesWithUrls(normalizedUrls);
     for (final note in notes) {
-      note.resourceStatus = _resourceStatusFailed;
-      await _noteRepository.save(note);
+      await persistResourceStatus(note, AppConstants.resourceStatusFailed);
     }
 
     await removePendingUrls(normalizedUrls);

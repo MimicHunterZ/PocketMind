@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
@@ -52,13 +53,13 @@ void callbackDispatcher() {
       );
 
       switch (task) {
-        case 'scrapeAndSave':
+        case AppConstants.taskScrapeAndSave:
           final urls =
-              (inputData?['urls'] as List?)
+              (inputData?[AppConstants.taskInputUrls] as List?)
                   ?.map((e) => e.toString())
                   .toList() ??
               [];
-          final userQuestion = inputData?['uq'];
+          final userQuestion = inputData?[AppConstants.taskInputUserQuestion];
           if (urls.isNotEmpty) {
             await scrapeAndSave(ref, urls, userQuestion, notificationService);
           } else {
@@ -69,9 +70,9 @@ void callbackDispatcher() {
             );
           }
           break;
-        case 'retryUrlsWithPolicy':
+        case AppConstants.taskRetryUrlsWithPolicy:
           final urls =
-              (inputData?['urls'] as List?)
+              (inputData?[AppConstants.taskInputUrls] as List?)
                   ?.map((e) => e.toString())
                   .toList() ??
               [];
@@ -79,9 +80,9 @@ void callbackDispatcher() {
             await retryUrlsWithPolicy(ref, urls, notificationService);
           }
           break;
-        case 'notifyRetryExhausted':
+        case AppConstants.taskNotifyRetryExhausted:
           final urls =
-              (inputData?['urls'] as List?)
+              (inputData?[AppConstants.taskInputUrls] as List?)
                   ?.map((e) => e.toString())
                   .toList() ??
               [];
@@ -89,9 +90,9 @@ void callbackDispatcher() {
             await notifyRetryExhausted(notificationService, urls);
           }
           break;
-        case 'markDismissedUrlsFailed':
+        case AppConstants.taskMarkDismissedUrlsFailed:
           final urls =
-              (inputData?['urls'] as List?)
+              (inputData?[AppConstants.taskInputUrls] as List?)
                   ?.map((e) => e.toString())
                   .toList() ??
               [];
@@ -146,6 +147,15 @@ Future<void> scrapeAndSave(
   try {
     final noteService = ref.read(noteServiceProvider);
 
+    // 0. 抓取开始：显式标记为抓取中，UI 仅根据该标记显示加载态
+    final processingNotes = await noteService.findNotesWithUrls(urls);
+    for (final note in processingNotes) {
+      await noteService.persistResourceStatus(
+        note,
+        AppConstants.resourceStatusScraping,
+      );
+    }
+
     // 1. 批量获取元数据
     final metadataResults = await ref
         .read(metadataManagerProvider)
@@ -154,7 +164,6 @@ Future<void> scrapeAndSave(
     // 2. 批量查找数据库中的笔记
     final notes = await noteService.findNotesWithUrls(urls);
 
-    final noteRepo = ref.read(noteRepositoryProvider);
     final noteApiService = ref.read(noteApiServiceProvider);
     final needCleanUrls = <String>[];
 
@@ -173,8 +182,6 @@ Future<void> scrapeAndSave(
         note.previewImageUrls =
             metaDataNote?.imageUrls ?? note.previewImageUrls;
 
-        await noteRepo.save(note);
-
         // 生成内容预览字符串：[平台] 内容前15个字...
         final platform = _getPlatformName(url, metaDataNote?.source);
         // 优先使用内容，其次标题
@@ -189,6 +196,11 @@ Future<void> scrapeAndSave(
         // 根据数据来源分类
         if (metaDataNote?.isFromPrimarySource ?? false) {
           // 来自主要渠道（平台爬虫/后端），算作成功
+          await noteService.persistResourceStatus(
+            note,
+            AppConstants.resourceStatusCrawled,
+          );
+
           successUrls.add(url);
           successPreviews.add(preview);
           needCleanUrls.add(url);
@@ -196,6 +208,11 @@ Future<void> scrapeAndSave(
         } else {
           // 来自兜底渠道（LinkPreview API/本地解析）
           // 需要发失败通知
+          await noteService.persistResourceStatus(
+            note,
+            AppConstants.resourceStatusPending,
+          );
+
           fallbackUrls.add(url);
           fallbackPreviews.add(preview);
           PMlog.d(tag, '笔记 $url 使用兜底策略获取元数据，来源: ${metaDataNote?.source}');
@@ -253,7 +270,7 @@ Future<void> scrapeAndSave(
           PMlog.d(tag, '笔记 $url AI 分析完成，mode=${aiResponse.mode}');
 
           // AI 分析完成后再次保存
-          await noteRepo.save(note);
+          await ref.read(noteRepositoryProvider).save(note);
         } catch (e) {
           // AI 分析失败静默处理，不阻塞其他笔记的处理
           PMlog.e(tag, '笔记 $url AI 分析失败: $e');
@@ -261,6 +278,11 @@ Future<void> scrapeAndSave(
       } else if (url != null) {
         // 元数据抓取完全失败（所有策略都失败了）
         // 这是真正的失败，需要通知用户
+        await noteService.persistResourceStatus(
+          note,
+          AppConstants.resourceStatusPending,
+        );
+
         failedUrls.add(url);
         lastErrorMessage = '无法获取链接预览信息';
         PMlog.w(tag, '笔记 $url 元数据抓取失败（所有策略）');
@@ -303,7 +325,8 @@ Future<void> scrapeAndSave(
 
     final prefs = ref.read(sharedPreferencesProvider);
     await prefs.reload();
-    final remainingUrls = prefs.getStringList('needCallBackUrl') ?? [];
+    final remainingUrls =
+      prefs.getStringList(AppConstants.keyNeedCallbackUrl) ?? [];
     PMlog.d(
       tag,
       'Pending URLs processed and cleared. Remaining: $remainingUrls',
@@ -350,6 +373,19 @@ Future<void> scrapeAndSave(
     }
   } catch (e) {
     PMlog.e(tag, '抓取过程发生异常: $e');
+
+    // 异常结束：将本次抓取中的记录恢复为待重试，避免 UI 卡在抓取中
+    final noteService = ref.read(noteServiceProvider);
+    final processingNotes = await noteService.findNotesWithUrls(urls);
+    for (final note in processingNotes) {
+      if (note.resourceStatus == AppConstants.resourceStatusScraping) {
+        await noteService.persistResourceStatus(
+          note,
+          AppConstants.resourceStatusPending,
+        );
+      }
+    }
+
     // 发送失败通知
     await notificationService.showScrapeResultNotification(
       resultType: ScrapeResultType.failed,
@@ -384,11 +420,13 @@ Future<void> retryUrlsWithPolicy(
     return;
   }
 
+  await noteService.markUrlsAsScraping(eligibility.retryableUrls);
+
   PMlog.d(tag, '触发重试任务: ${eligibility.retryableUrls}');
-  await Workmanager().registerOneOffTask(
-    'url_scraper_retry_${DateTime.now().millisecondsSinceEpoch}',
-    'scrapeAndSave',
-    inputData: {'urls': eligibility.retryableUrls, 'uq': null},
+  await noteService.scheduleScrapeTask(
+    urls: eligibility.retryableUrls,
+    taskUniqueName: 'url_scraper_retry_${DateTime.now().millisecondsSinceEpoch}',
+    userQuestion: null,
     initialDelay: const Duration(seconds: 1),
   );
 }

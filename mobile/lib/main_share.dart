@@ -123,7 +123,7 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
   }
 
   // 隐藏 UI 并关闭 Activity
-  void _dismissUI([Map<String, String>? data]) {
+  Future<void> _dismissUI([Map<String, String>? data]) async {
     PMlog.d(tag, 'Dismissing UI...');
 
     // 重置状态机
@@ -134,7 +134,7 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
     });
     final userQuestion = data?['uq'];
     // 统一入口：分享场景与 App 回前台场景都通过 NoteService.processPendingUrls 调度
-    noteService.processPendingUrls(userQuestion: userQuestion);
+    await noteService.processPendingUrls(userQuestion: userQuestion);
 
     // 关闭 ShareActivity
     SystemNavigator.pop();

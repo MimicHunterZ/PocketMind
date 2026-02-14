@@ -412,7 +412,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             child: NoteItem(
               note: note,
               noteService: noteService,
-              isGridMode: true,
+              isWaterfall: true,
               key: ValueKey('note_${note.id}'),
             ),
           );
@@ -432,7 +432,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             child: NoteItem(
               note: note,
               noteService: noteService,
-              isGridMode: false,
+              isWaterfall: false,
               key: ValueKey('note_${note.id}'),
             ),
           );

@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/router/route_paths.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/service/note_service.dart';
 import 'package:pocketmind/util/url_helper.dart';
-import 'link_preview_card.dart';
+import 'preview_card/link_preview_card.dart';
 import 'pm_image.dart';
 import 'local_text_card.dart';
 
@@ -14,7 +15,7 @@ String tag = 'noteItem';
 
 class NoteItem extends ConsumerStatefulWidget {
   final Note note;
-  final bool isGridMode;
+  final bool isWaterfall;
   final bool isDesktop;
 
   final NoteService noteService;
@@ -22,7 +23,7 @@ class NoteItem extends ConsumerStatefulWidget {
   const NoteItem({
     required this.note,
     required this.noteService,
-    required this.isGridMode,
+    required this.isWaterfall,
     this.isDesktop = false,
     super.key,
   });
@@ -49,6 +50,15 @@ class _NoteItemState extends ConsumerState<NoteItem>
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
+  bool _isLinkScraping(Note note) {
+    if (!UrlHelper.containsHttpsUrl(note.url)) {
+      return false;
+    }
+
+    return note.resourceStatus == AppConstants.resourceStatusScraping ||
+      note.resourceStatus == AppConstants.resourceStatusPending;
+  }
+
   @override
   Widget build(BuildContext context) {
     // 必须调用 super.build，让 AutomaticKeepAliveClientMixin 工作
@@ -61,13 +71,14 @@ class _NoteItemState extends ConsumerState<NoteItem>
     final isTextOnly = widget.note.url == null ? true : false;
     final isHttpsUrl = UrlHelper.containsHttpsUrl(widget.note.url);
     final isLocalImage = UrlHelper.isLocalImagePath(widget.note.url);
+    final isLinkScraping = _isLinkScraping(widget.note);
 
     final content = widget.note.content;
 
     // 桌面端样式调整
     final margin = widget.isDesktop
         ? EdgeInsets.symmetric(horizontal: 8.w, vertical: 8.w)
-        : (widget.isGridMode
+        : (widget.isWaterfall
               ? EdgeInsets.symmetric(horizontal: 4.w, vertical: 4.w)
               : EdgeInsets.symmetric(horizontal: 4.w, vertical: 4.w));
 
@@ -98,6 +109,27 @@ class _NoteItemState extends ConsumerState<NoteItem>
         ? Colors.white.withValues(alpha: 0.2)
         : Colors.black.withValues(alpha: 0.1);
 
+    // 抓取中：整卡直接替换为 skeleton，避免旧卡片+loading 卡片嵌套。
+    if (isHttpsUrl && isLinkScraping) {
+      return MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: Container(
+          margin: margin,
+          child: LinkPreviewCard(
+            note: widget.note,
+            isLoading: true,
+            isWaterfall: widget.isWaterfall,
+            hasContent: false,
+            onTap: () {},
+            isDesktop: widget.isDesktop,
+            publishDate: _formatDate(widget.note.time),
+            isHovered: _isHovered,
+          ),
+        ),
+      );
+    }
+
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
@@ -114,7 +146,7 @@ class _NoteItemState extends ConsumerState<NoteItem>
           boxShadow: shadow,
         ),
         child: InkWell(
-          onTap: () => _showNoteDetail(context),
+          onTap: isLinkScraping ? null : () => _showNoteDetail(context),
           borderRadius: BorderRadius.circular(16.r),
           child: isTextOnly
               // 1. 纯文本模式：
@@ -134,7 +166,7 @@ class _NoteItemState extends ConsumerState<NoteItem>
                         top: Radius.circular(16.r),
                       ),
                       child: AspectRatio(
-                        aspectRatio: widget.isGridMode ? 1.0 : 16 / 9,
+                        aspectRatio: widget.isWaterfall ? 1.0 : 16 / 9,
                         child: PMImage(
                           pathOrUrl: widget.note.url!,
                           fit: BoxFit.cover,
@@ -164,7 +196,8 @@ class _NoteItemState extends ConsumerState<NoteItem>
                     // 链接卡片部分
                     LinkPreviewCard(
                       note: widget.note,
-                      isVertical: widget.isGridMode,
+                      isLoading: isLinkScraping,
+                      isWaterfall: widget.isWaterfall,
                       hasContent: content != null && content.isNotEmpty,
                       onTap: () => _showNoteDetail(context),
                       isDesktop: widget.isDesktop,
@@ -173,7 +206,7 @@ class _NoteItemState extends ConsumerState<NoteItem>
                     ),
                     // 链接卡片下面的文字部分
                     if (content != null && content.isNotEmpty) ...[
-                      if (widget.isGridMode)
+                      if (widget.isWaterfall)
                         Divider(
                           color: colorScheme.outline,
                           thickness: 1.0,

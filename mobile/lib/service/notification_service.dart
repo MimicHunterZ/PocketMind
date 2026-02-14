@@ -57,8 +57,8 @@ void _handleRetryAction(String payload) async {
 
     await Workmanager().registerOneOffTask(
       'url_scraper_retry_policy_${DateTime.now().millisecondsSinceEpoch}',
-      'retryUrlsWithPolicy',
-      inputData: {'urls': failedUrls},
+      AppConstants.taskRetryUrlsWithPolicy,
+      inputData: {AppConstants.taskInputUrls: failedUrls},
       initialDelay: const Duration(seconds: 1),
     );
 
@@ -109,8 +109,8 @@ void _handleDismissAction(String payload) async {
 
     await Workmanager().registerOneOffTask(
       'url_scraper_dismiss_${DateTime.now().millisecondsSinceEpoch}',
-      'markDismissedUrlsFailed',
-      inputData: {'urls': failedUrls},
+      AppConstants.taskMarkDismissedUrlsFailed,
+      inputData: {AppConstants.taskInputUrls: failedUrls},
       initialDelay: const Duration(seconds: 0),
     );
 

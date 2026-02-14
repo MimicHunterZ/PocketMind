@@ -46,6 +46,43 @@ class AppConstants {
   /// 分享 URL 抓取最大重试次数
   static const int maxShareUrlRetryCount = 3;
 
+  // ==================== 资源抓取状态常量 ====================
+
+  /// 链接资源抓取中
+  static const String resourceStatusScraping = 'SCRAPING';
+
+  /// 抓取待重试/待回调
+  static const String resourceStatusPending = 'PENDING';
+
+  /// 抓取成功（正文可用）
+  static const String resourceStatusCrawled = 'CRAWLED';
+
+  /// 向量化/Embedding 完成
+  static const String resourceStatusEmbedded = 'EMBEDDED';
+
+  /// 抓取失败（终态，不再重试）
+  static const String resourceStatusFailed = 'FAILED';
+
+  // ==================== 后台任务常量 ====================
+
+  /// Workmanager: 执行抓取并保存
+  static const String taskScrapeAndSave = 'scrapeAndSave';
+
+  /// Workmanager: 按策略重试 URL
+  static const String taskRetryUrlsWithPolicy = 'retryUrlsWithPolicy';
+
+  /// Workmanager: 通知重试次数耗尽
+  static const String taskNotifyRetryExhausted = 'notifyRetryExhausted';
+
+  /// Workmanager: 将忽略 URL 标记失败
+  static const String taskMarkDismissedUrlsFailed = 'markDismissedUrlsFailed';
+
+  /// Workmanager input key: URL 列表
+  static const String taskInputUrls = 'urls';
+
+  /// Workmanager input key: 用户问题
+  static const String taskInputUserQuestion = 'uq';
+
   // ==================== UI 相关常量 ====================
 
   /// 桌面端断点宽度（像素）
