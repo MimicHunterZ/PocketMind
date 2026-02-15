@@ -326,7 +326,7 @@ Future<void> scrapeAndSave(
     final prefs = ref.read(sharedPreferencesProvider);
     await prefs.reload();
     final remainingUrls =
-      prefs.getStringList(AppConstants.keyNeedCallbackUrl) ?? [];
+        prefs.getStringList(AppConstants.keyNeedCallbackUrl) ?? [];
     PMlog.d(
       tag,
       'Pending URLs processed and cleared. Remaining: $remainingUrls',
@@ -425,7 +425,8 @@ Future<void> retryUrlsWithPolicy(
   PMlog.d(tag, '触发重试任务: ${eligibility.retryableUrls}');
   await noteService.scheduleScrapeTask(
     urls: eligibility.retryableUrls,
-    taskUniqueName: 'url_scraper_retry_${DateTime.now().millisecondsSinceEpoch}',
+    taskUniqueName:
+        'url_scraper_retry_${DateTime.now().millisecondsSinceEpoch}',
     userQuestion: null,
     initialDelay: const Duration(seconds: 1),
   );

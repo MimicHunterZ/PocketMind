@@ -56,7 +56,7 @@ class _NoteItemState extends ConsumerState<NoteItem>
     }
 
     return note.resourceStatus == AppConstants.resourceStatusScraping ||
-      note.resourceStatus == AppConstants.resourceStatusPending;
+        note.resourceStatus == AppConstants.resourceStatusPending;
   }
 
   @override

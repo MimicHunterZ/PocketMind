@@ -6,7 +6,6 @@ import 'package:pocketmind/page/widget/pm_image.dart';
 import '../source_info.dart';
 
 // 常量定义（用于保证不同布局下的高度一致性）
-final double _kWaterfallImageHeight = 100.w;
 final double _kWaterfallPlaceholderContentHeight = 105.w;
 
 /// 瀑布流卡片样式（原 vertical）。
@@ -180,10 +179,23 @@ class _CardImageSection extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final height = isDesktop ? 180.w : _kWaterfallImageHeight;
+    if (isWaterfallLayout) {
+      return ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: isDesktop ? 600.w : 350.w,
+        ),
+        child: PMImage(
+          pathOrUrl: imageUrl!,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: null,
+        ),
+      );
+    }
+
     return SizedBox(
-      width: isWaterfallLayout ? double.infinity : 120.w,
-      height: isWaterfallLayout ? height : double.infinity,
+      width: 120.w,
+      height: double.infinity,
       child: PMImage(
         pathOrUrl: imageUrl!,
         fit: BoxFit.cover,
