@@ -16,12 +16,18 @@ import java.util.concurrent.TimeUnit;
 public class ObservedToolCallback implements ToolCallback {
 
     private final ToolCallback delegate;
+    private final ToolResultContextEngineer contextEngineer;
     private final boolean logFullPayload;
     private final int maxPayloadLength;
     private final boolean logToolContext;
 
-    public ObservedToolCallback(ToolCallback delegate, boolean logFullPayload, int maxPayloadLength, boolean logToolContext) {
+    public ObservedToolCallback(ToolCallback delegate,
+                                ToolResultContextEngineer contextEngineer,
+                                boolean logFullPayload,
+                                int maxPayloadLength,
+                                boolean logToolContext) {
         this.delegate = delegate;
+        this.contextEngineer = contextEngineer;
         this.logFullPayload = logFullPayload;
         this.maxPayloadLength = maxPayloadLength;
         this.logToolContext = logToolContext;
@@ -65,7 +71,8 @@ public class ObservedToolCallback implements ToolCallback {
         }
 
         try {
-            String result = toolContext == null ? delegate.call(toolInput) : delegate.call(toolInput, toolContext);
+            String rawResult = toolContext == null ? delegate.call(toolInput) : delegate.call(toolInput, toolContext);
+            String result = contextEngineer.process(toolName, rawResult);
             long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
             log.debug("工具调用完成 - traceId: {}, tool: {}, latencyMs: {}, result: {}",
                 traceId, toolName, latencyMs, formatPayload(result));

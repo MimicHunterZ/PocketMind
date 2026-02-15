@@ -32,18 +32,49 @@ public class SkillDemoConfiguration {
     @Value("${pocketmind.observability.tool.log-tool-context:true}")
     private boolean logToolContext;
 
+    @Value("${pocketmind.context-engineering.tool-result.enabled:true}")
+    private boolean contextEngineeringEnabled;
+
+    @Value("${pocketmind.context-engineering.tool-result.max-lines:80}")
+    private int contextEngineeringMaxLines;
+
+    @Value("${pocketmind.context-engineering.tool-result.max-chars:4000}")
+    private int contextEngineeringMaxChars;
+
     @Bean("skillDemoChatClient")
     public ChatClient skillDemoChatClient(ChatClient.Builder chatClientBuilder) {
-        ToolCallback[] observedCallbacks = observedToolCallbacks();
+        return skillOptimizedChatClient(chatClientBuilder);
+    }
+
+    @Bean("skillOptimizedChatClient")
+    public ChatClient skillOptimizedChatClient(ChatClient.Builder chatClientBuilder) {
+        ToolResultContextEngineer contextEngineer = new ToolResultContextEngineer(
+                contextEngineeringEnabled,
+                contextEngineeringMaxLines,
+                contextEngineeringMaxChars
+        );
+        ToolCallback[] observedCallbacks = observedToolCallbacks(contextEngineer);
 
         return chatClientBuilder
                 .defaultAdvisors(new SimpleLoggerAdvisor())
                 .defaultToolCallbacks(observedCallbacks)
-                .defaultToolContext(Map.of("foo", "bar"))
+                .defaultToolContext(Map.of("foo", "bar", "contextMode", "optimized"))
                 .build();
     }
 
-    private ToolCallback[] observedToolCallbacks() {
+    @Bean("skillBaselineChatClient")
+    public ChatClient skillBaselineChatClient(ChatClient.Builder chatClientBuilder) {
+        ToolResultContextEngineer contextEngineer = new ToolResultContextEngineer(false, Integer.MAX_VALUE, Integer.MAX_VALUE);
+        ToolCallback[] observedCallbacks = observedToolCallbacks(contextEngineer);
+
+        return chatClientBuilder
+                .defaultAdvisors(new SimpleLoggerAdvisor())
+                .defaultToolCallbacks(observedCallbacks)
+                .defaultToolContext(Map.of("foo", "bar", "contextMode", "baseline"))
+                .build();
+    }
+
+    private ToolCallback[] observedToolCallbacks(ToolResultContextEngineer contextEngineer) {
         ToolCallback[] skillCallbacks = resolveToolCallbacks(SkillsTool.builder()
                 .addSkillsDirectory(".claude/skills")
                 .build());
@@ -56,7 +87,7 @@ public class SkillDemoConfiguration {
         allCallbacks.addAll(Arrays.asList(shellCallbacks));
 
         return allCallbacks.stream()
-                .map(callback -> new ObservedToolCallback(callback, logFullPayload, maxPayloadLength, logToolContext))
+        .map(callback -> new ObservedToolCallback(callback, contextEngineer, logFullPayload, maxPayloadLength, logToolContext))
                 .toArray(ToolCallback[]::new);
     }
 
