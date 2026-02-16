@@ -63,7 +63,7 @@ Future<void> mainShare() async {
   await ImageStorageHelper().init();
 
   //开启后台进程
-  Workmanager().initialize(callbackDispatcher);
+  await Workmanager().initialize(callbackDispatcher);
 
   // 4. 运行一个 只 包含分享 UI 的应用
   runApp(
@@ -124,18 +124,27 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
 
   // 隐藏 UI 并关闭 Activity
   Future<void> _dismissUI([Map<String, String>? data]) async {
-    PMlog.d(tag, 'Dismissing UI...');
-
     // 重置状态机
     setState(() {
       _currentState = ShareUIState.waiting;
       _currentShare = null;
       _noteId = -1;
     });
-    final userQuestion = data?['uq'];
-    // 统一入口：分享场景与 App 回前台场景都通过 NoteService.processPendingUrls 调度
-    await noteService.processPendingUrls(userQuestion: userQuestion);
-
+    try {
+      final userQuestion = data?['uq'];
+      // 统一入口：分享场景与 App 回前台场景都通过 NoteService.processPendingUrls 调度
+      await noteService.processPendingUrls(userQuestion: userQuestion);
+    } catch (e) {
+      PMlog.e(tag, 'processPendingUrls 失败，将继续关闭分享页');
+    } finally {
+      try {
+        PMlog.d(tag, 'Closing Isar (share)...');
+        await isar.close();
+        PMlog.d(tag, 'Isar closed (share).');
+      } catch (e) {
+        PMlog.w(tag, 'Isar close fail: $e');
+      }
+    }
     // 关闭 ShareActivity
     SystemNavigator.pop();
   }

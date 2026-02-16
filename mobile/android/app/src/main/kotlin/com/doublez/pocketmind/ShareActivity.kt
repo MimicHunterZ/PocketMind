@@ -184,12 +184,12 @@ class ShareActivity : FlutterActivity() {
 
     override fun onPause() {
         super.onPause()
-        Log.d(TAG, "onPause")
+        Log.d(TAG, "onPause: isFinishing=$isFinishing, pendingClipboardRead=$pendingClipboardRead, pendingShareData=${pendingShareData?.title ?: "null"}")
     }
 
     override fun onStop() {
         super.onStop()
-        Log.d(TAG, "onStop")
+        Log.d(TAG, "onStop: isFinishing=$isFinishing, pendingClipboardRead=$pendingClipboardRead, pendingShareData=${pendingShareData?.title ?: "null"}")
     }
 
     // 添加异常处理和更详细的日志

@@ -78,7 +78,7 @@ Future<void> main() async {
   };
 
   //开启后台进程
-  Workmanager().initialize(callbackDispatcher);
+  await Workmanager().initialize(callbackDispatcher);
 
   runApp(
     // 使用 ProviderScope 包裹应用，并 override isarProvider
