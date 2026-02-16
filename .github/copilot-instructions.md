@@ -64,6 +64,8 @@ The mobile app strictly follows **Clean Architecture** principles.
 - **Observability**: Implement comprehensive logging for all features to ensure good observability.
 - **Comments**: All comments must be in **Chinese**.
 - **Dependencies**: Before adding any dependency, use `context7 mcp` to check for the latest and compatible versions.
+- **Spring AI**: Do NOT rely on undocumented internal keys/structures. For prompt-size control, prefer pruning `Prompt` messages in an Advisor (e.g., removing early `ToolResponseMessage`) over guessing context keys.
+- **Scope**: Prefer deleting code and keeping only the minimum chains required (“less is more”).
 
 ## 🏗️ 核心架构准则 (Core Architecture Rules)
 

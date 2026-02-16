@@ -1,14 +1,10 @@
 spring:
   application:
     name: pocketmind-server
-  data:
-    redis:
-      host: localhost
-      port: 6379
   datasource:
     url: jdbc:postgresql://localhost:5432/pocketmind
-    username: your_name
-    password: your_password
+    username: your_username # 替换为你的数据库用户名
+    password: your_password # 替换为你的数据库密码
     driver-class-name: org.postgresql.Driver
   sql:
     init:
@@ -17,57 +13,92 @@ spring:
   rabbitmq:
     host: localhost
     port: 5672
-    username: guest
-    password: guest
+    username: your_username # 替换为你的 RabbitMQ 用户名
+    password: your_password # 替换为你的 RabbitMQ 密码
   ai:
-    dashscope:
-      api-key: your_key_here
+    tools:
+      observations:
+        include-content: true
+    chat:
+      client:
+        observations:
+          log-prompt: true
+          log-completion: true
+    openai:
+      api-key: your_api_key # 替换为你的 API Key
+      base-url: your_base_url # 替换为你的 Base URL 不需要 /v1
       chat:
         options:
-          model: qwen-turbo
-          temperature: 0.7
+          model: your_model_name # 替换为你使用的模型名称
     alibaba:
       toolcalling:
-        baidu:
-          search:
-            enabled: true
-        tavilysearch:
-          api-key: your_key_here
-          enabled: true
         jinacrawler:
-          enabled: true
-          api-key: your_jina_key
-    openai:
-      api-key: ${OPENAI_API_KEY:sk-placeholder} # 替换为你的 API Key
-      base-url: ${OPENAI_BASE_URL:https://api.openai.com} # 替换为你的 Base URL (例如本地 Ollama: http://localhost:11434/v1)
-      chat:
-        options:
-          model: ${OPENAI_MODEL:gpt-4-turbo} # 替换为你使用的模型名称
-  mail:
-    host: smtp.qq.com
-    port: 465
-    username: your_name
-    password: your_password
-    protocol: smtp
-    properties: # 下面要用properties的写法才可以生效
-      mail.smtp.auth: true
-      mail.smtp.ssl.enable: true  # 启用SSL
-      mail.smtp.socketFactory.class: javax.net.ssl.SSLSocketFactory
-    #      mail.debug: true  # 开启调试日志
-    default-encoding: utf-8
-# 日志配置
-logging:
-  level:
-    com.example: debug
-
+          api-key: your_api_key # 请在此处填入 Jina API Key
 mybatis-plus:
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
     map-underscore-to-camel-case: true
 
 pocketmind:
+  demo:
+    # demo 仅用于验证 Langfuse/上下文评估链路，避免在非开发环境暴露 /demo 接口与相关 Bean。
+    enabled: true
+    # 默认从 backend 目录启动，skills 在仓库根目录的 .claude/skills。
+    skills-path: "${user.dir}/../.claude/skills"
+    http:
+      # 启用 stream 输出，改成 false。
+      buffering-enabled: true
+    tool-response-pruning:
+      default-window-tokens: 64000
+      # 上下文窗口进行压缩
+      start-ratio: 0.05
+      keep-recent-tool-responses: 2
+      model-window-tokens:
+        deepseek-chat: 131072
+        deepseek-reasoner: 131072
   jwt:
-    secret: your-secret-key-here
+    secret: kjW0F9ieDxbd94LOdqQMRIFUjbzJt8/U33WltGqYD4A=
     user-id-claim: ${POCKETMIND_JWT_USER_ID_CLAIM:userId}
     leeway-seconds: ${POCKETMIND_JWT_LEEWAY_SECONDS:5}
     token-ttl-seconds: ${POCKETMIND_JWT_TOKEN_TTL_SECONDS:86400}
+  observability:
+    chat-client-simple-logger-enabled: true
+    tool:
+      log-full-payload: false
+      max-payload-length: 1200
+      log-tool-context: true
+app:
+  exception:
+    show-stacktrace: true
+# 更改日志记录
+logging:
+  level:
+    com.doublez.pocketmindserver.demo: DEBUG
+    org.springframework.ai.tool: DEBUG
+    org.springframework.ai.chat.client.advisor: DEBUG
+    org.springframework.ai.openai: DEBUG
+    org.springframework.ai: DEBUG
+
+management:
+  otlp:
+    metrics:
+      export:
+        enabled: false
+  tracing:
+    sampling:
+      probability: 1.0
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: https://cloud.langfuse.com/api/public/otel/v1/traces
+          protocol: http/protobuf
+          headers:
+            Authorization: Basic <your_encoded_credentials> # 替换为你的 langfuse Base64 编码的 "public_key:secret_key"
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always

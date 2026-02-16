@@ -3,13 +3,27 @@ package com.doublez.pocketmindserver.demo;
 import org.springaicommunity.agent.tools.FileSystemTools;
 import org.springaicommunity.agent.tools.ShellTools;
 import org.springaicommunity.agent.tools.SkillsTool;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
+import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import io.micrometer.observation.ObservationRegistry;
+import org.springframework.core.Ordered;
+import org.springframework.core.retry.RetryTemplate;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.BufferingClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -21,6 +35,7 @@ import java.util.Map;
  * 统一组装工具链、默认上下文和可观测日志 Advisor
  */
 @Configuration
+@ConditionalOnProperty(prefix = "pocketmind.demo", name = "enabled", havingValue = "true")
 public class SkillDemoConfiguration {
 
     @Value("${pocketmind.observability.tool.log-full-payload:false}")
@@ -32,51 +47,168 @@ public class SkillDemoConfiguration {
     @Value("${pocketmind.observability.tool.log-tool-context:true}")
     private boolean logToolContext;
 
-    @Value("${pocketmind.context-engineering.tool-result.enabled:true}")
-    private boolean contextEngineeringEnabled;
+    @Value("${pocketmind.observability.chat-client-simple-logger-enabled:false}")
+    private boolean chatClientSimpleLoggerEnabled;
 
-    @Value("${pocketmind.context-engineering.tool-result.max-lines:80}")
-    private int contextEngineeringMaxLines;
+    @Value("${pocketmind.demo.tool-response-pruning.default-window-tokens:64000}")
+    private int defaultWindowTokens;
 
-    @Value("${pocketmind.context-engineering.tool-result.max-chars:4000}")
-    private int contextEngineeringMaxChars;
+    @Value("${pocketmind.demo.tool-response-pruning.start-ratio:0.75}")
+    private double toolResponsePruneStartRatio;
 
-    @Bean("skillDemoChatClient")
-    public ChatClient skillDemoChatClient(ChatClient.Builder chatClientBuilder) {
-        return skillOptimizedChatClient(chatClientBuilder);
-    }
+    @Value("${pocketmind.demo.tool-response-pruning.keep-recent-tool-responses:2}")
+    private int keepRecentToolResponses;
 
-    @Bean("skillOptimizedChatClient")
-    public ChatClient skillOptimizedChatClient(ChatClient.Builder chatClientBuilder) {
-        ToolResultContextEngineer contextEngineer = new ToolResultContextEngineer(
-                contextEngineeringEnabled,
-                contextEngineeringMaxLines,
-                contextEngineeringMaxChars
-        );
-        ToolCallback[] observedCallbacks = observedToolCallbacks(contextEngineer);
+    // demo 先只关心 DeepSeek 两个模型的上下文窗口；通过 yml 字段映射配置。
+    // 128k token 这里用 131072（128 * 1024）表示。
+    @Value("${pocketmind.demo.tool-response-pruning.model-window-tokens.deepseek-chat:131072}")
+    private int deepseekChatWindowTokens;
 
-        return chatClientBuilder
-                .defaultAdvisors(new SimpleLoggerAdvisor())
-                .defaultToolCallbacks(observedCallbacks)
-                .defaultToolContext(Map.of("foo", "bar", "contextMode", "optimized"))
+    @Value("${pocketmind.demo.tool-response-pruning.model-window-tokens.deepseek-reasoner:131072}")
+    private int deepseekReasonerWindowTokens;
+
+    // 默认用 ../.claude/skills：本项目通常从 backend 目录启动 Spring Boot。
+    @Value("${pocketmind.demo.skills-path:../.claude/skills}")
+    private String skillsPath;
+
+    @Value("${pocketmind.demo.http.buffering-enabled:true}")
+    private boolean bufferingEnabled;
+
+    @Value("${spring.ai.openai.chat.options.model:unknown}")
+    private String modelName;
+
+    @Value("${spring.ai.openai.base-url:}")
+    private String openAiBaseUrl;
+
+    @Value("${spring.ai.openai.api-key:}")
+    private String openAiApiKey;
+
+    /**
+     * demo 专用模型：只影响 /demo/skill/*
+     * 1) 通过 RestClient interceptor 捕获 DeepSeek HTTP 的 request/response body，写入 Langfuse 便于排查。
+     * 2) 使用 BufferingClientHttpRequestFactory 缓存 response body，避免“读取一次后下游解析失败”。
+     *
+     * 注意：BufferingClientHttpRequestFactory 会把响应体完整读入内存；如果未来启用流式输出，建议将
+     * pocketmind.demo.http.buffering-enabled 设为 false，以免破坏流式效果或放大内存占用。
+     */
+    @Bean("skillDemoOpenAiChatModel")
+    public OpenAiChatModel skillDemoOpenAiChatModel(ObservationRegistry observationRegistry, RetryTemplate retryTemplate) {
+        SimpleClientHttpRequestFactory baseFactory = new SimpleClientHttpRequestFactory();
+        RestClient.Builder restClientBuilder = RestClient.builder()
+            .requestFactory(bufferingEnabled ? new BufferingClientHttpRequestFactory(baseFactory) : baseFactory)
+                .requestInterceptor(new LangfuseHttpBodyCaptureInterceptor());
+
+        WebClient.Builder webClientBuilder = WebClient.builder();
+
+        OpenAiApi api = OpenAiApi.builder()
+                .baseUrl(openAiBaseUrl)
+                .apiKey(openAiApiKey)
+                .restClientBuilder(restClientBuilder)
+                .webClientBuilder(webClientBuilder)
                 .build();
+
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+                .model(modelName)
+                .build();
+
+        return new OpenAiChatModel(
+                api,
+                options,
+                org.springframework.ai.model.tool.ToolCallingManager.builder().build(),
+                retryTemplate,
+                observationRegistry
+        );
     }
 
     @Bean("skillBaselineChatClient")
-    public ChatClient skillBaselineChatClient(ChatClient.Builder chatClientBuilder) {
-        ToolResultContextEngineer contextEngineer = new ToolResultContextEngineer(false, Integer.MAX_VALUE, Integer.MAX_VALUE);
-        ToolCallback[] observedCallbacks = observedToolCallbacks(contextEngineer);
-
-        return chatClientBuilder
-                .defaultAdvisors(new SimpleLoggerAdvisor())
-                .defaultToolCallbacks(observedCallbacks)
-                .defaultToolContext(Map.of("foo", "bar", "contextMode", "baseline"))
-                .build();
+    public ChatClient skillBaselineChatClient(OpenAiChatModel skillDemoOpenAiChatModel, ObjectMapper objectMapper) {
+        return buildSkillChatClient(skillDemoOpenAiChatModel, objectMapper, "raw", false);
     }
 
-    private ToolCallback[] observedToolCallbacks(ToolResultContextEngineer contextEngineer) {
+    /**
+     * 仅做“工具结果忽略”：当占用率 >= 75% 时丢弃早期的 ToolResponseMessage。
+     */
+    @Bean("skillPrunedChatClient")
+    public ChatClient skillPrunedChatClient(OpenAiChatModel skillDemoOpenAiChatModel, ObjectMapper objectMapper) {
+        return buildSkillChatClient(skillDemoOpenAiChatModel, objectMapper, "pruned", true);
+    }
+
+    private TrustedModelContextWindowResolver buildContextWindowResolver() {
+        // 依然保留 demo 默认的 DeepSeek 两个 key，但 resolver 已做归一化匹配与 fallback。
+        return new TrustedModelContextWindowResolver(
+            defaultWindowTokens,
+            Map.of(
+                "deepseek-chat", deepseekChatWindowTokens,
+                "deepseek-reasoner", deepseekReasonerWindowTokens
+            )
+        );
+    }
+
+    private ChatClient buildSkillChatClient(OpenAiChatModel chatModel,
+                                           ObjectMapper objectMapper,
+                                           String contextMode,
+                                           boolean enableToolResponsePruning) {
+        ToolCallback[] observedCallbacks = observedToolCallbacks();
+
+        ChatClient.Builder builder = ChatClient.builder(chatModel)
+                .defaultToolCallbacks(observedCallbacks)
+                .defaultToolContext(Map.of("contextMode", contextMode));
+
+        applyDefaultAdvisors(builder, objectMapper, enableToolResponsePruning);
+        return builder.build();
+    }
+
+    private void applyDefaultAdvisors(ChatClient.Builder builder,
+                                     ObjectMapper objectMapper,
+                                     boolean enableToolResponsePruning) {
+        if (enableToolResponsePruning) {
+            TrustedModelContextWindowResolver resolver = buildContextWindowResolver();
+            PruningToolCallAdvisor toolCallAdvisor = new PruningToolCallAdvisor(
+                org.springframework.ai.model.tool.ToolCallingManager.builder().build(),
+                    toolResponsePruneStartRatio,
+                    keepRecentToolResponses,
+                resolver,
+                modelName
+            );
+
+            if (chatClientSimpleLoggerEnabled) {
+                builder.defaultAdvisors(
+                        new LangfuseChatObservationAdvisor(objectMapper),
+                        toolCallAdvisor,
+                        new SimpleLoggerAdvisor()
+                );
+                return;
+            }
+
+            builder.defaultAdvisors(
+                    new LangfuseChatObservationAdvisor(objectMapper),
+                toolCallAdvisor
+            );
+            return;
+        }
+
+        ToolCallAdvisor toolCallAdvisor = ToolCallAdvisor.builder()
+            .advisorOrder(Ordered.HIGHEST_PRECEDENCE + 100)
+            .build();
+
+        if (chatClientSimpleLoggerEnabled) {
+            builder.defaultAdvisors(
+                    new LangfuseChatObservationAdvisor(objectMapper),
+                    toolCallAdvisor,
+                    new SimpleLoggerAdvisor()
+            );
+            return;
+        }
+
+        builder.defaultAdvisors(
+                new LangfuseChatObservationAdvisor(objectMapper),
+                toolCallAdvisor
+        );
+    }
+
+    private ToolCallback[] observedToolCallbacks() {
         ToolCallback[] skillCallbacks = resolveToolCallbacks(SkillsTool.builder()
-                .addSkillsDirectory(".claude/skills")
+                .addSkillsDirectory(skillsPath)
                 .build());
         ToolCallback[] fileCallbacks = resolveToolCallbacks(FileSystemTools.builder().build());
         ToolCallback[] shellCallbacks = resolveToolCallbacks(ShellTools.builder().build());
@@ -87,11 +219,19 @@ public class SkillDemoConfiguration {
         allCallbacks.addAll(Arrays.asList(shellCallbacks));
 
         return allCallbacks.stream()
-        .map(callback -> new ObservedToolCallback(callback, contextEngineer, logFullPayload, maxPayloadLength, logToolContext))
+        .map(callback -> new ObservedToolCallback(
+                callback,
+                modelName,
+                logFullPayload,
+                maxPayloadLength,
+                logToolContext
+        ))
                 .toArray(ToolCallback[]::new);
     }
 
     private ToolCallback[] resolveToolCallbacks(Object toolSource) {
+        // Spring AI 2.0.0-M2：ToolCallbacks.from(Object) 不一定能正确识别 ToolCallback 实例，
+        // 可能误走 MethodToolCallbackProvider（要求存在 @Tool 方法）从而导致启动失败。
         if (toolSource instanceof ToolCallback toolCallback) {
             return new ToolCallback[]{toolCallback};
         }
