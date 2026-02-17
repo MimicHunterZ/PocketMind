@@ -3,13 +3,11 @@ package com.doublez.pocketmindserver.ai.application;
 import com.doublez.pocketmindserver.ai.api.dto.AiAnalyzeRequest;
 import com.doublez.pocketmindserver.ai.api.dto.AiAnalyzeResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.chat.prompt.SystemPromptTemplate;
 import org.springframework.ai.converter.BeanOutputConverter;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -24,7 +22,7 @@ public class AiAnalyzeService {
     private static final String MODE_QA = "QA";
     private static final String MODE_SUMMARY = "SUMMARY";
 
-    private final ChatClient chatClient;
+    private final AiFailoverRouter failoverRouter;
 
     private final BeanOutputConverter<PocketMindSummary> summaryConverter =
             new BeanOutputConverter<>(PocketMindSummary.class);
@@ -41,8 +39,8 @@ public class AiAnalyzeService {
     @Value("classpath:prompts/ai/summary_template.md")
     private Resource summaryPromptResource;
 
-    public AiAnalyzeService(@Qualifier("openAiChatClient") ChatClient chatClient) {
-        this.chatClient = chatClient;
+    public AiAnalyzeService(AiFailoverRouter failoverRouter) {
+        this.failoverRouter = failoverRouter;
     }
 
     public AiAnalyzeResponse<?> analyze(AiAnalyzeRequest request, String userId) {
@@ -76,7 +74,7 @@ public class AiAnalyzeService {
         ));
 
         // 3. 调用 AI 获取原始文本
-        String rawResponse = chatClient.prompt(prompt).call().content();
+        String rawResponse = failoverRouter.executeChat("analyze-qa", client -> client.prompt(prompt).call().content());
         log.info("AI QA 完成 - responseLength: {}", rawResponse == null ? 0 : rawResponse.length());
         return qaConverter.convert(rawResponse);
     }
@@ -95,7 +93,7 @@ public class AiAnalyzeService {
         ));
 
         // 3. 调用 AI 获取原始文本
-        String rawResponse = chatClient.prompt(prompt).call().content();
+        String rawResponse = failoverRouter.executeChat("analyze-summary", client -> client.prompt(prompt).call().content());
 
         // 4. 解析器自动将 JSON 字符串转为 Java Record
         log.info("AI Raw JSON: {}", rawResponse);

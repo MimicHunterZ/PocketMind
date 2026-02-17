@@ -3,6 +3,8 @@ package com.doublez.pocketmindserver.demo;
 import org.springaicommunity.agent.tools.FileSystemTools;
 import org.springaicommunity.agent.tools.ShellTools;
 import org.springaicommunity.agent.tools.SkillsTool;
+import com.doublez.pocketmindserver.ai.config.AiProvidersProperties;
+import com.doublez.pocketmindserver.ai.config.AiRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.ai.chat.client.ChatClient;
@@ -27,6 +29,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -59,29 +62,12 @@ public class SkillDemoConfiguration {
     @Value("${pocketmind.demo.tool-response-pruning.keep-recent-tool-responses:2}")
     private int keepRecentToolResponses;
 
-    // demo 先只关心 DeepSeek 两个模型的上下文窗口；通过 yml 字段映射配置。
-    // 128k token 这里用 131072（128 * 1024）表示。
-    @Value("${pocketmind.demo.tool-response-pruning.model-window-tokens.deepseek-chat:131072}")
-    private int deepseekChatWindowTokens;
-
-    @Value("${pocketmind.demo.tool-response-pruning.model-window-tokens.deepseek-reasoner:131072}")
-    private int deepseekReasonerWindowTokens;
-
     // 默认用 ../.claude/skills：本项目通常从 backend 目录启动 Spring Boot。
     @Value("${pocketmind.demo.skills-path:../.claude/skills}")
     private String skillsPath;
 
     @Value("${pocketmind.demo.http.buffering-enabled:true}")
     private boolean bufferingEnabled;
-
-    @Value("${spring.ai.openai.chat.options.model:unknown}")
-    private String modelName;
-
-    @Value("${spring.ai.openai.base-url:}")
-    private String openAiBaseUrl;
-
-    @Value("${spring.ai.openai.api-key:}")
-    private String openAiApiKey;
 
     /**
      * demo 专用模型：只影响 /demo/skill/*
@@ -92,7 +78,11 @@ public class SkillDemoConfiguration {
      * pocketmind.demo.http.buffering-enabled 设为 false，以免破坏流式效果或放大内存占用。
      */
     @Bean("skillDemoOpenAiChatModel")
-    public OpenAiChatModel skillDemoOpenAiChatModel(ObservationRegistry observationRegistry, RetryTemplate retryTemplate) {
+    public OpenAiChatModel skillDemoOpenAiChatModel(AiProvidersProperties providers,
+                                                    ObservationRegistry observationRegistry,
+                                                    RetryTemplate retryTemplate) {
+        AiProvidersProperties.ProviderConfig providerConfig = providers.resolveConfig(AiRole.PRIMARY);
+
         SimpleClientHttpRequestFactory baseFactory = new SimpleClientHttpRequestFactory();
         RestClient.Builder restClientBuilder = RestClient.builder()
             .requestFactory(bufferingEnabled ? new BufferingClientHttpRequestFactory(baseFactory) : baseFactory)
@@ -101,14 +91,14 @@ public class SkillDemoConfiguration {
         WebClient.Builder webClientBuilder = WebClient.builder();
 
         OpenAiApi api = OpenAiApi.builder()
-                .baseUrl(openAiBaseUrl)
-                .apiKey(openAiApiKey)
+            .baseUrl(providerConfig.baseUrl())
+            .apiKey(providerConfig.apiKey())
                 .restClientBuilder(restClientBuilder)
                 .webClientBuilder(webClientBuilder)
                 .build();
 
         OpenAiChatOptions options = OpenAiChatOptions.builder()
-                .model(modelName)
+            .model(providerConfig.model())
                 .build();
 
         return new OpenAiChatModel(
@@ -121,48 +111,76 @@ public class SkillDemoConfiguration {
     }
 
     @Bean("skillBaselineChatClient")
-    public ChatClient skillBaselineChatClient(OpenAiChatModel skillDemoOpenAiChatModel, ObjectMapper objectMapper) {
-        return buildSkillChatClient(skillDemoOpenAiChatModel, objectMapper, "raw", false);
+    public ChatClient skillBaselineChatClient(AiProvidersProperties providers,
+                                              OpenAiChatModel skillDemoOpenAiChatModel,
+                                              ObjectMapper objectMapper) {
+        String modelName = providers.resolveConfig(AiRole.PRIMARY).model();
+        return buildSkillChatClient(providers, skillDemoOpenAiChatModel, objectMapper, modelName, "raw", false);
     }
 
     /**
      * 仅做“工具结果忽略”：当占用率 >= 75% 时丢弃早期的 ToolResponseMessage。
      */
     @Bean("skillPrunedChatClient")
-    public ChatClient skillPrunedChatClient(OpenAiChatModel skillDemoOpenAiChatModel, ObjectMapper objectMapper) {
-        return buildSkillChatClient(skillDemoOpenAiChatModel, objectMapper, "pruned", true);
+    public ChatClient skillPrunedChatClient(AiProvidersProperties providers,
+                                            OpenAiChatModel skillDemoOpenAiChatModel,
+                                            ObjectMapper objectMapper) {
+        String modelName = providers.resolveConfig(AiRole.PRIMARY).model();
+        return buildSkillChatClient(providers, skillDemoOpenAiChatModel, objectMapper, modelName, "pruned", true);
     }
 
-    private TrustedModelContextWindowResolver buildContextWindowResolver() {
-        // 依然保留 demo 默认的 DeepSeek 两个 key，但 resolver 已做归一化匹配与 fallback。
+    private TrustedModelContextWindowResolver buildContextWindowResolver(AiProvidersProperties providers) {
+        // demo 也统一从 pocketmind.ai.providers.configs.*.window-tokens 读取，避免重复配置与歧义。
         return new TrustedModelContextWindowResolver(
-            defaultWindowTokens,
-            Map.of(
-                "deepseek-chat", deepseekChatWindowTokens,
-                "deepseek-reasoner", deepseekReasonerWindowTokens
-            )
+                defaultWindowTokens,
+                resolveWindowTokensFromProviders(providers)
         );
     }
 
-    private ChatClient buildSkillChatClient(OpenAiChatModel chatModel,
+    private Map<String, Integer> resolveWindowTokensFromProviders(AiProvidersProperties providers) {
+        if (providers == null || providers.configs() == null || providers.configs().isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Integer> map = new HashMap<>();
+        for (AiProvidersProperties.ProviderConfig cfg : providers.configs().values()) {
+            if (cfg == null) {
+                continue;
+            }
+            if (cfg.model() == null || cfg.model().isBlank()) {
+                continue;
+            }
+            if (cfg.windowTokens() <= 0) {
+                continue;
+            }
+            map.put(cfg.model().trim(), cfg.windowTokens());
+        }
+        return map;
+    }
+
+    private ChatClient buildSkillChatClient(AiProvidersProperties providers,
+                                           OpenAiChatModel chatModel,
                                            ObjectMapper objectMapper,
+                                           String modelName,
                                            String contextMode,
                                            boolean enableToolResponsePruning) {
-        ToolCallback[] observedCallbacks = observedToolCallbacks();
+        ToolCallback[] observedCallbacks = observedToolCallbacks(modelName);
 
         ChatClient.Builder builder = ChatClient.builder(chatModel)
                 .defaultToolCallbacks(observedCallbacks)
                 .defaultToolContext(Map.of("contextMode", contextMode));
 
-        applyDefaultAdvisors(builder, objectMapper, enableToolResponsePruning);
+        applyDefaultAdvisors(providers, builder, objectMapper, enableToolResponsePruning, modelName);
         return builder.build();
     }
 
-    private void applyDefaultAdvisors(ChatClient.Builder builder,
+    private void applyDefaultAdvisors(AiProvidersProperties providers,
+                                     ChatClient.Builder builder,
                                      ObjectMapper objectMapper,
-                                     boolean enableToolResponsePruning) {
+                                     boolean enableToolResponsePruning,
+                                     String modelName) {
         if (enableToolResponsePruning) {
-            TrustedModelContextWindowResolver resolver = buildContextWindowResolver();
+            // demo 的剪枝窗口也统一与 providers 配置一致。
+            TrustedModelContextWindowResolver resolver = buildContextWindowResolver(providers);
             PruningToolCallAdvisor toolCallAdvisor = new PruningToolCallAdvisor(
                 org.springframework.ai.model.tool.ToolCallingManager.builder().build(),
                     toolResponsePruneStartRatio,
@@ -206,7 +224,7 @@ public class SkillDemoConfiguration {
         );
     }
 
-    private ToolCallback[] observedToolCallbacks() {
+    private ToolCallback[] observedToolCallbacks(String modelName) {
         ToolCallback[] skillCallbacks = resolveToolCallbacks(SkillsTool.builder()
                 .addSkillsDirectory(skillsPath)
                 .build());

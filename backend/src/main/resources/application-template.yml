@@ -53,9 +53,6 @@ pocketmind:
       # 上下文窗口进行压缩
       start-ratio: 0.05
       keep-recent-tool-responses: 2
-      model-window-tokens:
-        deepseek-chat: 131072
-        deepseek-reasoner: 131072
   jwt:
     secret: kjW0F9ieDxbd94LOdqQMRIFUjbzJt8/U33WltGqYD4A=
     user-id-claim: ${POCKETMIND_JWT_USER_ID_CLAIM:userId}
