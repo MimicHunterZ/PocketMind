@@ -7,12 +7,20 @@ class NoteDetailTopBar extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
+  /// 顶部栏中间区域（用于放置分类/时间等信息）。
+  final Widget? middle;
+
+  /// 右侧操作区的前置区域（用于放置分类选择器等）。
+  final Widget? rightLeading;
+
   const NoteDetailTopBar({
     super.key,
     required this.onBack,
     required this.onShare,
     required this.onEdit,
     required this.onDelete,
+    this.middle,
+    this.rightLeading,
   });
 
   @override
@@ -41,12 +49,17 @@ class NoteDetailTopBar extends StatelessWidget {
             colorScheme: colorScheme,
           ),
 
-          const Spacer(),
+          // 中间区域：分类 & 时间
+          Expanded(child: Center(child: middle ?? const SizedBox.shrink())),
 
           // 右侧操作按钮组
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (rightLeading != null) ...[
+                rightLeading!,
+                SizedBox(width: 8.w),
+              ],
               // _buildNavButton(
               //   icon: Icons.share_outlined,
               //   label: '分享',

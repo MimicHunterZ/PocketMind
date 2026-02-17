@@ -14,6 +14,9 @@ import '../widget/note_detail/note_detail_sidebar.dart';
 import '../widget/note_detail/note_tags_section.dart';
 import '../widget/note_detail/note_ai_insight_section.dart';
 import '../widget/note_detail/note_original_data_section.dart';
+import '../widget/category_selector.dart';
+import '../widget/common/category_badge.dart';
+import '../widget/common/date_label.dart';
 import '../../util/date_formatter.dart';
 
 /// 笔记详情页
@@ -124,6 +127,22 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
               onShare: _onSharePressed,
               onEdit: () {}, // TODO: 编辑模式切换
               onDelete: _onDeletePressed,
+              // 顶部栏中间显示时间
+              middle: DateLabel(
+                dateText: DateFormatter.formatChinese(detailState.note.time),
+                style: DateLabelStyle.normal,
+              ),
+              // 分类
+              rightLeading: CategorySelector(
+                selectedCategoryId: detailState.note.categoryId,
+                onCategorySelected: (id) => ref
+                    .read(noteDetailProvider(_currentNote).notifier)
+                    .updateCategory(id),
+                builder: (context, category) => CategoryBadge(
+                  categoryName: category.name,
+                  style: CategoryBadgeStyle.normal,
+                ),
+              ),
             ),
 
             // 主内容区域

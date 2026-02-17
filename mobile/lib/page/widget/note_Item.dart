@@ -7,6 +7,7 @@ import 'package:pocketmind/router/route_paths.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/service/note_service.dart';
 import 'package:pocketmind/util/url_helper.dart';
+import 'package:pocketmind/util/image_prefetcher.dart';
 import 'preview_card/link_preview_card.dart';
 import 'pm_image.dart';
 import 'local_text_card.dart';
@@ -39,6 +40,7 @@ class _NoteItemState extends ConsumerState<NoteItem>
   bool get wantKeepAlive => true;
 
   bool _isHovered = false;
+  bool _didPrewarmImages = false;
 
   // 显示笔记详情页
   void _showNoteDetail(BuildContext context) {
@@ -74,6 +76,31 @@ class _NoteItemState extends ConsumerState<NoteItem>
     final isLinkScraping = _isLinkScraping(widget.note);
 
     final content = widget.note.content;
+
+    // 列表阶段预热：让用户点进详情前就完成图片缓存 & 详情轮播高度计算。
+    // 这样可以显著减少“进详情先 loading”和“返回预览重载”的割裂感。
+    if (!_didPrewarmImages && !isLinkScraping) {
+      final imagesToPrewarm = <String>[];
+      if (isLocalImage && widget.note.url != null) {
+        imagesToPrewarm.add(widget.note.url!);
+      } else if (isHttpsUrl && widget.note.previewImageUrls.isNotEmpty) {
+        imagesToPrewarm.addAll(widget.note.previewImageUrls);
+      }
+
+      if (imagesToPrewarm.isNotEmpty) {
+        _didPrewarmImages = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          // decode 尺寸大致按列表卡片图片区域来（不需要精确，主要是降内存）。
+          ImagePrefetcher.prewarm(
+            context,
+            imagesToPrewarm,
+            logicalDecodeWidth: widget.isWaterfall ? 240 : 360,
+            logicalDecodeHeight: widget.isWaterfall ? 240 : 200,
+          );
+        });
+      }
+    }
 
     // 桌面端样式调整
     final margin = widget.isDesktop
@@ -167,9 +194,26 @@ class _NoteItemState extends ConsumerState<NoteItem>
                       ),
                       child: AspectRatio(
                         aspectRatio: widget.isWaterfall ? 1.0 : 16 / 9,
-                        child: PMImage(
-                          pathOrUrl: widget.note.url!,
-                          fit: BoxFit.cover,
+                        child: RepaintBoundary(
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final dpr = MediaQuery.of(
+                                context,
+                              ).devicePixelRatio;
+                              final decodeW = (constraints.maxWidth * dpr)
+                                  .round();
+                              final decodeH = (constraints.maxHeight * dpr)
+                                  .round();
+                              return PMImage(
+                                pathOrUrl: widget.note.url!,
+                                fit: BoxFit.cover,
+                                cacheWidth: decodeW,
+                                cacheHeight: decodeH,
+                                memCacheWidth: decodeW,
+                                memCacheHeight: decodeH,
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),

@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/model/note.dart';
-import 'package:pocketmind/page/widget/note_detail/hero_gallery.dart';
-import 'package:pocketmind/page/widget/category_selector.dart';
-import 'package:pocketmind/page/widget/common/category_badge.dart';
-import 'package:pocketmind/page/widget/common/date_label.dart';
+import 'package:pocketmind/page/widget/common/immersive_image.dart';
 import 'package:pocketmind/util/url_helper.dart';
 import 'note_link_content_section.dart';
 import 'note_source_link_card.dart';
@@ -76,22 +73,8 @@ class NoteOriginalDataSection extends StatelessWidget {
       children: [
         // 图片/画廊区域
         if (hasImages) ...[
-          HeroGallery(
-            images: displayImages,
-            title: hasTitle ? note.title! : '',
-            isDesktop: isDesktop,
-            showGradientFade: true,
-            categoryBadge: CategorySelector(
-              selectedCategoryId: note.categoryId,
-              onCategorySelected: onCategorySelected,
-              builder: (context, category) => CategoryBadge(
-                categoryName: category.name,
-                style: CategoryBadgeStyle.onImage,
-              ),
-            ),
-            dateLabel: formattedDate,
-            overlayTitle: previewTitle ?? '',
-          ),
+          // 图片轮播：
+          ImmersiveImageCarousel(images: displayImages, isDesktop: isDesktop),
         ] else if (isNetworkImage && isLoadingPreview) ...[
           // 加载中显示占位
           Container(
@@ -112,30 +95,24 @@ class NoteOriginalDataSection extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (isHttpsUrl &&
+                  !isLoadingPreview &&
+                  previewTitle != null &&
+                  previewTitle!.isNotEmpty) ...[
+                SizedBox(height: hasImages ? 16.h : 24.h),
+                Text(
+                  previewTitle!,
+                  style: textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    height: 1.25,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                SizedBox(height: 16.h),
+              ],
+
               // 无图时显示分类和日期
               if (!hasImages && !isLoadingPreview) ...[
-                SizedBox(height: 24.h),
-                // 分类标签和日期
-                Row(
-                  children: [
-                    // 分类胶囊 - 可点击切换分类
-                    CategorySelector(
-                      selectedCategoryId: note.categoryId,
-                      onCategorySelected: onCategorySelected,
-                      builder: (context, category) => CategoryBadge(
-                        categoryName: category.name,
-                        style: CategoryBadgeStyle.normal,
-                      ),
-                    ),
-                    SizedBox(width: 12.w),
-                    // 日期
-                    DateLabel(
-                      dateText: formattedDate,
-                      style: DateLabelStyle.normal,
-                    ),
-                  ],
-                ),
-
                 SizedBox(height: 20.h),
 
                 // 标题（无图时）

@@ -181,9 +181,7 @@ class _CardImageSection extends StatelessWidget {
 
     if (isWaterfallLayout) {
       return ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: isDesktop ? 600.w : 350.w,
-        ),
+        constraints: BoxConstraints(maxHeight: isDesktop ? 600.w : 350.w),
         child: PMImage(
           pathOrUrl: imageUrl!,
           fit: BoxFit.cover,
