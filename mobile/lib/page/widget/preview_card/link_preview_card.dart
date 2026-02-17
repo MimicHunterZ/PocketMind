@@ -42,8 +42,6 @@ class LinkPreviewCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final titleEnabled = ref.watch(appConfigProvider).titleEnabled;
-
     if (isLoading) {
       return ScrapingSkeletonCard(
         isVertical: isWaterfall,
@@ -52,39 +50,23 @@ class LinkPreviewCard extends ConsumerWidget {
       );
     }
 
-    final metadata = Metadata()
-      ..title = note.previewTitle
-      ..desc = note.previewContent ?? note.previewDescription
-      ..image = note.previewImageUrls.isNotEmpty
-          ? note.previewImageUrls.first
-          : null
-      ..url = note.url;
-
-    final firstImageUrl = note.previewImageUrls.isNotEmpty
-        ? note.previewImageUrls.first
-        : null;
-
     if (isWaterfall) {
       return WaterfallPreviewCard(
         url: note.url ?? '',
-        metadata: metadata,
-        imageUrl: firstImageUrl,
+        note: note,
         hasContent: hasContent,
         onTap: onTap,
         isDesktop: isDesktop,
         publishDate: publishDate,
         isHovered: isHovered,
-        titleEnabled: titleEnabled,
       );
     }
 
     return ClassicListPreviewCard(
       url: note.url ?? '',
-      metadata: metadata,
-      imageUrl: firstImageUrl,
+      note: note,
       onTap: onTap,
       publishDate: publishDate,
-      titleEnabled: titleEnabled,
     );
   }
 }

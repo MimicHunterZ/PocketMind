@@ -1,72 +1,69 @@
 import 'package:any_link_preview/any_link_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/page/widget/pm_image.dart';
 
 import '../source_info.dart';
 
 // 常量定义（用于保证不同布局下的高度一致性）
 final double _kWaterfallPlaceholderContentHeight = 105.w;
+final double _kClassicCardHeight = 120.w;
 
-/// 瀑布流卡片样式（原 vertical）。
+/// 瀑布流卡片样式
 ///
 /// 适用于双列/多列瀑布流场景，内容区域采用“上图下文”结构。
 class WaterfallPreviewCard extends StatelessWidget {
   final String url;
-  final Metadata metadata;
-  final String? imageUrl;
+  final Note note;
   final bool hasContent;
   final VoidCallback onTap;
   final bool isDesktop;
   final String? publishDate;
   final bool isHovered;
-  final bool titleEnabled;
 
   const WaterfallPreviewCard({
     super.key,
     required this.url,
-    required this.metadata,
-    this.imageUrl,
+    required this.note,
     required this.hasContent,
     required this.onTap,
     this.isDesktop = false,
     this.publishDate,
     this.isHovered = false,
-    required this.titleEnabled,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bool isEmptyContent =
-        (metadata.title == null || metadata.title!.isEmpty) &&
-        (metadata.desc == null || metadata.desc!.isEmpty);
-    final bool isEmptyImage =
-        (metadata.image == null || metadata.image!.isEmpty);
+    final String? imageUrl = note.firstPreviewImage;
+    final bool isEmptyContent = note.hasNoTitle;
+    final bool isEmptyImage = imageUrl == null || imageUrl.isEmpty;
+
+    // 当图片和内容都为空时，固定高度以保持布局整齐
+    final double? fixedHeight = (isEmptyContent && isEmptyImage)
+        ? _kWaterfallPlaceholderContentHeight
+        : null;
 
     return _PreviewCardContainer(
-      isWaterfallLayout: true,
-      hasContent: hasContent,
-      isDesktop: isDesktop,
-      height: isEmptyContent && isEmptyImage
-          ? _kWaterfallPlaceholderContentHeight
-          : null,
+      borderRadius: (hasContent)
+          ? const BorderRadius.only(
+              topLeft: Radius.circular(16),
+              topRight: Radius.circular(16),
+            )
+          : BorderRadius.circular(16),
+      height: fixedHeight,
       onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          _CardImageSection(
-            imageUrl: imageUrl,
-            isWaterfallLayout: true,
-            isDesktop: isDesktop,
-          ),
+          _CardImageSection.waterfall(imageUrl: imageUrl, isDesktop: isDesktop),
           _WaterfallContentSection(
-            metadata: metadata,
-            fixedHeight: isEmptyContent,
+            note: note,
+            isFixedMode: isEmptyContent,
             isDesktop: isDesktop,
             publishDate: publishDate,
             isHovered: isHovered,
-            titleEnabled: titleEnabled,
           ),
         ],
       ),
@@ -74,41 +71,33 @@ class WaterfallPreviewCard extends StatelessWidget {
   }
 }
 
-/// 经典列表卡片样式（原 horizontal）。
+/// 经典列表卡片样式
 ///
 /// 适用于单列列表场景，内容结构为“左图右文”。
 class ClassicListPreviewCard extends StatelessWidget {
   final String url;
-  final Metadata metadata;
-  final String? imageUrl;
+  final Note note;
   final VoidCallback onTap;
   final String? publishDate;
-  final bool titleEnabled;
 
   const ClassicListPreviewCard({
     super.key,
     required this.url,
-    required this.metadata,
-    this.imageUrl,
+    required this.note,
     required this.onTap,
     this.publishDate,
-    required this.titleEnabled,
   });
 
   @override
   Widget build(BuildContext context) {
     return _PreviewCardContainer(
-      isWaterfallLayout: false,
-      height: 120,
+      borderRadius: BorderRadius.circular(16),
+      height: _kClassicCardHeight,
       onTap: onTap,
       child: Row(
         children: [
-          _CardImageSection(imageUrl: imageUrl, isWaterfallLayout: false),
-          _ClassicListContentSection(
-            metadata: metadata,
-            publishDate: publishDate,
-            titleEnabled: titleEnabled,
-          ),
+          _CardImageSection.classic(imageUrl: note.firstPreviewImage),
+          _ClassicListContentSection(note: note, publishDate: publishDate),
         ],
       ),
     );
@@ -121,40 +110,29 @@ class ClassicListPreviewCard extends StatelessWidget {
 class _PreviewCardContainer extends StatelessWidget {
   final Widget child;
   final VoidCallback? onTap;
-  final bool isWaterfallLayout;
-  final bool hasContent;
+  final BorderRadiusGeometry borderRadius;
   final double? height;
-  final bool isDesktop;
 
   const _PreviewCardContainer({
     required this.child,
     this.onTap,
-    required this.isWaterfallLayout,
-    this.hasContent = true,
+    required this.borderRadius,
     this.height,
-    this.isDesktop = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final borderRadius = (isWaterfallLayout && hasContent)
-        ? const BorderRadius.only(
-            topLeft: Radius.circular(16),
-            topRight: Radius.circular(16),
-          )
-        : BorderRadius.circular(16);
-
-    final decoration = BoxDecoration(
-      color: Theme.of(context).cardColor,
-      borderRadius: borderRadius,
-    );
-
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: borderRadius is BorderRadius
+          ? borderRadius as BorderRadius
+          : BorderRadius.circular(16),
       child: Container(
         height: height,
-        decoration: decoration,
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: borderRadius,
+        ),
         clipBehavior: Clip.antiAlias,
         child: child,
       ),
@@ -164,67 +142,74 @@ class _PreviewCardContainer extends StatelessWidget {
 
 class _CardImageSection extends StatelessWidget {
   final String? imageUrl;
-  final bool isWaterfallLayout;
+  final bool isWaterfall;
   final bool isDesktop;
 
-  const _CardImageSection({
+  const _CardImageSection._({
     required this.imageUrl,
-    required this.isWaterfallLayout,
+    required this.isWaterfall,
     this.isDesktop = false,
   });
 
+  factory _CardImageSection.waterfall({
+    required String? imageUrl,
+    bool isDesktop = false,
+  }) {
+    return _CardImageSection._(
+      imageUrl: imageUrl,
+      isWaterfall: true,
+      isDesktop: isDesktop,
+    );
+  }
+
+  factory _CardImageSection.classic({required String? imageUrl}) {
+    return _CardImageSection._(imageUrl: imageUrl, isWaterfall: false);
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (imageUrl == null) {
+    if (imageUrl == null || imageUrl!.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    if (isWaterfallLayout) {
+    final imageWidget = PMImage(
+      pathOrUrl: imageUrl!,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: isWaterfall ? null : double.infinity,
+    );
+
+    if (isWaterfall) {
       return ConstrainedBox(
         constraints: BoxConstraints(maxHeight: isDesktop ? 600.w : 350.w),
-        child: PMImage(
-          pathOrUrl: imageUrl!,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: null,
-        ),
+        child: imageWidget,
       );
     }
 
-    return SizedBox(
-      width: 120.w,
-      height: double.infinity,
-      child: PMImage(
-        pathOrUrl: imageUrl!,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-      ),
-    );
+    return SizedBox(width: 120.w, height: double.infinity, child: imageWidget);
   }
 }
 
 class _WaterfallContentSection extends StatelessWidget {
-  final Metadata metadata;
-  final bool fixedHeight;
+  final Note note;
+  final bool isFixedMode; // 重命名语义更清晰
   final bool isDesktop;
   final String? publishDate;
   final bool isHovered;
-  final bool titleEnabled;
 
   const _WaterfallContentSection({
-    required this.metadata,
-    this.fixedHeight = false,
+    required this.note,
+    this.isFixedMode = false,
     this.isDesktop = false,
     this.publishDate,
     this.isHovered = false,
-    required this.titleEnabled,
   });
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
 
     final titleStyle = textTheme.titleMedium?.copyWith(
       fontSize: isDesktop ? 20.sp : 17.sp,
@@ -238,82 +223,56 @@ class _WaterfallContentSection extends StatelessWidget {
 
     final padding = isDesktop ? 16.0 : 12.0;
 
-    if (fixedHeight) {
-      return Container(
-        height: _kWaterfallPlaceholderContentHeight,
-        padding: EdgeInsets.all(padding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (titleEnabled)
-              Text(
-                metadata.title ?? '预览失败',
-                style: titleStyle?.copyWith(
-                  color: metadata.title == null ? colorScheme.error : null,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            if (titleEnabled) SizedBox(height: 4.h),
-            Expanded(
-              child: Text(
-                metadata.desc ?? (metadata.title == null ? '无法获取该链接的预览信息' : ''),
-                style: descStyle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            SizedBox(height: 4.h),
-            SourceInfo(metadata: metadata, publishDate: publishDate),
-          ],
-        ),
-      );
-    }
-
-    return Padding(
-      padding: EdgeInsets.all(padding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (titleEnabled)
-            Text(
-              metadata.title ?? '预览失败',
-              style: titleStyle?.copyWith(
-                color: metadata.title == null ? colorScheme.error : null,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          if (titleEnabled) SizedBox(height: isDesktop ? 10.w : 8.w),
-          Text(
-            metadata.desc ?? (metadata.title == null ? '无法获取该链接的预览信息' : ''),
-            style: descStyle,
-            maxLines: isDesktop ? 4 : 3,
-            overflow: TextOverflow.ellipsis,
+    // 统一构建内容列，减少重复代码
+    final contentColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: isFixedMode ? MainAxisSize.max : MainAxisSize.min,
+      children: [
+        Text(
+          note.displayTitle,
+          style: titleStyle?.copyWith(
+            color: note.hasNoTitle ? colorScheme.error : null,
           ),
-          SizedBox(height: isDesktop ? 14.w : 12.w),
-          SourceInfo(metadata: metadata, publishDate: publishDate),
-        ],
-      ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        SizedBox(height: isDesktop ? 10.w : 8.w),
+        isFixedMode
+            ? Expanded(child: _buildDescText(note, descStyle, maxLines: 2))
+            : _buildDescText(note, descStyle, maxLines: isDesktop ? 4 : 3),
+        SizedBox(height: isDesktop ? 14.w : 12.w),
+        SourceInfo(url: note.url, publishDate: publishDate),
+      ],
+    );
+
+    return Container(
+      height: isFixedMode ? _kWaterfallPlaceholderContentHeight : null,
+      padding: EdgeInsets.all(padding),
+      child: contentColumn,
+    );
+  }
+
+  Widget _buildDescText(Note note, TextStyle? style, {required int maxLines}) {
+    return Text(
+      note.displayDescription,
+      style: style,
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }
 
 class _ClassicListContentSection extends StatelessWidget {
-  final Metadata metadata;
+  final Note note;
   final String? publishDate;
-  final bool titleEnabled;
 
-  const _ClassicListContentSection({
-    required this.metadata,
-    this.publishDate,
-    required this.titleEnabled,
-  });
+  const _ClassicListContentSection({required this.note, this.publishDate});
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
 
     return Expanded(
       child: Padding(
@@ -321,21 +280,20 @@ class _ClassicListContentSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (titleEnabled)
-              Text(
-                metadata.title ?? '预览失败，请检查网络连接',
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16.sp,
-                  color: metadata.title == null ? colorScheme.error : null,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            Text(
+              note.displayTitle,
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: 16.sp,
+                color: note.hasNoTitle ? colorScheme.error : null,
               ),
-            if (titleEnabled) const SizedBox(height: 4),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
             Expanded(
               child: Text(
-                metadata.desc ?? (metadata.title == null ? '无法获取该链接的预览信息' : ''),
+                note.displayDescription,
                 style: textTheme.bodySmall?.copyWith(
                   color: colorScheme.secondary,
                 ),
@@ -344,10 +302,23 @@ class _ClassicListContentSection extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            SourceInfo(metadata: metadata, publishDate: publishDate),
+            SourceInfo(url: note.url, publishDate: publishDate),
           ],
         ),
       ),
     );
   }
+}
+
+// 扩展方法定义
+extension NotePreviewExtension on Note {
+  String? get firstPreviewImage =>
+      previewImageUrls.isNotEmpty ? previewImageUrls.first : null;
+
+  bool get hasNoTitle => (previewTitle == null || previewTitle!.isEmpty);
+
+  String get displayTitle => hasNoTitle ? '预览失败' : previewTitle!;
+
+  String get displayDescription =>
+      previewContent ?? previewDescription ?? '无法获取该链接的预览信息';
 }
