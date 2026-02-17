@@ -1,8 +1,10 @@
 package com.doublez.pocketmindserver.ai.api;
 
+import com.doublez.pocketmindserver.ai.api.dto.AiImageAnalyzeRequest;
 import com.doublez.pocketmindserver.ai.api.dto.AiAnalyzeRequest;
 import com.doublez.pocketmindserver.ai.api.dto.AiAnalyzeResponse;
 import com.doublez.pocketmindserver.ai.application.AiAnalyzeService;
+import com.doublez.pocketmindserver.ai.application.VisionService;
 import com.doublez.pocketmindserver.shared.security.UserContext;
 import com.doublez.pocketmindserver.shared.web.ApiCode;
 import com.doublez.pocketmindserver.shared.web.BusinessException;
@@ -30,6 +32,8 @@ public class AiController {
 
     private final AiAnalyzeService aiAnalyzeService;
 
+    private final VisionService visionService;
+
     /**
      * AI 分析接口
      * 
@@ -47,5 +51,17 @@ public class AiController {
             throw new BusinessException(ApiCode.AI_RESPONSE_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
         }
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/analyze/image")
+    public String analyzeImage(@Valid @RequestBody AiImageAnalyzeRequest request) {
+        String userId = UserContext.getRequiredUserId();
+        log.info("收到图片识别请求 - userId: {}, path: {}", userId, request.localImagePath());
+
+        String response = visionService.analyzeImage(request.localImagePath());
+        if(response == null){
+            throw new BusinessException(ApiCode.AI_RESPONSE_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+        return response;
     }
 }
