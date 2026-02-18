@@ -7,6 +7,8 @@ import com.doublez.pocketmindserver.ai.observability.AiObservabilityProperties;
 import com.doublez.pocketmindserver.ai.observability.langfuse.LangfuseChatObservationAdvisor;
 import com.doublez.pocketmindserver.ai.observability.langfuse.AiLangfuseHttpBodyCaptureInterceptor;
 import com.doublez.pocketmindserver.ai.tools.observability.ObservedToolCallback;
+import com.doublez.pocketmindserver.shared.web.ApiCode;
+import com.doublez.pocketmindserver.shared.web.BusinessException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.chat.client.ChatClient;
@@ -23,6 +25,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.retry.RetryTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.client.BufferingClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
@@ -46,12 +49,62 @@ public class AiConfiguration {
      */
     @Bean
     public SmartInitializingSingleton aiProvidersStartupValidator(AiProvidersProperties providers) {
-        return () -> validateVisionFailoverRoutes(providers);
+        return () -> {
+            validateChatFailoverRoutes(providers);
+            validateVisionFailoverRoutes(providers);
+        };
+    }
+
+    private void validateChatFailoverRoutes(AiProvidersProperties providers) {
+        if (providers == null || providers.routes() == null) {
+            return;
+        }
+
+        boolean hasChatPrimary = StringUtils.hasText(providers.routes().chatPrimary());
+        if (!hasChatPrimary) {
+            throw new BusinessException(
+                    ApiCode.INTERNAL_ERROR,
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "必须配置 " + AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX + "." + AiProviderRouteKeys.CHAT_PRIMARY
+            );
+        }
+
+        String chatSecondary = providers.routes().chatSecondary();
+        String chatFallback = providers.routes().chatFallback();
+
+        boolean hasChatSecondary = StringUtils.hasText(chatSecondary);
+        boolean hasChatFallback = StringUtils.hasText(chatFallback);
+
+        // chat 链路：允许只配 secondary（主 -> 副），不强制要求 fallback。
+        if (!hasChatSecondary && hasChatFallback) {
+            throw new BusinessException(
+                    ApiCode.INTERNAL_ERROR,
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "chat-fallback 不能单独配置：请同时配置 chat-secondary，或仅配置 chat-secondary"
+            );
+        }
+
+        // 若配置了链路，则确保 config 合法。
+        if (hasChatSecondary) {
+            providers.resolveConfig(AiClientId.CHAT_SECONDARY);
+            if (hasChatFallback) {
+                providers.resolveConfig(AiClientId.CHAT_FALLBACK);
+            }
+        }
     }
 
     private void validateVisionFailoverRoutes(AiProvidersProperties providers) {
         if (providers == null || providers.routes() == null) {
             return;
+        }
+
+        boolean hasVisionPrimary = StringUtils.hasText(providers.routes().visionPrimary());
+        if (!hasVisionPrimary) {
+            throw new BusinessException(
+                    ApiCode.INTERNAL_ERROR,
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "必须配置 " + AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX + "." + AiProviderRouteKeys.VISION_PRIMARY
+            );
         }
 
         String visionSecondary = providers.routes().visionSecondary();
@@ -60,73 +113,104 @@ public class AiConfiguration {
         boolean hasVisionSecondary = StringUtils.hasText(visionSecondary);
         boolean hasVisionFallback = StringUtils.hasText(visionFallback);
 
-        if (hasVisionSecondary ^ hasVisionFallback) {
-            throw new IllegalStateException("vision-secondary 与 vision-fallback 必须同时配置（或同时不配）");
+        // 视觉链路：允许只配 secondary（主 -> 副），不强制要求 fallback。
+        if (!hasVisionSecondary && hasVisionFallback) {
+            throw new BusinessException(
+                    ApiCode.INTERNAL_ERROR,
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    AiProviderRouteKeys.VISION_FALLBACK + " 不能单独配置：请同时配置 " + AiProviderRouteKeys.VISION_SECONDARY + "，或仅配置 " + AiProviderRouteKeys.VISION_SECONDARY
+            );
         }
 
         // 若配置了链路，则确保 providerKey 存在且 config 合法。
         if (hasVisionSecondary) {
-            providers.resolveConfigByProviderKey(visionSecondary, "vision-secondary");
-            providers.resolveConfigByProviderKey(visionFallback, "vision-fallback");
+            providers.resolveConfig(AiClientId.VISION_SECONDARY);
+            if (hasVisionFallback) {
+                providers.resolveConfig(AiClientId.VISION_FALLBACK);
+            }
         }
     }
 
     // region ChatModel
 
-    @Bean("primaryChatModel")
+    @Bean(AiBeanNames.CHAT_PRIMARY_MODEL)
     public OpenAiChatModel primaryChatModel(AiProvidersProperties providers,
                                             AiHttpClientProperties httpClientProperties,
                                             AiObservabilityProperties observabilityProperties,
                                             ObservationRegistry observationRegistry,
                                             RetryTemplate retryTemplate) {
-        return buildChatModel(providers.resolveConfig(AiRole.PRIMARY), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
+        return buildChatModel(providers.resolveConfig(AiClientId.CHAT_PRIMARY), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
     }
 
-    @Bean("secondaryChatModel")
+    @Bean(AiBeanNames.CHAT_SECONDARY_MODEL)
+    @ConditionalOnProperty(prefix = AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX, name = AiProviderRouteKeys.CHAT_SECONDARY)
     public OpenAiChatModel secondaryChatModel(AiProvidersProperties providers,
                                               AiHttpClientProperties httpClientProperties,
                                               AiObservabilityProperties observabilityProperties,
                                               ObservationRegistry observationRegistry,
                                               RetryTemplate retryTemplate) {
-        return buildChatModel(providers.resolveConfig(AiRole.SECONDARY), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
+        return buildChatModel(providers.resolveConfig(AiClientId.CHAT_SECONDARY), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
     }
 
-    @Bean("fallbackChatModel")
+    @Bean(AiBeanNames.CHAT_FALLBACK_MODEL)
+    @ConditionalOnProperty(prefix = AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX, name = AiProviderRouteKeys.CHAT_FALLBACK)
     public OpenAiChatModel fallbackChatModel(AiProvidersProperties providers,
                                              AiHttpClientProperties httpClientProperties,
                                              AiObservabilityProperties observabilityProperties,
                                              ObservationRegistry observationRegistry,
                                              RetryTemplate retryTemplate) {
-        return buildChatModel(providers.resolveConfig(AiRole.FALLBACK), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
+        return buildChatModel(providers.resolveConfig(AiClientId.CHAT_FALLBACK), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
     }
 
-    @Bean("visionChatModel")
+    @Bean(AiBeanNames.VISION_PRIMARY_MODEL)
     public OpenAiChatModel visionChatModel(AiProvidersProperties providers,
                                            AiHttpClientProperties httpClientProperties,
                                            AiObservabilityProperties observabilityProperties,
                                            ObservationRegistry observationRegistry,
                                            RetryTemplate retryTemplate) {
-        return buildChatModel(providers.resolveConfig(AiRole.VISION), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
+        return buildChatModel(providers.resolveConfig(AiClientId.VISION_PRIMARY), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
     }
 
-    @Bean("imageChatModel")
-    @ConditionalOnProperty(prefix = "pocketmind.ai.providers.routes", name = "image")
+    // region Vision failover chain (optional)
+
+    @Bean(AiBeanNames.VISION_SECONDARY_MODEL)
+    @ConditionalOnProperty(prefix = AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX, name = AiProviderRouteKeys.VISION_SECONDARY)
+    public OpenAiChatModel visionSecondaryChatModel(AiProvidersProperties providers,
+                                                    AiHttpClientProperties httpClientProperties,
+                                                    AiObservabilityProperties observabilityProperties,
+                                                    ObservationRegistry observationRegistry,
+                                                    RetryTemplate retryTemplate) {
+        return buildChatModel(providers.resolveConfig(AiClientId.VISION_SECONDARY), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
+    }
+
+    @Bean(AiBeanNames.VISION_FALLBACK_MODEL)
+    @ConditionalOnProperty(prefix = AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX, name = AiProviderRouteKeys.VISION_FALLBACK)
+    public OpenAiChatModel visionFallbackChatModel(AiProvidersProperties providers,
+                                                   AiHttpClientProperties httpClientProperties,
+                                                   AiObservabilityProperties observabilityProperties,
+                                                   ObservationRegistry observationRegistry,
+                                                   RetryTemplate retryTemplate) {
+        return buildChatModel(providers.resolveConfig(AiClientId.VISION_FALLBACK), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
+    }
+
+    @Bean(AiBeanNames.IMAGE_MODEL)
+    @ConditionalOnProperty(prefix = AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX, name = AiProviderRouteKeys.IMAGE)
     public OpenAiChatModel imageChatModel(AiProvidersProperties providers,
                                           AiHttpClientProperties httpClientProperties,
                                           AiObservabilityProperties observabilityProperties,
                                           ObservationRegistry observationRegistry,
                                           RetryTemplate retryTemplate) {
-        return buildChatModel(providers.resolveConfig(AiRole.IMAGE), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
+        return buildChatModel(providers.resolveConfig(AiClientId.IMAGE), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
     }
 
-    @Bean("audioChatModel")
-    @ConditionalOnProperty(prefix = "pocketmind.ai.providers.routes", name = "audio")
+    @Bean(AiBeanNames.AUDIO_MODEL)
+    @ConditionalOnProperty(prefix = AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX, name = AiProviderRouteKeys.AUDIO)
     public OpenAiChatModel audioChatModel(AiProvidersProperties providers,
                                           AiHttpClientProperties httpClientProperties,
                                           AiObservabilityProperties observabilityProperties,
                                           ObservationRegistry observationRegistry,
                                           RetryTemplate retryTemplate) {
-        return buildChatModel(providers.resolveConfig(AiRole.AUDIO), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
+        return buildChatModel(providers.resolveConfig(AiClientId.AUDIO), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
     }
 
     private OpenAiChatModel buildChatModel(AiProvidersProperties.ProviderConfig config,
@@ -173,130 +257,104 @@ public class AiConfiguration {
         );
     }
 
-    // region Vision failover chain (optional)
-
-    @Bean("visionSecondaryChatModel")
-    @ConditionalOnProperty(prefix = "pocketmind.ai.providers.routes", name = "vision-secondary")
-    public OpenAiChatModel visionSecondaryChatModel(AiProvidersProperties providers,
-                                                    AiHttpClientProperties httpClientProperties,
-                                                    AiObservabilityProperties observabilityProperties,
-                                                    ObservationRegistry observationRegistry,
-                                                    RetryTemplate retryTemplate) {
-        String providerKey = providers.routes() == null ? null : providers.routes().visionSecondary();
-        AiProvidersProperties.ProviderConfig config = providers.resolveConfigByProviderKey(providerKey, "vision-secondary");
-        return buildChatModel(config, httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
-    }
-
-    @Bean("visionFallbackChatModel")
-    @ConditionalOnProperty(prefix = "pocketmind.ai.providers.routes", name = "vision-fallback")
-    public OpenAiChatModel visionFallbackChatModel(AiProvidersProperties providers,
-                                                   AiHttpClientProperties httpClientProperties,
-                                                   AiObservabilityProperties observabilityProperties,
-                                                   ObservationRegistry observationRegistry,
-                                                   RetryTemplate retryTemplate) {
-        String providerKey = providers.routes() == null ? null : providers.routes().visionFallback();
-        AiProvidersProperties.ProviderConfig config = providers.resolveConfigByProviderKey(providerKey, "vision-fallback");
-        return buildChatModel(config, httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
-    }
-
     // region ChatClient（多角色）
 
-    @Bean("primaryChatClient")
-    public ChatClient primaryChatClient(@Qualifier("primaryChatModel") OpenAiChatModel primaryChatModel,
+    @Bean(AiBeanNames.CHAT_PRIMARY_CLIENT)
+    public ChatClient primaryChatClient(@Qualifier(AiBeanNames.CHAT_PRIMARY_MODEL) OpenAiChatModel primaryChatModel,
                                         AiProvidersProperties providers,
                                         JsonMapper aiJsonMapper,
                                         AiObservabilityProperties observabilityProperties,
                                         ToolResultContextEngineeringProperties toolResultProps,
                                         List<ToolCallback> toolCallbacks) {
-        return buildChatClient(primaryChatModel, providers, providers.resolveConfig(AiRole.PRIMARY).model(), aiJsonMapper,
+        return buildChatClient(AiClientId.CHAT_PRIMARY, primaryChatModel, providers, providers.resolveConfig(AiClientId.CHAT_PRIMARY).model(), aiJsonMapper,
             observabilityProperties, toolResultProps, toolCallbacks);
     }
 
-    @Bean("secondaryChatClient")
-    public ChatClient secondaryChatClient(@Qualifier("secondaryChatModel") OpenAiChatModel secondaryChatModel,
+    @Bean(AiBeanNames.CHAT_SECONDARY_CLIENT)
+    @ConditionalOnProperty(prefix = AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX, name = AiProviderRouteKeys.CHAT_SECONDARY)
+    public ChatClient secondaryChatClient(@Qualifier(AiBeanNames.CHAT_SECONDARY_MODEL) OpenAiChatModel secondaryChatModel,
                                           AiProvidersProperties providers,
                                           JsonMapper aiJsonMapper,
                                           AiObservabilityProperties observabilityProperties,
                                           ToolResultContextEngineeringProperties toolResultProps,
                                           List<ToolCallback> toolCallbacks) {
-        return buildChatClient(secondaryChatModel, providers, providers.resolveConfig(AiRole.SECONDARY).model(), aiJsonMapper,
+        return buildChatClient(AiClientId.CHAT_SECONDARY, secondaryChatModel, providers, providers.resolveConfig(AiClientId.CHAT_SECONDARY).model(), aiJsonMapper,
             observabilityProperties, toolResultProps, toolCallbacks);
     }
 
-    @Bean("fallbackChatClient")
-    public ChatClient fallbackChatClient(@Qualifier("fallbackChatModel") OpenAiChatModel fallbackChatModel,
+    @Bean(AiBeanNames.CHAT_FALLBACK_CLIENT)
+    @ConditionalOnProperty(prefix = AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX, name = AiProviderRouteKeys.CHAT_FALLBACK)
+    public ChatClient fallbackChatClient(@Qualifier(AiBeanNames.CHAT_FALLBACK_MODEL) OpenAiChatModel fallbackChatModel,
                                          AiProvidersProperties providers,
                                          JsonMapper aiJsonMapper,
                                          AiObservabilityProperties observabilityProperties,
                                          ToolResultContextEngineeringProperties toolResultProps,
                                          List<ToolCallback> toolCallbacks) {
-        return buildChatClient(fallbackChatModel, providers, providers.resolveConfig(AiRole.FALLBACK).model(), aiJsonMapper,
+        return buildChatClient(AiClientId.CHAT_FALLBACK, fallbackChatModel, providers, providers.resolveConfig(AiClientId.CHAT_FALLBACK).model(), aiJsonMapper,
             observabilityProperties, toolResultProps, toolCallbacks);
     }
 
-    @Bean("visionChatClient")
-    public ChatClient visionChatClient(@Qualifier("visionChatModel") OpenAiChatModel visionChatModel,
+    @Bean(AiBeanNames.VISION_PRIMARY_CLIENT)
+    public ChatClient visionChatClient(@Qualifier(AiBeanNames.VISION_PRIMARY_MODEL) OpenAiChatModel visionChatModel,
                                        AiProvidersProperties providers,
                                        JsonMapper aiJsonMapper,
                                        AiObservabilityProperties observabilityProperties,
                                        ToolResultContextEngineeringProperties toolResultProps,
                                        List<ToolCallback> toolCallbacks) {
-        return buildChatClient(visionChatModel, providers, providers.resolveConfig(AiRole.VISION).model(), aiJsonMapper,
+        return buildChatClient(AiClientId.VISION_PRIMARY, visionChatModel, providers, providers.resolveConfig(AiClientId.VISION_PRIMARY).model(), aiJsonMapper,
                 observabilityProperties, toolResultProps, toolCallbacks);
     }
 
-    @Bean("visionSecondaryChatClient")
-    @ConditionalOnProperty(prefix = "pocketmind.ai.providers.routes", name = "vision-secondary")
-    public ChatClient visionSecondaryChatClient(@Qualifier("visionSecondaryChatModel") OpenAiChatModel chatModel,
+    @Bean(AiBeanNames.VISION_SECONDARY_CLIENT)
+    @ConditionalOnProperty(prefix = AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX, name = AiProviderRouteKeys.VISION_SECONDARY)
+        public ChatClient visionSecondaryChatClient(@Qualifier(AiBeanNames.VISION_SECONDARY_MODEL) OpenAiChatModel visionSecondaryModel,
                                                 AiProvidersProperties providers,
                                                 JsonMapper aiJsonMapper,
                                                 AiObservabilityProperties observabilityProperties,
                                                 ToolResultContextEngineeringProperties toolResultProps,
                                                 List<ToolCallback> toolCallbacks) {
-        String providerKey = providers.routes() == null ? null : providers.routes().visionSecondary();
-        String modelName = providers.resolveConfigByProviderKey(providerKey, "vision-secondary").model();
-        return buildChatClient(chatModel, providers, modelName, aiJsonMapper, observabilityProperties, toolResultProps, toolCallbacks);
+        return buildChatClient(AiClientId.VISION_SECONDARY, visionSecondaryModel, providers, providers.resolveConfig(AiClientId.VISION_SECONDARY).model(), aiJsonMapper,
+            observabilityProperties, toolResultProps, toolCallbacks);
     }
 
-    @Bean("visionFallbackChatClient")
-    @ConditionalOnProperty(prefix = "pocketmind.ai.providers.routes", name = "vision-fallback")
-    public ChatClient visionFallbackChatClient(@Qualifier("visionFallbackChatModel") OpenAiChatModel chatModel,
+    @Bean(AiBeanNames.VISION_FALLBACK_CLIENT)
+    @ConditionalOnProperty(prefix = AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX, name = AiProviderRouteKeys.VISION_FALLBACK)
+    public ChatClient visionFallbackChatClient(@Qualifier(AiBeanNames.VISION_FALLBACK_MODEL) OpenAiChatModel chatModel,
                                                AiProvidersProperties providers,
                                                JsonMapper aiJsonMapper,
                                                AiObservabilityProperties observabilityProperties,
                                                ToolResultContextEngineeringProperties toolResultProps,
                                                List<ToolCallback> toolCallbacks) {
-        String providerKey = providers.routes() == null ? null : providers.routes().visionFallback();
-        String modelName = providers.resolveConfigByProviderKey(providerKey, "vision-fallback").model();
-        return buildChatClient(chatModel, providers, modelName, aiJsonMapper, observabilityProperties, toolResultProps, toolCallbacks);
+        return buildChatClient(AiClientId.VISION_FALLBACK, chatModel, providers, providers.resolveConfig(AiClientId.VISION_FALLBACK).model(), aiJsonMapper, observabilityProperties, toolResultProps, toolCallbacks);
     }
 
-    @Bean("imageChatClient")
-    @ConditionalOnProperty(prefix = "pocketmind.ai.providers.routes", name = "image")
-    public ChatClient imageChatClient(@Qualifier("imageChatModel") OpenAiChatModel imageChatModel,
+    @Bean(AiBeanNames.IMAGE_CLIENT)
+    @ConditionalOnProperty(prefix = AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX, name = AiProviderRouteKeys.IMAGE)
+    public ChatClient imageChatClient(@Qualifier(AiBeanNames.IMAGE_MODEL) OpenAiChatModel imageChatModel,
                                       AiProvidersProperties providers,
                                       JsonMapper aiJsonMapper,
                                       AiObservabilityProperties observabilityProperties,
                                       ToolResultContextEngineeringProperties toolResultProps,
                                       List<ToolCallback> toolCallbacks) {
-        return buildChatClient(imageChatModel, providers, providers.resolveConfig(AiRole.IMAGE).model(), aiJsonMapper,
+        return buildChatClient(AiClientId.IMAGE, imageChatModel, providers, providers.resolveConfig(AiClientId.IMAGE).model(), aiJsonMapper,
             observabilityProperties, toolResultProps, toolCallbacks);
     }
 
-    @Bean("audioChatClient")
-    @ConditionalOnProperty(prefix = "pocketmind.ai.providers.routes", name = "audio")
-    public ChatClient audioChatClient(@Qualifier("audioChatModel") OpenAiChatModel audioChatModel,
+    @Bean(AiBeanNames.AUDIO_CLIENT)
+    @ConditionalOnProperty(prefix = AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX, name = AiProviderRouteKeys.AUDIO)
+    public ChatClient audioChatClient(@Qualifier(AiBeanNames.AUDIO_MODEL) OpenAiChatModel audioChatModel,
                                       AiProvidersProperties providers,
                                       JsonMapper aiJsonMapper,
                                       AiObservabilityProperties observabilityProperties,
                                       ToolResultContextEngineeringProperties toolResultProps,
                                       List<ToolCallback> toolCallbacks) {
-        return buildChatClient(audioChatModel, providers, providers.resolveConfig(AiRole.AUDIO).model(), aiJsonMapper,
+        return buildChatClient(AiClientId.AUDIO, audioChatModel, providers, providers.resolveConfig(AiClientId.AUDIO).model(), aiJsonMapper,
             observabilityProperties, toolResultProps, toolCallbacks);
     }
 
-    private ChatClient buildChatClient(OpenAiChatModel chatModel,
-                           AiProvidersProperties providers,
+    private ChatClient buildChatClient(AiClientId clientId,
+                                       OpenAiChatModel chatModel,
+                                       AiProvidersProperties providers,
                                        String modelName,
                                        JsonMapper aiJsonMapper,
                                        AiObservabilityProperties observabilityProperties,
@@ -304,29 +362,52 @@ public class AiConfiguration {
                                        List<ToolCallback> toolCallbacks) {
         ChatClient.Builder builder = ChatClient.builder(chatModel);
 
+        List<ToolCallback> selectedToolCallbacks = filterToolCallbacksForClient(clientId, toolCallbacks);
+
         // 1) Langfuse 展示适配（业务侧独立开关，禁止使用 demo 配置）。
         if (observabilityProperties.langfuse().enabled()) {
             builder.defaultAdvisors(new LangfuseChatObservationAdvisor(aiJsonMapper));
         }
 
-        // 2) 工具调用：默认 advisor（非 demo），以及可选的 tool-result 剪枝。
+        // 2) 工具调用：默认 advisor），以及可选的 tool-result 剪枝。
         //    注意：只有在存在 tool callback 时才挂载 tool advisor，避免无工具场景引入额外复杂度。
-        if (toolCallbacks != null && !toolCallbacks.isEmpty()) {
+        if (!selectedToolCallbacks.isEmpty()) {
             ToolCallAdvisor toolCallAdvisor = buildToolCallAdvisor(providers, toolResultContextEngineeringProperties, modelName);
             builder.defaultAdvisors(toolCallAdvisor);
         }
 
-        // 3) ChatClient 调试日志（业务侧独立开关）。
+        // 3) ChatClient 调试日志。
         if (observabilityProperties.chat().simpleLoggerEnabled()) {
             builder.defaultAdvisors(new SimpleLoggerAdvisor());
         }
 
         // 4) 默认工具回调：如果业务侧注册了 ToolCallback，则默认启用（并按开关做观测包装）。
-        if (toolCallbacks != null && !toolCallbacks.isEmpty()) {
-            builder.defaultToolCallbacks(wrapToolCallbacks(toolCallbacks, observabilityProperties, modelName));
+        if (!selectedToolCallbacks.isEmpty()) {
+            builder.defaultToolCallbacks(wrapToolCallbacks(selectedToolCallbacks, observabilityProperties, modelName));
         }
 
         return builder.build();
+    }
+
+    private List<ToolCallback> filterToolCallbacksForClient(AiClientId clientId, List<ToolCallback> toolCallbacks) {
+        if (toolCallbacks == null || toolCallbacks.isEmpty()) {
+            return List.of();
+        }
+        if (clientId == null) {
+            return List.of();
+        }
+
+        // 视觉不提供工具；对话提供 Skills/FileSystem/Shell 三类工具。
+        // 当前工程工具来源（AiToolsConfiguration）就是这三类，因此对话侧直接启用全部 ToolCallback 即可。
+        if (clientId.isVision()) {
+            return List.of();
+        }
+        if (clientId.isChat()) {
+            return toolCallbacks;
+        }
+
+        // 其他类型默认不启用工具（如 image/audio）。
+        return List.of();
     }
 
     // endregion
@@ -344,11 +425,11 @@ public class AiConfiguration {
 
             // 强约束：开启剪枝时，必须为当前模型显式配置上下文窗口。
             if (!hasExplicitWindowTokensForModel(windowTokens, modelName)) {
-            throw new IllegalStateException(
-                "已开启 pocketmind.context-engineering.tool-result.enabled=true，但未为当前模型配置 window-tokens：model="
-                    + (modelName == null ? "" : modelName)
+                throw new BusinessException(ApiCode.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
+                        "已开启 pocketmind.context-engineering.tool-result.enabled=true，但未为当前模型配置 window-tokens：model="
+                                + (modelName == null ? "" : modelName)
                                 + "。请在 pocketmind.ai.providers.configs.*.window-tokens 或 pocketmind.context-engineering.tool-result.model-window-tokens 中显式配置。"
-            );
+                );
             }
 
             TrustedModelContextWindowResolver resolver = new TrustedModelContextWindowResolver(
@@ -468,35 +549,4 @@ public class AiConfiguration {
         return result.toArray(new ToolCallback[0]);
     }
 
-    private Map<String, Integer> parseModelWindowOverrides(String overrides) {
-        if (overrides == null || overrides.isBlank()) {
-            return Map.of();
-        }
-
-        // 格式：deepseek-chat:64000,deepseek-reasoner:64000
-        Map<String, Integer> map = new HashMap<>();
-        String[] pairs = overrides.split(",");
-        for (String pair : pairs) {
-            if (pair == null || pair.isBlank()) {
-                continue;
-            }
-            String[] parts = pair.trim().split(":");
-            if (parts.length != 2) {
-                continue;
-            }
-            String key = parts[0].trim();
-            String value = parts[1].trim();
-            if (key.isEmpty() || value.isEmpty()) {
-                continue;
-            }
-            try {
-                int tokens = Integer.parseInt(value);
-                if (tokens > 0) {
-                    map.put(key, tokens);
-                }
-            } catch (NumberFormatException ignored) {
-            }
-        }
-        return map;
-    }
 }

@@ -4,7 +4,7 @@ import org.springaicommunity.agent.tools.FileSystemTools;
 import org.springaicommunity.agent.tools.ShellTools;
 import org.springaicommunity.agent.tools.SkillsTool;
 import com.doublez.pocketmindserver.ai.config.AiProvidersProperties;
-import com.doublez.pocketmindserver.ai.config.AiRole;
+import com.doublez.pocketmindserver.ai.config.AiClientId;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.ai.chat.client.ChatClient;
@@ -81,7 +81,7 @@ public class SkillDemoConfiguration {
     public OpenAiChatModel skillDemoOpenAiChatModel(AiProvidersProperties providers,
                                                     ObservationRegistry observationRegistry,
                                                     RetryTemplate retryTemplate) {
-        AiProvidersProperties.ProviderConfig providerConfig = providers.resolveConfig(AiRole.PRIMARY);
+        AiProvidersProperties.ProviderConfig providerConfig = providers.resolveConfig(AiClientId.CHAT_PRIMARY);
 
         SimpleClientHttpRequestFactory baseFactory = new SimpleClientHttpRequestFactory();
         RestClient.Builder restClientBuilder = RestClient.builder()
@@ -114,7 +114,7 @@ public class SkillDemoConfiguration {
     public ChatClient skillBaselineChatClient(AiProvidersProperties providers,
                                               OpenAiChatModel skillDemoOpenAiChatModel,
                                               ObjectMapper objectMapper) {
-        String modelName = providers.resolveConfig(AiRole.PRIMARY).model();
+        String modelName = providers.resolveConfig(AiClientId.CHAT_PRIMARY).model();
         return buildSkillChatClient(providers, skillDemoOpenAiChatModel, objectMapper, modelName, "raw", false);
     }
 
@@ -125,7 +125,7 @@ public class SkillDemoConfiguration {
     public ChatClient skillPrunedChatClient(AiProvidersProperties providers,
                                             OpenAiChatModel skillDemoOpenAiChatModel,
                                             ObjectMapper objectMapper) {
-        String modelName = providers.resolveConfig(AiRole.PRIMARY).model();
+        String modelName = providers.resolveConfig(AiClientId.CHAT_PRIMARY).model();
         return buildSkillChatClient(providers, skillDemoOpenAiChatModel, objectMapper, modelName, "pruned", true);
     }
 

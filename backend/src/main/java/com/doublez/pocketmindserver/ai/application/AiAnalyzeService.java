@@ -2,6 +2,9 @@ package com.doublez.pocketmindserver.ai.application;
 
 import com.doublez.pocketmindserver.ai.api.dto.AiAnalyzeRequest;
 import com.doublez.pocketmindserver.ai.api.dto.AiAnalyzeResponse;
+import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
+import com.doublez.pocketmindserver.shared.web.ApiCode;
+import com.doublez.pocketmindserver.shared.web.BusinessException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -11,6 +14,7 @@ import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
 import java.util.Map;
@@ -55,7 +59,13 @@ public class AiAnalyzeService {
             return new AiAnalyzeResponse<>(mode, request.userQuestion(), finalResult);
         } catch (Exception e) {
             log.error("AI 分析服务异常 - userId: {}, mode: {}", userId, mode, e);
-            throw new RuntimeException("AI 分析服务暂时不可用: " + e.getMessage(), e);
+            BusinessException ex = new BusinessException(
+                    ApiCode.AI_RESPONSE_ERROR,
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "AI 分析服务暂时不可用"
+            );
+            ex.initCause(e);
+            throw ex;
         }
     }
 

@@ -28,8 +28,6 @@ class AiProvidersPropertiesTest {
         );
 
         AiProvidersProperties props = new AiProvidersProperties(
-                "deepseek",
-                "dashscope",
                 new AiProvidersProperties.Routes(
                         "dashscope",
                         "deepseek",
@@ -46,13 +44,13 @@ class AiProvidersPropertiesTest {
                 )
         );
 
-        assertEquals("qwen", props.resolveConfig(AiRole.PRIMARY).model());
-        assertEquals("deepseek-chat", props.resolveConfig(AiRole.SECONDARY).model());
-        assertEquals("qwen", props.resolveConfig(AiRole.VISION).model());
+        assertEquals("qwen", props.resolveConfig(AiClientId.CHAT_PRIMARY).model());
+        assertEquals("deepseek-chat", props.resolveConfig(AiClientId.CHAT_SECONDARY).model());
+        assertEquals("qwen", props.resolveConfig(AiClientId.VISION_PRIMARY).model());
     }
 
     @Test
-    void resolveConfig_shouldFallbackToActiveChatAndVision() {
+    void resolveConfig_shouldThrowWhenRoutesMissing() {
         AiProvidersProperties.ProviderConfig deepseek = new AiProvidersProperties.ProviderConfig(
                 "k1",
                 "https://api.deepseek.com",
@@ -67,8 +65,6 @@ class AiProvidersPropertiesTest {
         );
 
         AiProvidersProperties props = new AiProvidersProperties(
-                "deepseek",
-                "dashscope",
                 null,
                 Map.of(
                         "deepseek", deepseek,
@@ -76,20 +72,13 @@ class AiProvidersPropertiesTest {
                 )
         );
 
-        assertEquals("deepseek-chat", props.resolveConfig(AiRole.PRIMARY).model());
-        assertEquals("deepseek-chat", props.resolveConfig(AiRole.FALLBACK).model());
-        assertEquals("qwen", props.resolveConfig(AiRole.VISION).model());
+        assertThrows(RuntimeException.class, () -> props.resolveConfig(AiClientId.CHAT_PRIMARY));
     }
 
     @Test
     void resolveConfig_shouldThrowWhenMissing() {
-        AiProvidersProperties props = new AiProvidersProperties(
-                "",
-                "",
-                null,
-                Map.of()
-        );
+                AiProvidersProperties props = new AiProvidersProperties(null, Map.of());
 
-        assertThrows(IllegalStateException.class, () -> props.resolveConfig(AiRole.PRIMARY));
+        assertThrows(RuntimeException.class, () -> props.resolveConfig(AiClientId.CHAT_PRIMARY));
     }
 }

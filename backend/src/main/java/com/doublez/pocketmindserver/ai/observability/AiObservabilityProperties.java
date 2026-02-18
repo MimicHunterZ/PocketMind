@@ -58,7 +58,7 @@ public record AiObservabilityProperties(
     }
 
     /**
-     * 工具调用观测（业务侧）：用于工具调用场景的日志与 Langfuse observation 字段补齐。
+     * 工具调用观测 用于工具调用场景的日志与 Langfuse observation 字段补齐。
      */
     public record Tool(
             boolean enabled,

@@ -1,5 +1,6 @@
 package com.doublez.pocketmindserver.ai.application;
 
+import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Answers;
@@ -33,10 +34,17 @@ class VisionServiceTest {
         ChatClient vision = Mockito.mock(ChatClient.class, Answers.RETURNS_DEEP_STUBS);
 
         @SuppressWarnings("unchecked")
-        ObjectProvider<ChatClient> emptyProvider = Mockito.mock(ObjectProvider.class);
-        Mockito.when(emptyProvider.getIfAvailable()).thenReturn(null);
+        ObjectProvider<ChatClient> chatSecondaryProvider = Mockito.mock(ObjectProvider.class);
+        ObjectProvider<ChatClient> chatFallbackProvider = Mockito.mock(ObjectProvider.class);
+        ObjectProvider<ChatClient> visionSecondaryProvider = Mockito.mock(ObjectProvider.class);
+        ObjectProvider<ChatClient> visionFallbackProvider = Mockito.mock(ObjectProvider.class);
 
-        AiFailoverRouter router = new AiFailoverRouter(primary, secondary, fallback, vision, emptyProvider, emptyProvider);
+        Mockito.when(chatSecondaryProvider.getIfAvailable()).thenReturn(secondary);
+        Mockito.when(chatFallbackProvider.getIfAvailable()).thenReturn(fallback);
+        Mockito.when(visionSecondaryProvider.getIfAvailable()).thenReturn(null);
+        Mockito.when(visionFallbackProvider.getIfAvailable()).thenReturn(null);
+
+        AiFailoverRouter router = new AiFailoverRouter(primary, vision, chatSecondaryProvider, chatFallbackProvider, visionSecondaryProvider, visionFallbackProvider);
         VisionService service = new VisionService(
             router,
                 new ByteArrayResource("sys".getBytes()),
@@ -56,10 +64,17 @@ class VisionServiceTest {
         ChatClient vision = Mockito.mock(ChatClient.class, Answers.RETURNS_DEEP_STUBS);
 
         @SuppressWarnings("unchecked")
-        ObjectProvider<ChatClient> emptyProvider = Mockito.mock(ObjectProvider.class);
-        Mockito.when(emptyProvider.getIfAvailable()).thenReturn(null);
+        ObjectProvider<ChatClient> chatSecondaryProvider = Mockito.mock(ObjectProvider.class);
+        ObjectProvider<ChatClient> chatFallbackProvider = Mockito.mock(ObjectProvider.class);
+        ObjectProvider<ChatClient> visionSecondaryProvider = Mockito.mock(ObjectProvider.class);
+        ObjectProvider<ChatClient> visionFallbackProvider = Mockito.mock(ObjectProvider.class);
 
-        AiFailoverRouter router = new AiFailoverRouter(primary, secondary, fallback, vision, emptyProvider, emptyProvider);
+        Mockito.when(chatSecondaryProvider.getIfAvailable()).thenReturn(secondary);
+        Mockito.when(chatFallbackProvider.getIfAvailable()).thenReturn(fallback);
+        Mockito.when(visionSecondaryProvider.getIfAvailable()).thenReturn(null);
+        Mockito.when(visionFallbackProvider.getIfAvailable()).thenReturn(null);
+
+        AiFailoverRouter router = new AiFailoverRouter(primary, vision, chatSecondaryProvider, chatFallbackProvider, visionSecondaryProvider, visionFallbackProvider);
 
         // 明确匹配 Consumer 重载，避免与 system(Resource)/user(Resource) 冲突。
         Mockito.when(vision.prompt()

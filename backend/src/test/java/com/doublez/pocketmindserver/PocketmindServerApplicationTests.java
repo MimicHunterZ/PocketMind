@@ -48,8 +48,10 @@ import com.doublez.pocketmindserver.resource.infra.persistence.ResourceMetadataR
     "spring.sql.init.mode=never",
 
     // 多厂商路由（业务侧）：提供 dummy 值让 contextLoads 能启动。
-    "pocketmind.ai.providers.active-chat=deepseek",
-    "pocketmind.ai.providers.active-vision=dashscope",
+    "pocketmind.ai.providers.routes.chat-primary=deepseek",
+    "pocketmind.ai.providers.routes.chat-secondary=deepseek",
+    "pocketmind.ai.providers.routes.chat-fallback=deepseek",
+    "pocketmind.ai.providers.routes.vision-primary=dashscope",
 
     // EmailServiceImpl 依赖：避免缺少 spring.mail.username 导致容器启动失败。
     "spring.mail.username=dummy@pocketmind.local",

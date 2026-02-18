@@ -1,11 +1,15 @@
 package com.doublez.pocketmindserver.ai.application;
 
+import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
+import com.doublez.pocketmindserver.shared.web.ApiCode;
+import com.doublez.pocketmindserver.shared.web.BusinessException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StreamUtils;
 import org.springframework.util.MimeTypeUtils;
+import org.springframework.http.HttpStatus;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -60,7 +64,13 @@ public class VisionService {
         try {
             return StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new IllegalStateException("读取提示词资源失败: " + resource.getDescription(), e);
+            BusinessException ex = new BusinessException(
+                    ApiCode.INTERNAL_ERROR,
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "读取提示词资源失败: " + resource.getDescription()
+            );
+            ex.initCause(e);
+            throw ex;
         }
     }
 }

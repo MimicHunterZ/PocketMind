@@ -1,5 +1,8 @@
 package com.doublez.pocketmindserver.ai.config;
 
+import com.doublez.pocketmindserver.shared.web.ApiCode;
+import com.doublez.pocketmindserver.shared.web.BusinessException;
+import org.springframework.http.HttpStatus;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.HashMap;
@@ -13,9 +16,6 @@ import java.util.Map;
  */
 @ConfigurationProperties(prefix = "pocketmind.ai.providers")
 public record AiProvidersProperties(
-        String activeChat,
-        String activeVision,
-
         Routes routes,
         Map<String, ProviderConfig> configs
 ) {
@@ -30,10 +30,26 @@ public record AiProvidersProperties(
      * 角色路由：每个角色指定一个 provider key（对应 configs 的 key）。
      */
     public record Routes(
-            String primary,
-            String secondary,
-            String fallback,
-            String vision,
+            /**
+             * 对话主模型路由（chat-primary）。
+             */
+            String chatPrimary,
+
+            /**
+             * 对话副模型路由（chat-secondary）。
+             */
+            String chatSecondary,
+
+            /**
+             * 对话兜底模型路由（chat-fallback）。
+             */
+            String chatFallback,
+
+            /**
+             * 视觉主模型路由（vision-primary）。
+             */
+            String visionPrimary,
+
             /**
              * vision 专用降级链路（可选）：当 vision 失败时使用的“第二候选”。
              */
@@ -65,24 +81,14 @@ public record AiProvidersProperties(
     ) {
     }
 
-    public ProviderConfig resolveConfigByProviderKey(String providerKey, String purpose) {
-        if (providerKey == null || providerKey.isBlank()) {
-            throw new IllegalStateException("未配置 providerKey: purpose=" + purpose);
-        }
-        ProviderConfig config = configs.get(providerKey.trim());
-        if (config == null) {
-            throw new IllegalStateException("未找到 provider 配置：providerKey=" + providerKey + ", purpose=" + purpose);
-        }
-        validateConfig(config, providerKey.trim(), purpose);
-        return config;
-    }
-
-    public String resolveProviderKey(AiRole role) {
-        String byRoute = routes == null ? null : switch (role) {
-            case PRIMARY -> routes.primary();
-            case SECONDARY -> routes.secondary();
-            case FALLBACK -> routes.fallback();
-            case VISION -> routes.vision();
+    public String resolveProviderKey(AiClientId clientId) {
+        String byRoute = routes == null ? null : switch (clientId) {
+            case CHAT_PRIMARY -> routes.chatPrimary();
+            case CHAT_SECONDARY -> routes.chatSecondary();
+            case CHAT_FALLBACK -> routes.chatFallback();
+            case VISION_PRIMARY -> routes.visionPrimary();
+            case VISION_SECONDARY -> routes.visionSecondary();
+            case VISION_FALLBACK -> routes.visionFallback();
             case IMAGE -> routes.image();
             case AUDIO -> routes.audio();
         };
@@ -90,44 +96,37 @@ public record AiProvidersProperties(
         if (byRoute != null && !byRoute.isBlank()) {
             return byRoute.trim();
         }
-
-        // 兼容：如果没有 routes，则沿用 activeChat / activeVision。
-        if (role == AiRole.VISION) {
-            if (activeVision != null && !activeVision.isBlank()) {
-                return activeVision.trim();
-            }
-        }
-
-        if (activeChat != null && !activeChat.isBlank()) {
-            return activeChat.trim();
-        }
-
         return "";
     }
 
-    public ProviderConfig resolveConfig(AiRole role) {
-        String providerKey = resolveProviderKey(role);
+    public ProviderConfig resolveConfig(AiClientId clientId) {
+        String providerKey = resolveProviderKey(clientId);
         if (providerKey.isBlank()) {
-            throw new IllegalStateException("未配置 provider 路由：role=" + role);
+            throw new BusinessException(ApiCode.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
+                    "未配置 provider 路由：clientId=" + clientId);
         }
 
         ProviderConfig config = configs.get(providerKey);
         if (config == null) {
-            throw new IllegalStateException("未找到 provider 配置：providerKey=" + providerKey + ", role=" + role);
+            throw new BusinessException(ApiCode.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
+                    "未找到 provider 配置：providerKey=" + providerKey + ", clientId=" + clientId);
         }
-        validateConfig(config, providerKey, "role=" + role);
+        validateConfig(config, providerKey, "clientId=" + clientId);
         return config;
     }
 
     private void validateConfig(ProviderConfig config, String providerKey, String purpose) {
         if (config.baseUrl() == null || config.baseUrl().isBlank()) {
-            throw new IllegalStateException("provider.base-url 不能为空：providerKey=" + providerKey + ", " + purpose);
+            throw new BusinessException(ApiCode.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
+                    "provider.base-url 不能为空：providerKey=" + providerKey + ", " + purpose);
         }
         if (config.apiKey() == null || config.apiKey().isBlank()) {
-            throw new IllegalStateException("provider.api-key 不能为空：providerKey=" + providerKey + ", " + purpose);
+            throw new BusinessException(ApiCode.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
+                    "provider.api-key 不能为空：providerKey=" + providerKey + ", " + purpose);
         }
         if (config.model() == null || config.model().isBlank()) {
-            throw new IllegalStateException("provider.model 不能为空：providerKey=" + providerKey + ", " + purpose);
+            throw new BusinessException(ApiCode.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
+                    "provider.model 不能为空：providerKey=" + providerKey + ", " + purpose);
         }
     }
 }
