@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.amqp.rabbit.connection.Connection;
@@ -11,6 +12,15 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 
 import com.doublez.pocketmindserver.auth.infra.persistence.UserAccountRepository;
 import com.doublez.pocketmindserver.resource.infra.persistence.ResourceMetadataRepository;
+import com.doublez.pocketmindserver.note.infra.persistence.note.NoteMapper;
+import com.doublez.pocketmindserver.note.infra.persistence.category.CategoryMapper;
+import com.doublez.pocketmindserver.note.infra.persistence.tag.TagMapper;
+import com.doublez.pocketmindserver.note.infra.persistence.note.NoteTagRelationMapper;
+import com.doublez.pocketmindserver.attachment.infra.persistence.attachment.AttachmentMapper;
+import com.doublez.pocketmindserver.attachment.infra.persistence.vision.AttachmentVisionMapper;
+import com.doublez.pocketmindserver.chat.infra.persistence.session.ChatSessionMapper;
+import com.doublez.pocketmindserver.chat.infra.persistence.message.ChatMessageMapper;
+import com.doublez.pocketmindserver.sync.infra.persistence.SyncChangeLogMapper;
 
 @SpringBootTest(properties = {
     // 避免 application.yml 默认激活 dev。
@@ -74,6 +84,17 @@ import com.doublez.pocketmindserver.resource.infra.persistence.ResourceMetadataR
     "pocketmind.ai.providers.configs.dashscope.model=qwen3.5-plus"
 })
 class PocketmindServerApplicationTests {
+
+    // Mock 所有 MyBatis Mapper 接口，避免 DataSource 不可用时容器启动失败
+    @MockitoBean NoteMapper noteMapper;
+    @MockitoBean CategoryMapper categoryMapper;
+    @MockitoBean TagMapper tagMapper;
+    @MockitoBean NoteTagRelationMapper noteTagRelationMapper;
+    @MockitoBean AttachmentMapper attachmentMapper;
+    @MockitoBean AttachmentVisionMapper attachmentVisionMapper;
+    @MockitoBean ChatSessionMapper chatSessionMapper;
+    @MockitoBean ChatMessageMapper chatMessageMapper;
+    @MockitoBean SyncChangeLogMapper syncChangeLogMapper;
 
     @TestConfiguration
     static class TestOverrides {

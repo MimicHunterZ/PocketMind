@@ -1,6 +1,7 @@
 package com.doublez.pocketmindserver.resource.infra.persistence;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.doublez.pocketmindserver.resource.domain.Resource;
 import com.doublez.pocketmindserver.resource.domain.ResourceRepository;
 import org.springframework.stereotype.Repository;
@@ -42,7 +43,6 @@ public class MybatisResourceRepository implements ResourceRepository {
                 new LambdaQueryWrapper<ResourceMetadata>()
                         .eq(ResourceMetadata::getId, id)
                         .eq(ResourceMetadata::getUserId, userId)
-                        .last("limit 1")
         );
         if (model == null) {
             return Optional.empty();
@@ -62,12 +62,17 @@ public class MybatisResourceRepository implements ResourceRepository {
 
     @Override
     public Optional<Resource> findLatestByUrl(String url) {
-        ResourceMetadata model = mapper.selectOne(
-                new LambdaQueryWrapper<ResourceMetadata>()
-                        .eq(ResourceMetadata::getOriginalUrl, url)
-                        .orderByDesc(ResourceMetadata::getUpdatedAt)
-                        .last("limit 1")
-        );
+        Page<ResourceMetadata> page = new Page<>(1L, 1L);
+        ResourceMetadata model = mapper.selectPage(
+                        page,
+                        new LambdaQueryWrapper<ResourceMetadata>()
+                                .eq(ResourceMetadata::getOriginalUrl, url)
+                                .orderByDesc(ResourceMetadata::getUpdatedAt)
+                )
+                .getRecords()
+                .stream()
+                .findFirst()
+                .orElse(null);
         if (model == null) {
             return Optional.empty();
         }

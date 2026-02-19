@@ -35,6 +35,11 @@ spring:
         jinacrawler:
           api-key: your_api_key # 请在此处填入 Jina API Key
 mybatis-plus:
+  global-config:
+    db-config:
+      logic-delete-field: isDeleted  # 实体类中的属性名
+      logic-delete-value: "true"     # 逻辑已删除值 (String 形式的 true)
+      logic-not-delete-value: "false" # 逻辑未删除值 (String 形式的 false)
   configuration:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
     map-underscore-to-camel-case: true

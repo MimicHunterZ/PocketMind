@@ -33,18 +33,17 @@ public class AuthApplicationService {
 
     public AuthTokenResponse register(RegisterRequest request) {
         UserAccount existing = userAccountRepository.selectOne(new LambdaQueryWrapper<UserAccount>()
-                .eq(UserAccount::getUsername, request.username())
-                .last("LIMIT 1"));
+                .eq(UserAccount::getUsername, request.username()));
         if (existing != null) {
             throw new BusinessException(ApiCode.AUTH_USERNAME_EXISTS, HttpStatus.CONFLICT);
         }
 
         UserAccount account = new UserAccount();
-        account.setId(UUID.randomUUID());
+        account.setUuid(UUID.randomUUID());
         account.setUsername(request.username());
         account.setPasswordHash(passwordEncoder.encode(request.password()));
         account.setCreatedAt(LocalDateTime.now());
-        account.setUpdatedAt(LocalDateTime.now());
+        account.setUpdatedAt(System.currentTimeMillis());
 
         int inserted = userAccountRepository.insert(account);
         if (inserted != 1) {
@@ -57,8 +56,7 @@ public class AuthApplicationService {
 
     public AuthTokenResponse login(LoginRequest request) {
         UserAccount account = userAccountRepository.selectOne(new LambdaQueryWrapper<UserAccount>()
-                .eq(UserAccount::getUsername, request.username())
-                .last("LIMIT 1"));
+                .eq(UserAccount::getUsername, request.username()));
         if (account == null) {
             throw new BusinessException(ApiCode.AUTH_BAD_CREDENTIALS, HttpStatus.UNAUTHORIZED);
         }

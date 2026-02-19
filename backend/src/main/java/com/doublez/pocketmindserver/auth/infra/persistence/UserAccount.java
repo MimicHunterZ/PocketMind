@@ -1,19 +1,19 @@
 package com.doublez.pocketmindserver.auth.infra.persistence;
 
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
-@TableName("user_account")
+@TableName("users")
 public class UserAccount {
 
-    @TableId
-    private UUID id;
+    @TableId(type = IdType.AUTO)
+    private Long id;
+
+    private UUID uuid;
 
     private String username;
 
@@ -24,5 +24,9 @@ public class UserAccount {
     private LocalDateTime createdAt;
 
     @TableField("updated_at")
-    private LocalDateTime updatedAt;
+    private Long updatedAt;
+
+    @TableLogic
+    @TableField("is_deleted")
+    private Boolean isDeleted;
 }

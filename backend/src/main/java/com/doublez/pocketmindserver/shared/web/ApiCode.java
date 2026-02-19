@@ -16,6 +16,13 @@ public enum ApiCode {
     AUTH_REGISTER_FAILED(400104, "注册失败"),
     RESOURCE_NOT_FOUND(501001, "资源不存在或处理失败"),
     AI_RESPONSE_ERROR(501002, "AI服务响应异常"),
+    NOTE_SAVE_FAILED(502001, "笔记保存失败"),
+    NOTE_UPDATE_FAILED(502002, "笔记更新失败"),
+    CHAT_SESSION_SAVE_FAILED(502003, "会话保存失败"),
+    CHAT_MESSAGE_SAVE_FAILED(502004, "消息保存失败"),
+    CHAT_MESSAGE_UPDATE_FAILED(502007, "消息更新失败"),
+    ATTACHMENT_SAVE_FAILED(502005, "附件保存失败"),
+    VISION_SAVE_FAILED(502006, "Vision 记录保存失败"),
     INTERNAL_ERROR(500000, "服务器内部错误");
 
     private final int code;
