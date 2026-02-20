@@ -2,7 +2,6 @@ package com.doublez.pocketmindserver.note.domain.note;
 
 /**
  * 笔记来源 URL 的抓取状态
- * <p>
  * 状态流转：
  * NONE      — 无来源 URL，无需抓取
  * PENDING   — 有 URL，等待调度

@@ -10,8 +10,6 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
 
 /**
  * NoteEntity ↔ NoteModel 映射接口
- * <p>
- * 由 MapStruct 在编译期自动生成实现类，消除手写转换易遗漏字段的风险。
  * 新增字段只需同时加入 entity 和 model 即可自动映射（字段名一致时）。
  */
 @Mapper(

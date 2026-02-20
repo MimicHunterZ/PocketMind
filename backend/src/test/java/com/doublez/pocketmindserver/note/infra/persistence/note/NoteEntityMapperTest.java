@@ -39,6 +39,7 @@ class NoteEntityMapperTest {
         original.changeNoteTime(now);
         original.completeFetch("预览标题", "预览摘要", "预览内容");
         original.updateMemoryPath("/memory/path");
+        original.updateSummary("总结");
         original.addTag(100L);
         original.addTag(200L);
         original.overrideUpdatedAtForSync(ts);
@@ -59,6 +60,7 @@ class NoteEntityMapperTest {
         assertEquals(original.getPreviewDescription(), restored.getPreviewDescription());
         assertEquals(original.getPreviewContent(), restored.getPreviewContent());
         assertEquals(NoteResourceStatus.DONE, restored.getResourceStatus());
+        assertEquals(original.getSummary(), restored.getSummary());
         assertEquals(original.getMemoryPath(), restored.getMemoryPath());
         assertEquals(original.getUpdatedAt(), restored.getUpdatedAt());
         assertEquals(original.isDeleted(), restored.isDeleted());

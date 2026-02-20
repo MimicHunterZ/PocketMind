@@ -43,6 +43,9 @@ public class NoteEntity {
     private String previewContent;
     private NoteResourceStatus resourceStatus;
 
+    // AI 分析结果（轮询模式）
+    private String summary;
+
     // 预留：持久记忆系统扩展
     private String memoryPath;
 
@@ -67,6 +70,7 @@ public class NoteEntity {
             "previewDescription",
             "previewContent",
             "resourceStatus",
+            "summary",
             "memoryPath",
             "updatedAt",
             "deleted"
@@ -83,6 +87,7 @@ public class NoteEntity {
                       String previewDescription,
                       String previewContent,
                       NoteResourceStatus resourceStatus,
+                      String summary,
                       String memoryPath,
                       long updatedAt,
                       boolean deleted) {
@@ -98,6 +103,7 @@ public class NoteEntity {
         this.previewDescription = previewDescription;
         this.previewContent = previewContent;
         this.resourceStatus = resourceStatus != null ? resourceStatus : NoteResourceStatus.NONE;
+        this.summary = summary;
         this.memoryPath = memoryPath;
         this.updatedAt = updatedAt;
         this.deleted = deleted;
@@ -124,9 +130,26 @@ public class NoteEntity {
                 null,
                 NoteResourceStatus.NONE,
                 null,
+                null,
                 System.currentTimeMillis(),
                 false
         );
+    }
+
+    /**
+     * analyse 受理：清空旧 summary。
+     */
+    public void clearSummary() {
+        this.summary = null;
+        this.updatedAt = System.currentTimeMillis();
+    }
+
+    /**
+     * analyse 完成：写入 summary。
+     */
+    public void updateSummary(String summary) {
+        this.summary = summary;
+        this.updatedAt = System.currentTimeMillis();
     }
 
     // 业务行为
@@ -168,7 +191,6 @@ public class NoteEntity {
 
     /**
      * 同步专用：使用客户端/远端传入的 updatedAt 覆盖本地 updatedAt。
-     * <p>
      * LWW 冲突解决基于此时间戳；因此不能强制使用 System.currentTimeMillis()。
      */
     public void overrideUpdatedAtForSync(long updatedAt) {
@@ -221,6 +243,22 @@ public class NoteEntity {
             this.resourceStatus = NoteResourceStatus.PENDING;
             this.updatedAt = System.currentTimeMillis();
         }
+    }
+
+    /**
+     * 等待 mq 消费
+     */
+    public void pendingForFetch() {
+        this.resourceStatus = NoteResourceStatus.PENDING;
+        this.updatedAt = System.currentTimeMillis();
+    }
+
+    /**
+     * 设置为 FETCHING
+     */
+    public void fetching() {
+        this.resourceStatus = NoteResourceStatus.FETCHING;
+        this.updatedAt = System.currentTimeMillis();
     }
 
     /**

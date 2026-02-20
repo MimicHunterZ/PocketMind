@@ -11,7 +11,6 @@ import org.springframework.amqp.rabbit.connection.Connection;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 
 import com.doublez.pocketmindserver.auth.infra.persistence.UserAccountRepository;
-import com.doublez.pocketmindserver.resource.infra.persistence.ResourceMetadataRepository;
 import com.doublez.pocketmindserver.note.infra.persistence.note.NoteMapper;
 import com.doublez.pocketmindserver.note.infra.persistence.category.CategoryMapper;
 import com.doublez.pocketmindserver.note.infra.persistence.tag.TagMapper;
@@ -107,11 +106,6 @@ class PocketmindServerApplicationTests {
         @Bean
         UserAccountRepository userAccountRepository() {
             return Mockito.mock(UserAccountRepository.class);
-        }
-
-        @Bean
-        ResourceMetadataRepository resourceMetadataRepository() {
-            return Mockito.mock(ResourceMetadataRepository.class);
         }
 
         @Bean

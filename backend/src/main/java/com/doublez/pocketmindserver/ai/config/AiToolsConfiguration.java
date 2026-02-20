@@ -27,7 +27,7 @@ import java.util.List;
 public class AiToolsConfiguration {
 
     @Bean
-    public BeanFactoryPostProcessor aiToolCallbackRegistrar(AiToolsProperties props) {
+    public static BeanFactoryPostProcessor aiToolCallbackRegistrar(AiToolsProperties props) {
         return beanFactory -> {
             if (!(beanFactory instanceof DefaultListableBeanFactory dlbf)) {
                 return;
@@ -56,7 +56,7 @@ public class AiToolsConfiguration {
         };
     }
 
-    private ToolCallback[] resolveToolCallbacks(Object toolSource) {
+    private static ToolCallback[] resolveToolCallbacks(Object toolSource) {
         // Spring AI 2.0.0-M2：ToolCallbacks.from(Object) 不一定能正确识别 ToolCallback 实例，
         // 可能误走 MethodToolCallbackProvider（要求存在 @Tool 方法）从而导致启动失败。
         if (toolSource instanceof ToolCallback toolCallback) {
@@ -68,7 +68,7 @@ public class AiToolsConfiguration {
         return ToolCallbacks.from(toolSource);
     }
 
-    private String sanitize(String raw) {
+    private static String sanitize(String raw) {
         if (raw == null || raw.isBlank()) {
             return "tool";
         }

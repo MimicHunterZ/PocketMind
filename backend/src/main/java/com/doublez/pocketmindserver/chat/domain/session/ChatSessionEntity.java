@@ -73,6 +73,12 @@ public class ChatSessionEntity {
         this.updatedAt = System.currentTimeMillis();
     }
 
+    /** 更新会话记忆快照 */
+    public void updateMemorySnapshot(String memorySnapshot) {
+        this.memorySnapshot = memorySnapshot;
+        this.updatedAt = System.currentTimeMillis();
+    }
+
     /** 软删除 */
     public void softDelete() {
         this.deleted = true;

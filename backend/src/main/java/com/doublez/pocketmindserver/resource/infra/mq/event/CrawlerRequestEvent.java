@@ -6,5 +6,6 @@ import java.util.UUID;
 public record CrawlerRequestEvent(
         UUID uuid,
         String url,
-        String userId
+        String userId,
+        String userQuestion
 ) implements Serializable {}

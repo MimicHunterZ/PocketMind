@@ -37,6 +37,8 @@ public class NoteModel {
 
     private NoteResourceStatus resourceStatus;
 
+    private String summary;
+
     private String memoryPath;
 
     @TableField(fill = FieldFill.INSERT)

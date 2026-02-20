@@ -54,6 +54,9 @@ CREATE TABLE IF NOT EXISTS notes (
     resource_status     VARCHAR(20)  NOT NULL DEFAULT 'NONE',
     -- NONE / PENDING / FETCHING / DONE / FAILED
 
+    -- AI 分析（轮询模式）：总结
+    summary             TEXT,
+
     -- 预留：持久记忆系统扩展（暂不实现）
     memory_path         TEXT,
 

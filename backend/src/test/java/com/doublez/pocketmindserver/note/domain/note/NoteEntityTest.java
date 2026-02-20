@@ -25,7 +25,19 @@ class NoteEntityTest {
         assertFalse(note.isDeleted());
         // 无 URL 时默认状态为 NONE
         assertEquals(NoteResourceStatus.NONE, note.getResourceStatus());
+        assertNull(note.getSummary());
         assertTrue(note.getUpdatedAt() > 0);
+    }
+
+    @Test
+    void aiProcessingLifecycle_shouldUpdateStatusAndFields() {
+        NoteEntity note = NoteEntity.create(ID, USER_ID);
+
+        note.clearSummary();
+        assertNull(note.getSummary());
+
+        note.updateSummary("总结");
+        assertEquals("总结", note.getSummary());
     }
 
     @Test
