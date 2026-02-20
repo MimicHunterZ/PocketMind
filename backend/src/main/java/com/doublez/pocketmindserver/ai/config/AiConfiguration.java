@@ -1,14 +1,17 @@
 package com.doublez.pocketmindserver.ai.config;
 
-import com.doublez.pocketmindserver.ai.context.PruningToolCallAdvisor;
+import com.doublez.pocketmindserver.ai.context.PersistingPruningToolCallAdvisor;
+import com.doublez.pocketmindserver.ai.context.PersistingToolCallAdvisor;
 import com.doublez.pocketmindserver.ai.context.ToolResultContextEngineeringProperties;
 import com.doublez.pocketmindserver.ai.context.TrustedModelContextWindowResolver;
 import com.doublez.pocketmindserver.ai.observability.AiObservabilityProperties;
 import com.doublez.pocketmindserver.ai.observability.langfuse.LangfuseChatObservationAdvisor;
 import com.doublez.pocketmindserver.ai.observability.langfuse.AiLangfuseHttpBodyCaptureInterceptor;
 import com.doublez.pocketmindserver.ai.observability.tool.ObservedToolCallback;
+import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
 import com.doublez.pocketmindserver.shared.web.ApiCode;
 import com.doublez.pocketmindserver.shared.web.BusinessException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.chat.client.ChatClient;
@@ -43,6 +46,14 @@ import java.util.Map;
  */
 @Configuration
 public class AiConfiguration {
+
+    private final ChatMessageRepository chatMessageRepository;
+    private final ObjectMapper objectMapper;
+
+    public AiConfiguration(ChatMessageRepository chatMessageRepository, ObjectMapper objectMapper) {
+        this.chatMessageRepository = chatMessageRepository;
+        this.objectMapper = objectMapper;
+    }
 
     /**
      * 启动期校验：vision 的降级链路必须成对配置。
@@ -436,18 +447,23 @@ public class AiConfiguration {
                     props.defaultWindowTokens(),
                     windowTokens
             );
-            return new PruningToolCallAdvisor(
+                return new PersistingPruningToolCallAdvisor(
                     ToolCallingManager.builder().build(),
                     props.compressStartRatio(),
                     props.keepRecentToolResponses(),
                     resolver,
-                    modelName
-            );
+                    modelName,
+                    chatMessageRepository,
+                    objectMapper
+                );
         }
 
-        return ToolCallAdvisor.builder()
-                .advisorOrder(Ordered.HIGHEST_PRECEDENCE + 100)
-                .build();
+            // 默认 ToolCallAdvisor + 落库增强
+            return new PersistingToolCallAdvisor(
+                ToolCallingManager.builder().build(),
+                chatMessageRepository,
+                objectMapper
+            );
     }
 
     private boolean hasExplicitWindowTokensForModel(Map<String, Integer> windowTokens, String modelName) {

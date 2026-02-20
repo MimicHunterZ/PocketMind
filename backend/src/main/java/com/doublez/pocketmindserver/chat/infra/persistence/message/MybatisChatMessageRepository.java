@@ -70,4 +70,10 @@ public class MybatisChatMessageRepository implements ChatMessageRepository {
         return mapper.findChangedSince(userId, query.cursor(), query.limit())
                 .stream().map(chatStructMapper::toMessageDomain).toList();
     }
+
+    @Override
+    public List<ChatMessageEntity> findChain(UUID leafUuid, long userId) {
+        return mapper.findChain(leafUuid, userId)
+                .stream().map(chatStructMapper::toMessageDomain).toList();
+    }
 }

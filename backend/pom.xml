@@ -112,7 +112,12 @@
             <artifactId>spring-ai-agent-utils</artifactId>
             <version>0.4.2</version>
         </dependency>
-
+        <!--快照原因引入的依赖，todo -->
+        <dependency>
+            <groupId>io.modelcontextprotocol.sdk</groupId>
+            <artifactId>mcp-json-jackson3</artifactId>
+            <version>0.18.1</version>
+        </dependency>
     </dependencies>
 
     <dependencyManagement>

@@ -1,17 +1,25 @@
 package com.doublez.pocketmindserver.ai.application;
 
 import com.doublez.pocketmindserver.ai.api.dto.AiAnalyseAcceptRequest;
+import com.doublez.pocketmindserver.ai.api.dto.AiAnalysePollingResult;
 import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
+import com.doublez.pocketmindserver.chat.application.ChatPersistenceContextHolder;
 import com.doublez.pocketmindserver.note.domain.note.NoteEntity;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
+import com.doublez.pocketmindserver.note.domain.tag.TagRepository;
+import com.doublez.pocketmindserver.note.infra.persistence.note.NoteTagRelationMapper;
 import com.doublez.pocketmindserver.mq.CrawlerProducer;
 import com.doublez.pocketmindserver.mq.event.CrawlerRequestEvent;
 import com.doublez.pocketmindserver.shared.util.PromptBuilder;
 import com.doublez.pocketmindserver.shared.web.ApiCode;
 import com.doublez.pocketmindserver.shared.web.BusinessException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.advisor.StructuredOutputValidationAdvisor;
+import org.springframework.ai.chat.client.advisor.api.BaseAdvisor;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.converter.BeanOutputConverter;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.Resource;
@@ -33,7 +41,8 @@ public class AiAnalysePollingService {
     private final JinaReaderClient jinaReaderClient;
     private final AiFailoverRouter failoverRouter;
     private final AiAnalyseChatSessionService chatSessionService;
-    private final ObjectMapper objectMapper;
+    private final TagRepository tagRepository;
+    private final NoteTagRelationMapper noteTagRelationMapper;
     private final TaskExecutor taskExecutor;
 
     @Value("classpath:prompts/analyse/system_prompt.md")
@@ -43,18 +52,20 @@ public class AiAnalysePollingService {
     private Resource pollingPrompt;
 
     public AiAnalysePollingService(NoteRepository noteRepository,
-                                  CrawlerProducer crawlerProducer,
-                                  JinaReaderClient jinaReaderClient,
-                                  AiFailoverRouter failoverRouter,
-                                  AiAnalyseChatSessionService chatSessionService,
-                                  ObjectMapper objectMapper,
-                                  @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
+                                   CrawlerProducer crawlerProducer,
+                                   JinaReaderClient jinaReaderClient,
+                                   AiFailoverRouter failoverRouter,
+                                   AiAnalyseChatSessionService chatSessionService,
+                                   TagRepository tagRepository,
+                                   NoteTagRelationMapper noteTagRelationMapper,
+                                   @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
         this.noteRepository = noteRepository;
         this.crawlerProducer = crawlerProducer;
         this.jinaReaderClient = jinaReaderClient;
         this.failoverRouter = failoverRouter;
         this.chatSessionService = chatSessionService;
-        this.objectMapper = objectMapper;
+        this.tagRepository = tagRepository;
+        this.noteTagRelationMapper = noteTagRelationMapper;
         this.taskExecutor = taskExecutor;
     }
 
@@ -80,18 +91,29 @@ public class AiAnalysePollingService {
         noteRepository.save(note);
 
         if (request.hasPreviewContent()) {
-            taskExecutor.execute(() -> process(userIdStr, request.uuid(), request.userQuestion()));
+            taskExecutor.execute(() -> process(
+                    userIdStr,
+                    request.uuid(),
+                    request.userQuestion()
+            ));
             return;
         }
 
         // 慢路径：发 MQ 抓取
-        crawlerProducer.sendCrawlerRequest(new CrawlerRequestEvent(request.uuid(), request.url(), userIdStr, request.userQuestion()));
+        crawlerProducer.sendCrawlerRequest(new CrawlerRequestEvent(
+            request.uuid(),
+            request.url(),
+            userIdStr,
+            request.userQuestion()
+        ));
     }
 
     /**
      * 第二/三阶段：抓取补全后或快路径触发的 AI 处理。
      */
-    public void process(String userIdStr, UUID noteUuid, String userQuestion) {
+    public void process(String userIdStr,
+                        UUID noteUuid,
+                        String userQuestion) {
         long userId = parseUserId(userIdStr);
         var noteOpt = noteRepository.findByUuidAndUserId(noteUuid, userId);
         if (noteOpt.isEmpty()) {
@@ -124,44 +146,107 @@ public class AiAnalysePollingService {
             noteRepository.update(note);
             return;
         }
+
         Prompt prompt;
-        try{
+        try {
             // 使用 HashMap 防止 value 中出现 null 导致应用崩溃
             Map<String, Object> variables = new java.util.HashMap<>();
             variables.put("url", note.getSourceUrl());
             variables.put("title", safe(title));
             variables.put("description", safe(description));
-            variables.put("content", content); // 即使 content 为空也不会报错
+            variables.put("content", content);
             variables.put("question", safe(userQuestion));
 
-            prompt = PromptBuilder.build(systemTemplate,pollingPrompt, variables);
-        }catch(Exception e){
+            // format: BeanOutputConverter 生成的结构化输出格式说明（用于提示模型输出 JSON）
+            String format = new BeanOutputConverter<>(AiAnalysePollingResult.class).getFormat();
+            variables.put("format", format);
+
+            var outputConverter = new BeanOutputConverter<>(AiAnalysePollingResult.class);
+            String jsonSchema = outputConverter.getJsonSchema();
+                OpenAiChatOptions options = OpenAiChatOptions.builder()
+                        .responseFormat(new ResponseFormat(ResponseFormat.Type.JSON_OBJECT,jsonSchema))
+                        .build();
+                prompt = PromptBuilder.build(systemTemplate, pollingPrompt, variables, options);
+        } catch (Exception e) {
             log.error("Failed to build prompt for note {}, url={}", noteUuid, note.getSourceUrl(), e);
             note.failFetch();
             noteRepository.update(note);
             return;
         }
-        String text = failoverRouter.executeChat("ai-analyse-polling", client -> client.prompt(prompt).call().content());
-        AnalyseResult result = parseResult(text);
 
+        //todo 这里 mcp 底层依赖 json解析，这里的依赖有问题
+//        StructuredOutputValidationAdvisor validationAdvisor = StructuredOutputValidationAdvisor.builder()
+//                .outputType(AiAnalysePollingResult.class)
+//                .maxRepeatAttempts(Math.max(0, maxRepeatAttempts))
+//                .advisorOrder(BaseAdvisor.HIGHEST_PRECEDENCE + 1000)
+//                .build();
+
+        AiAnalysePollingResult result;
+
+        // 有问题时才创建会话并启用 tool 落库
+        AiAnalyseChatSessionService.ChatInit chatInit = null;
         if (userQuestion != null && !userQuestion.isBlank()) {
-            chatSessionService.createSessionWithMessages(note.getUuid(), userId, safe(title, note.getSourceUrl()), userQuestion,
-                    result.answer);
+            chatInit = chatSessionService.initSessionWithUserMessage(
+                    note.getUuid(),
+                    userId,
+                    safe(title, note.getSourceUrl()),
+                    userQuestion
+            );
+            ChatPersistenceContextHolder.set(userId, chatInit.sessionUuid(), chatInit.userMessageUuid());
         }
 
-        note.updateSummary(result.summary());
-        noteRepository.update(note);
+        try {
+            result = failoverRouter.executeChat(
+                    "ai-analyse-polling",
+                    client -> client.prompt(prompt)
+                            .call()
+                            .entity(AiAnalysePollingResult.class)
+            );
+        } catch (RuntimeException e) {
+            if (chatInit != null) {
+                ChatPersistenceContextHolder.clear();
+            }
+            // todo 失败重试
+            log.warn("AI analyse failed, skip write: noteUuid={}, url={}, err={}",
+                    noteUuid, note.getSourceUrl(), e.getClass().getSimpleName());
+            return;
+        }
+
+        // 更新笔记摘要
+        if (result.summary() != null && !result.summary().isBlank()) {
+            note.updateSummary(result.summary());
+            noteRepository.update(note);
+        }
+
+        // 写入 AI 标签
+        writeNoteTags(userId, note.getUuid(), result.tags());
+
+        // 落库对话（assistant reply）
+        if (chatInit != null) {
+            UUID parentUuid = ChatPersistenceContextHolder.getParentUuid();
+            chatSessionService.saveAssistantReply(chatInit.sessionUuid(), userId, parentUuid, result.answer());
+            ChatPersistenceContextHolder.clear();
+        }
     }
 
-    private AnalyseResult parseResult(String text) {
-        if (text == null || text.isBlank()) {
-            return new AnalyseResult("", "");
+    /**
+     * 将 AI 生成的标签写入数据库（幂等）。
+     */
+    private void writeNoteTags(long userId, UUID noteUuid, List<String> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return;
         }
-        try {
-            return objectMapper.readValue(text, AnalyseResult.class);
-        } catch (Exception ignored) {
-            // 兜底：当成 summary，answer 为空
-            return new AnalyseResult(text.trim(), "");
+        for (String tagName : tags) {
+            if (tagName == null || tagName.isBlank()) {
+                continue;
+            }
+            try {
+                var tagEntity = tagRepository.findOrCreate(userId, tagName.trim());
+                noteTagRelationMapper.insert(noteUuid, tagEntity.getId());
+            } catch (Exception e) {
+                // 标签写入失败不影响主流程
+                log.warn("tag write failed, noteUuid={}, tag={}", noteUuid, tagName, e);
+            }
         }
     }
 
@@ -188,6 +273,5 @@ public class AiAnalysePollingService {
         }
     }
 
-    public record AnalyseResult(String summary, String answer) {
-    }
 }
+

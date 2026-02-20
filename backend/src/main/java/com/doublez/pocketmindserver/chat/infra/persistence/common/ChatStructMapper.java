@@ -37,5 +37,6 @@ public interface ChatStructMapper {
     /** 持久化模型 → 领域实体 */
     @Mapping(target = "deleted", source = "isDeleted")
     @Mapping(target = "updatedAt", defaultValue = "0L")
+    @Mapping(target = "messageType", defaultValue = "TEXT")
     ChatMessageEntity toMessageDomain(ChatMessageModel model);
 }

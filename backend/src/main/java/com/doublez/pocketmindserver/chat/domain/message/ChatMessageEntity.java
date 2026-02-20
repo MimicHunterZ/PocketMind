@@ -18,6 +18,10 @@ public class ChatMessageEntity {
     private final UUID uuid;
     private final long userId;
     private final UUID sessionUuid;
+    /** 链表结构：指向上一条消息的 uuid，NULL = 链头 */
+    private final UUID parentUuid;
+    /** 消息类型：TEXT | TOOL_CALL | TOOL_RESULT */
+    private final String messageType;
     private final ChatRole role;
     private final String content;
     private final List<UUID> attachmentUuids;
@@ -31,6 +35,8 @@ public class ChatMessageEntity {
             "uuid",
             "userId",
             "sessionUuid",
+            "parentUuid",
+            "messageType",
             "role",
             "content",
             "attachmentUuids",
@@ -40,6 +46,8 @@ public class ChatMessageEntity {
     public ChatMessageEntity(UUID uuid,
                              long userId,
                              UUID sessionUuid,
+                             UUID parentUuid,
+                             String messageType,
                              ChatRole role,
                              String content,
                              List<UUID> attachmentUuids,
@@ -48,28 +56,72 @@ public class ChatMessageEntity {
         this.uuid = Objects.requireNonNull(uuid, "uuid 不能为空");
         this.userId = userId;
         this.sessionUuid = Objects.requireNonNull(sessionUuid, "sessionUuid 不能为空");
+        this.parentUuid = parentUuid;
+        this.messageType = messageType != null ? messageType : "TEXT";
         this.role = Objects.requireNonNull(role, "role 不能为空");
-        this.content = Objects.requireNonNull(content, "content 不能为空");
+        this.content = content != null ? content : "";
         this.attachmentUuids = attachmentUuids != null ? List.copyOf(attachmentUuids) : Collections.emptyList();
         this.updatedAt = updatedAt;
         this.deleted = deleted;
     }
 
     // 工厂方法
-    /** 新建消息（客户端传来 UUID） */
+
+    /**
+     * 新建普通文本消息（无父节点，即链头）。
+     */
     public static ChatMessageEntity create(UUID uuid, long userId, UUID sessionUuid,
-                                            ChatRole role, String content, List<UUID> attachmentUuids) {
+                                           ChatRole role, String content, List<UUID> attachmentUuids) {
+        return create(uuid, userId, sessionUuid, null, role, content, attachmentUuids);
+    }
+
+    /**
+         * 新建带 parentUuid 的消息（链式对话）。
+     *
+     * @param parentUuid     上一条消息 uuid（NULL = 链头）
+     */
+    public static ChatMessageEntity create(UUID uuid, long userId, UUID sessionUuid,
+                           UUID parentUuid, ChatRole role, String content,
+                           List<UUID> attachmentUuids) {
+        return new ChatMessageEntity(
+                uuid,
+                userId,
+                sessionUuid,
+                parentUuid,
+                "TEXT",
+                role,
+                content,
+                attachmentUuids,
+                System.currentTimeMillis(),
+                false
+        );
+    }
+
+        /**
+         * 新建工具消息（TOOL_CALL / TOOL_RESULT）。
+         * <p>
+         * content 必须是 JSON 字符串，客户端可直接解析。
+         */
+        public static ChatMessageEntity createTool(UUID uuid,
+                               long userId,
+                               UUID sessionUuid,
+                               UUID parentUuid,
+                               String messageType,
+                               ChatRole role,
+                               String content) {
         return new ChatMessageEntity(
             uuid,
             userId,
             sessionUuid,
+            parentUuid,
+            messageType != null ? messageType : "TEXT",
             role,
             content,
-            attachmentUuids,
+            List.of(),
             System.currentTimeMillis(),
             false
         );
-    }
+        }
 
     // 业务行为
     /** 软删除 */

@@ -29,12 +29,11 @@ public class AiAnalyseChatSessionService {
         this.chatMessageRepository = chatMessageRepository;
     }
 
-        @Transactional
-        public UUID createSessionWithMessages(UUID noteUuid,
-                         long userId,
-                         String title,
-                         String userQuestion,
-                         String assistantContent) {
+    @Transactional
+    public ChatInit initSessionWithUserMessage(UUID noteUuid,
+                                               long userId,
+                                               String title,
+                                               String userQuestion) {
         UUID sessionUuid = UUID.randomUUID();
         String finalTitle = (title != null && !title.isBlank()) ? title : "";
 
@@ -43,29 +42,42 @@ public class AiAnalyseChatSessionService {
 
         UUID userMessageUuid = UUID.randomUUID();
         ChatMessageEntity userMessage = ChatMessageEntity.create(
-            userMessageUuid,
-            userId,
-            sessionUuid,
-            ChatRole.USER,
-            userQuestion,
-            List.of()
+                userMessageUuid,
+                userId,
+                sessionUuid,
+                ChatRole.USER,
+                userQuestion,
+                List.of()
         );
         chatMessageRepository.save(userMessage);
 
+        log.info("analyse chat session created (init): userId={}, sessionUuid={}, noteUuid={}", userId, sessionUuid, noteUuid);
+        return new ChatInit(sessionUuid, userMessageUuid);
+    }
+
+    @Transactional
+    public void saveAssistantReply(UUID sessionUuid,
+                                  long userId,
+                                  UUID parentUuid,
+                                  String assistantContent) {
+        String content = assistantContent == null ? "" : assistantContent;
+
         UUID assistantMessageUuid = UUID.randomUUID();
         ChatMessageEntity assistantMessage = ChatMessageEntity.create(
-            assistantMessageUuid,
-            userId,
-            sessionUuid,
-            ChatRole.ASSISTANT,
-            assistantContent == null ? "" : assistantContent,
-            List.of()
+                assistantMessageUuid,
+                userId,
+                sessionUuid,
+                parentUuid,
+                ChatRole.ASSISTANT,
+                content,
+                List.of()
         );
         chatMessageRepository.save(assistantMessage);
+        log.info("analyse chat assistant saved: userId={}, sessionUuid={}", userId, sessionUuid);
+    }
 
-        log.info("analyse chat session created: userId={}, sessionUuid={}, noteUuid={}", userId, sessionUuid, noteUuid);
-        return sessionUuid;
-        }
+    public record ChatInit(UUID sessionUuid, UUID userMessageUuid) {
+    }
 
     @Transactional
     public void updateMemorySnapshot(long userId, UUID sessionUuid, String memorySnapshot) {

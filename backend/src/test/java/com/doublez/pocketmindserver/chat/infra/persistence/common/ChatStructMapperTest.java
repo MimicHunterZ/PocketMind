@@ -96,14 +96,16 @@ class ChatStructMapperTest {
         ChatMessageEntity original = ChatMessageEntity.create(
                 uuid, 5L, sessionUuid, ChatRole.USER, "消息内容", List.of(attachUuid));
         original = new ChatMessageEntity(
-            uuid,
-            5L,
-            sessionUuid,
-            ChatRole.USER,
-            "消息内容",
-            List.of(attachUuid),
-            ts,
-            false
+                uuid,
+                5L,
+                sessionUuid,
+                null,           // parentUuid
+                "TEXT",         // messageType
+                ChatRole.USER,
+                "消息内容",
+                List.of(attachUuid),
+                ts,
+                false
         );
 
         ChatMessageModel model     = mapper.toMessageModel(original);

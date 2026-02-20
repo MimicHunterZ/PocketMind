@@ -2,6 +2,7 @@ package com.doublez.pocketmindserver.shared.util;
 
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.template.st.StTemplateRenderer;
@@ -42,5 +43,22 @@ public class PromptBuilder {
 
         // 3. 组合并返回最终的 Prompt
         return new Prompt(List.of(systemMessage, userMessage));
+    }
+
+    /**
+     * 组装 Prompt 并携带模型 options（如 OpenAiChatOptions）。
+     */
+    public static Prompt build(Resource systemTemplate,
+                               Resource userTemplate,
+                               Map<String, Object> userVariables,
+                               ChatOptions options) throws IOException {
+        String systemContent = systemTemplate.getContentAsString(StandardCharsets.UTF_8);
+        SystemMessage systemMessage = new SystemMessage(systemContent);
+
+        String userContent = render(userTemplate, userVariables);
+        UserMessage userMessage = new UserMessage(userContent);
+
+        // Spring AI Prompt 支持携带 options（ChatOptions），用于启用 JSON mode 等能力。
+        return new Prompt(List.of(systemMessage, userMessage), options);
     }
 }

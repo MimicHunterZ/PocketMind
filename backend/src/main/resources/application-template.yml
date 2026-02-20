@@ -72,6 +72,7 @@ pocketmind:
 app:
   exception:
     show-stacktrace: true
+
 # 更改日志记录
 logging:
   level:

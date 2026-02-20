@@ -218,8 +218,13 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     user_id          BIGINT      NOT NULL,
     session_uuid     UUID        NOT NULL,   -- FK → chat_sessions.uuid
 
-    role             VARCHAR(20) NOT NULL,   -- 'user' | 'assistant' | 'system'
-    content          TEXT        NOT NULL,
+    -- 链表结构：指向上一条消息的 uuid，NULL = 链头（第一条用户消息）
+    parent_uuid      UUID,
+    -- 消息类型：TEXT | TOOL_CALL | TOOL_RESULT
+    message_type     VARCHAR(30) NOT NULL DEFAULT 'TEXT',
+
+    role             VARCHAR(20) NOT NULL,   -- 'USER' | 'ASSISTANT' | 'SYSTEM' | 'TOOL_CALL' | 'TOOL_RESULT'
+    content          TEXT        NOT NULL DEFAULT '',
     -- 消息中引用的附件（图片等），存 UUIDs 数组
     attachment_uuids UUID[]      NOT NULL DEFAULT '{}',
 
@@ -230,6 +235,13 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 
 CREATE INDEX IF NOT EXISTS idx_messages_session_time  ON chat_messages(session_uuid, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_messages_user_uuid     ON chat_messages(user_id, uuid);
+CREATE INDEX IF NOT EXISTS idx_messages_parent        ON chat_messages(parent_uuid);
+
+-- 兼容旧库：为已存在的 chat_messages 表添加新列（IF NOT EXISTS 保证幂等）
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS parent_uuid  UUID;
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message_type VARCHAR(30) NOT NULL DEFAULT 'TEXT';
+-- content 列旧版为 NOT NULL 但无 DEFAULT，补充 DEFAULT 值（DDL 不可重复执行跳过）
+CREATE INDEX IF NOT EXISTS idx_messages_parent ON chat_messages(parent_uuid);
 
 -- ============================================================
 -- 9. sync_change_log（后端增量 pull 使用，不存内容只存变更事件）

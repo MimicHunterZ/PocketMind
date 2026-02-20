@@ -60,9 +60,10 @@ class ChatMessageEntityTest {
     }
 
     @Test
-    void create_withNullContent_shouldThrow() {
-        assertThrows(NullPointerException.class,
-                () -> ChatMessageEntity.create(MSG_UUID, USER_ID, SESSION_UUID, ChatRole.USER, null, null));
+    void create_withNullContent_shouldDefaultToEmpty() {
+        // null content 在流式场景（初始化时 content 为空）合法，默认转为空字符串
+        ChatMessageEntity msg = ChatMessageEntity.create(MSG_UUID, USER_ID, SESSION_UUID, ChatRole.USER, null, null);
+        assertEquals("", msg.getContent());
     }
 
     @Test

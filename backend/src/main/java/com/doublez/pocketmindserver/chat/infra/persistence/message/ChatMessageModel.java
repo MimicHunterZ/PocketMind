@@ -18,12 +18,18 @@ public class ChatMessageModel {
     private UUID uuid;
     private Long userId;
     private UUID sessionUuid;
+
+    /** 链表结构：指向上一条消息的 uuid，NULL = 链头 */
+    private UUID parentUuid;
+
+    /** 消息类型：TEXT | TOOL_CALL | TOOL_RESULT */
+    private String messageType;
+
     private ChatRole role;
     private String content;
 
     /**
-     * PostgreSQL UUID[] — 存储为 TEXT[] 然后应用层自行转换
-     * 简化处理：序列化为 JSON 字符串（或用自定义 TypeHandler）
+     * PostgreSQL UUID[] — 使用自定义 TypeHandler 处理
      */
     @TableField(typeHandler = UuidArrayTypeHandler.class)
     private List<UUID> attachmentUuids;
