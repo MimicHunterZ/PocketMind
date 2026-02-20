@@ -4,28 +4,22 @@ import com.doublez.pocketmindserver.ai.api.dto.AiAnalyseAcceptRequest;
 import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
 import com.doublez.pocketmindserver.note.domain.note.NoteEntity;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
-import com.doublez.pocketmindserver.resource.infra.http.JinaReaderClient;
-import com.doublez.pocketmindserver.resource.infra.mq.CrawlerProducer;
-import com.doublez.pocketmindserver.resource.infra.mq.event.CrawlerRequestEvent;
+import com.doublez.pocketmindserver.mq.CrawlerProducer;
+import com.doublez.pocketmindserver.mq.event.CrawlerRequestEvent;
+import com.doublez.pocketmindserver.shared.util.PromptBuilder;
 import com.doublez.pocketmindserver.shared.web.ApiCode;
 import com.doublez.pocketmindserver.shared.web.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.chat.prompt.PromptTemplate;
-import org.springframework.ai.chat.prompt.SystemPromptTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StreamUtils;
 
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * AI 分析（轮询模式）应用服务。
@@ -42,11 +36,11 @@ public class AiAnalysePollingService {
     private final ObjectMapper objectMapper;
     private final TaskExecutor taskExecutor;
 
-    @Value("classpath:prompts/ai/system_prompt.md")
-    private org.springframework.core.io.Resource systemPersonaResource;
+    @Value("classpath:prompts/analyse/system_prompt.md")
+    private Resource systemTemplate;
 
     @Value("classpath:prompts/analyse/polling_template.md")
-    private org.springframework.core.io.Resource pollingPromptResource;
+    private Resource pollingPrompt;
 
     public AiAnalysePollingService(NoteRepository noteRepository,
                                   CrawlerProducer crawlerProducer,
@@ -130,54 +124,33 @@ public class AiAnalysePollingService {
             noteRepository.update(note);
             return;
         }
+        Prompt prompt;
+        try{
+            // 使用 HashMap 防止 value 中出现 null 导致应用崩溃
+            Map<String, Object> variables = new java.util.HashMap<>();
+            variables.put("url", note.getSourceUrl());
+            variables.put("title", safe(title));
+            variables.put("description", safe(description));
+            variables.put("content", content); // 即使 content 为空也不会报错
+            variables.put("question", safe(userQuestion));
 
-        Prompt prompt = buildPrompt(Map.of(
-                "url", note.getSourceUrl(),
-                "title", safe(title),
-                "description", safe(description),
-                "content", content,
-                "question", safe(userQuestion)
-        ));
-
+            prompt = PromptBuilder.build(systemTemplate,pollingPrompt, variables);
+        }catch(Exception e){
+            log.error("Failed to build prompt for note {}, url={}", noteUuid, note.getSourceUrl(), e);
+            note.failFetch();
+            noteRepository.update(note);
+            return;
+        }
         String text = failoverRouter.executeChat("ai-analyse-polling", client -> client.prompt(prompt).call().content());
         AnalyseResult result = parseResult(text);
 
         if (userQuestion != null && !userQuestion.isBlank()) {
             chatSessionService.createSessionWithMessages(note.getUuid(), userId, safe(title, note.getSourceUrl()), userQuestion,
-                    buildAssistantContent(result));
+                    result.answer);
         }
 
         note.updateSummary(result.summary());
         noteRepository.update(note);
-    }
-
-    private Prompt buildPrompt(Map<String, Object> variables) {
-        try {
-            // 1. 获取系统提示词（如果系统提示词是静态的，直接读成 String）
-            String systemContent = StreamUtils.copyToString(
-                    systemPersonaResource.getInputStream(), StandardCharsets.UTF_8);
-            var systemMessage = new org.springframework.ai.chat.messages.SystemMessage(systemContent);
-
-            // 2. 获取用户模板内容
-
-            // 3. 将所有的 {key} 替换为 value
-            String renderedUserContent = StreamUtils.copyToString(
-                    pollingPromptResource.getInputStream(), StandardCharsets.UTF_8);
-            for (Map.Entry<String, Object> entry : variables.entrySet()) {
-                String placeholder = "{" + entry.getKey() + "}";
-                String value = entry.getValue() == null ? "" : entry.getValue().toString();
-                // 注意：这里使用 replace 而不是 replaceAll，避免正则转义问题
-                renderedUserContent = renderedUserContent.replace(placeholder, value);
-            }
-
-            var userMessage = new org.springframework.ai.chat.messages.UserMessage(renderedUserContent);
-
-            return new Prompt(List.of(systemMessage, userMessage));
-
-        } catch (java.io.IOException e) {
-            log.error("Failed to load prompt resource", e);
-            throw new BusinessException(ApiCode.AI_RESPONSE_ERROR, HttpStatus.INTERNAL_SERVER_ERROR, "Prompt加载失败");
-        }
     }
 
     private AnalyseResult parseResult(String text) {
@@ -190,15 +163,6 @@ public class AiAnalysePollingService {
             // 兜底：当成 summary，answer 为空
             return new AnalyseResult(text.trim(), "");
         }
-    }
-
-    private String buildAssistantContent(AnalyseResult result) {
-        String summary = result.summary() == null ? "" : result.summary();
-        String answer = result.answer() == null ? "" : result.answer();
-        if (answer.isBlank()) {
-            return summary;
-        }
-        return summary + "\n\n" + answer;
     }
 
     private String safe(String value) {

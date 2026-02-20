@@ -6,7 +6,7 @@ import com.doublez.pocketmindserver.ai.context.TrustedModelContextWindowResolver
 import com.doublez.pocketmindserver.ai.observability.AiObservabilityProperties;
 import com.doublez.pocketmindserver.ai.observability.langfuse.LangfuseChatObservationAdvisor;
 import com.doublez.pocketmindserver.ai.observability.langfuse.AiLangfuseHttpBodyCaptureInterceptor;
-import com.doublez.pocketmindserver.ai.tools.observability.ObservedToolCallback;
+import com.doublez.pocketmindserver.ai.observability.tool.ObservedToolCallback;
 import com.doublez.pocketmindserver.shared.web.ApiCode;
 import com.doublez.pocketmindserver.shared.web.BusinessException;
 import com.fasterxml.jackson.databind.json.JsonMapper;

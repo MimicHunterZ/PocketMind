@@ -1,6 +1,6 @@
-package com.doublez.pocketmindserver.resource.infra.mq.config;
+package com.doublez.pocketmindserver.mq.config;
 
-import com.doublez.pocketmindserver.resource.infra.mq.CrawlerMqConstants;
+import com.doublez.pocketmindserver.mq.CrawlerMqConstants;
 
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;

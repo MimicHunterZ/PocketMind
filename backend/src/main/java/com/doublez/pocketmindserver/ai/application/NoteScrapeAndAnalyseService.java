@@ -1,9 +1,8 @@
 package com.doublez.pocketmindserver.ai.application;
 
+import com.doublez.pocketmindserver.mq.event.CrawlerRequestEvent;
 import com.doublez.pocketmindserver.note.domain.note.NoteEntity;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
-import com.doublez.pocketmindserver.resource.infra.http.JinaReaderClient;
-import com.doublez.pocketmindserver.resource.infra.mq.event.CrawlerRequestEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 

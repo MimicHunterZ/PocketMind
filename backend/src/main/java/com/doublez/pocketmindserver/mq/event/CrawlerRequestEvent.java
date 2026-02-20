@@ -1,4 +1,4 @@
-package com.doublez.pocketmindserver.resource.infra.mq.event;
+package com.doublez.pocketmindserver.mq.event;
 
 import java.io.Serializable;
 import java.util.UUID;

@@ -15,13 +15,12 @@ import java.util.UUID;
 @Getter
 @EqualsAndHashCode(of = "uuid")
 public class ChatMessageEntity {
-
     private final UUID uuid;
     private final long userId;
     private final UUID sessionUuid;
-    private ChatRole role;
-    private String content;
-    private List<UUID> attachmentUuids;
+    private final ChatRole role;
+    private final String content;
+    private final List<UUID> attachmentUuids;
     private long updatedAt;
     private boolean deleted;
 

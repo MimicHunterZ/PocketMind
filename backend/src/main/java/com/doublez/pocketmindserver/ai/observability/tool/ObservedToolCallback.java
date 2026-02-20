@@ -1,4 +1,4 @@
-package com.doublez.pocketmindserver.ai.tools.observability;
+package com.doublez.pocketmindserver.ai.observability.tool;
 
 import com.doublez.pocketmindserver.ai.observability.langfuse.LangfuseSpanWriter;
 import lombok.extern.slf4j.Slf4j;

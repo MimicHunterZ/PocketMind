@@ -17,7 +17,7 @@ public class ChatSessionEntity {
     private final UUID uuid;
     private final long userId;
     /** 关联某条笔记（可选；null 表示全局对话） */
-    private UUID scopeNoteUuid;
+    private final UUID scopeNoteUuid;
     private String title;
     /** 预留：持久记忆快照（暂不实现） */
     private String memorySnapshot;

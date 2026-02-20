@@ -1,4 +1,4 @@
-package com.doublez.pocketmindserver.resource.infra.mq;
+package com.doublez.pocketmindserver.mq;
 
 public final class CrawlerMqConstants {
 

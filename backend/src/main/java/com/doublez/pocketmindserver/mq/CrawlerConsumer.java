@@ -1,6 +1,6 @@
-package com.doublez.pocketmindserver.resource.infra.mq;
+package com.doublez.pocketmindserver.mq;
 
-import com.doublez.pocketmindserver.resource.infra.mq.event.CrawlerRequestEvent;
+import com.doublez.pocketmindserver.mq.event.CrawlerRequestEvent;
 import com.doublez.pocketmindserver.ai.application.NoteScrapeAndAnalyseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

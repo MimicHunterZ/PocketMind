@@ -1,4 +1,4 @@
-package com.doublez.pocketmindserver.resource.infra.http;
+package com.doublez.pocketmindserver.ai.application;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
