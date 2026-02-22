@@ -1,7 +1,7 @@
 ---
 name: "asset-image-subsystem"
-description: "PocketMind 图片资产存储与分发子系统。涵盖 SPI 存储抽象层、防 OOM 上传管线、HTTP 206 断点续传分发、MyBatis-Plus 持久化以及 Spring Boot 4.x 关键陷阱。当用户讨论图片上传、图片下载、Range 请求、AssetStore、NoteAttachment、ImageUploadService、ImageServeService、AssetController 时触发。"
-version: 1.0.0
+description: "PocketMind 资产存储与分发子系统（图片/PDF/视频/音频/任意文件）。涵盖 SPI 存储抽象层、防 OOM 上传管线、HTTP 206 断点续传分发、MyBatis-Plus + PostgreSQL JSONB 持久化以及 Spring Boot 4.x 关键陷阱。当用户讨论图片上传、图片下载、Range 请求、AssetStore、Asset、ImageUploadService、ImageServeService、AssetController、JsonbTypeHandler 时触发。"
+version: 2.0.0
 category: "backend"
 modularized: false
 user-invocable: false
@@ -15,7 +15,7 @@ status: "active"
 
 **图片资产子系统**：负责图片的 上传→落盘→持久化→分发 完整生命周期。
 
-**Auto-Triggers**：提到 AssetStore / NoteAttachment / ImageUploadService / ImageServeService / AssetController / HTTP Range 图片 / ResourceRegion / 图片上传 OOM
+**Auto-Triggers**：提到 AssetStore / Asset / ImageUploadService / ImageServeService / AssetController / HTTP Range 图片 / ResourceRegion / 图片上传 OOM / JsonbTypeHandler / asset_extractions
 
 **核心能力**：
 
@@ -43,21 +43,26 @@ backend/src/main/java/com/doublez/pocketmindserver/
     ├── config/
     │   └── StorageProperties.java        # @ConfigurationProperties("app.storage.local")
     ├── domain/
-    │   ├── NoteAttachment.java           # MyBatis-Plus 实体，映射 note_attachments
-    │   ├── NoteAttachmentMapper.java     # BaseMapper<NoteAttachment>
-    │   └── NoteAttachmentRepository.java # 仓储接口（业务逻辑解耦）
+    │   ├── Asset.java                    # MyBatis-Plus 实体，映射 assets 表
+    │   ├── AssetMapper.java              # BaseMapper<Asset>
+    │   └── AssetRepository.java          # 仓储接口（业务逻辑解耦）
     ├── infra/
-    │   └── NoteAttachmentDBRepository.java # MyBatis-Plus 实现
+    │   └── AssetDBRepository.java        # MyBatis-Plus 实现
     └── spi/
         ├── AssetStore.java               # 存储 SPI 接口（4 个方法）
         └── LocalFileAssetStore.java      # 本地磁盘实现
+
+backend/src/main/java/com/doublez/pocketmindserver/
+└── shared/
+    └── mybatis/
+        └── JsonbTypeHandler.java         # PostgreSQL JSONB 专用 TypeHandler（Map↔jsonb）
 
 backend/src/main/java/com/doublez/pocketmindserver/
 └── mq/
     ├── config/
     │   └── RabbitMQConfig.java           # MQ 基建 + Listener 虚拟线程配置（含重试 + DLQ）
     ├── event/
-    │   └── VisionJobMessage.java         # 图片识别任务消息（attachmentUuid + userId）
+    │   └── VisionJobMessage.java         # 图片识别任务消息（assetUuid + userId）
     ├── VisionMqConstants.java            # vision_queue / exchange / routingKey / dlq 常量
     ├── VisionMessagePublisher.java       # 上传成功后投递识别任务
     └── VisionWorker.java                 # 异步识别消费者（幂等 + 落库 + 重试 + DLQ）
@@ -65,7 +70,7 @@ backend/src/main/java/com/doublez/pocketmindserver/
 backend/src/main/java/com/doublez/pocketmindserver/
 └── attachment/
     └── infra/persistence/vision/
-        ├── AttachmentVisionModel.java    # MyBatis-Plus 模型：attachment_visions
+        ├── AttachmentVisionModel.java    # MyBatis-Plus 模型：asset_extractions
         └── MybatisAttachmentVisionRepository.java
 ```
 
@@ -224,12 +229,12 @@ public ResponseEntity<?> getImage(@PathVariable UUID uuid,
 
 ```java
 public ResponseEntity<ResourceRegion> servePartialImage(...) {
-    NoteAttachment attachment = requireOwnedAttachment(attachmentUuid, userId); // 越权防御
+    Asset asset = requireOwnedAsset(assetUuid, userId); // 越权防御
     ResourceRegion region = assetStore.createResourceRegion(
-            String.valueOf(userId), attachment.getStorageKey(), requestHeaders);
+            String.valueOf(userId), asset.getStorageKey(), requestHeaders);
 
     return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
-            .contentType(resolveMediaType(attachment.getMime())) // 设置正确 Content-Type
+            .contentType(resolveMediaType(asset.getMime())) // 设置正确 Content-Type
             .cacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePrivate())
             .body(region);
 }
@@ -279,25 +284,25 @@ public Object beforeBodyWrite(Object body, ...) {
 
 ## Step 4：异步图片识别（MQ + Vision Worker）
 
-> 目标：上传链路只负责「落盘 + note_attachments 落库 + 投递 MQ」，
+> 目标：上传链路只负责「落盘 + assets 落库 + 投递 MQ」，
 > 识别链路交给异步 Worker 在虚拟线程里跑，失败可重试，最终进入 DLQ，绝不阻塞主队列。
 
 ### 两张表的职责（非常重要）
 
-- `note_attachments`：图片资产事实表（上传成功即写入），字段包含 `uuid/user_id/mime/storage_key/...`
-- `attachment_visions`：图片内容识别结果表（异步 Worker 写入），通过 `attachment_uuid` 关联 `note_attachments.uuid`
+- `assets`：任意格式资产事实表（上传成功即写入），字段包含 `uuid/user_id/type/mime/storage_key/metadata/...`
+- `asset_extractions`：内容提取结果表（异步 Worker 写入），通过 `asset_uuid` 关联 `assets.uuid`；`content_type` 区分提取方式（`vision`/`ocr`/`pdf_text`/`transcript`）
 
-识别幂等检查必须查 `attachment_visions`，这是“识别是否完成”的唯一可信来源。
+识别幂等检查必须查 `asset_extractions`，这是"提取是否完成"的唯一可信来源。
 
 ### 消息契约（当前实现）
 
 文件：[backend/src/main/java/com/doublez/pocketmindserver/mq/event/VisionJobMessage.java](../../backend/src/main/java/com/doublez/pocketmindserver/mq/event/VisionJobMessage.java)
 
 ```java
-public record VisionJobMessage(UUID attachmentUuid, long userId) {}
+public record VisionJobMessage(UUID assetUuid, long userId) {}
 ```
 
-- `attachmentUuid`：幂等键（同一个附件识别完成后，后续重复投递会被直接 Ack 丢弃）
+- `assetUuid`：幂等键（同一资产提取完成后，后续重复投递会被直接 Ack 丢弃）
 - `userId`：租户隔离（AssetStore 物理路径 = `{rootDir}/{userId}/{storageKey}`）
 
 ### MQ 拓扑 + 重试 + DLQ
@@ -332,11 +337,11 @@ factory.setTaskExecutor(virtualExecutor);
 
 投递器：[backend/src/main/java/com/doublez/pocketmindserver/mq/VisionMessagePublisher.java](../../backend/src/main/java/com/doublez/pocketmindserver/mq/VisionMessagePublisher.java)
 
-上传链路在 `ImageUploadService.upload()` 中完成落盘与 `note_attachments` 落库后投递：
+上传链路在 `ImageUploadService.upload()` 中完成落盘与 `assets` 落库后投递：
 
 ```java
-attachmentRepository.save(entity);
-visionMessagePublisher.publishVisionTask(attachmentUuid, userId);
+assetRepository.save(entity);
+visionMessagePublisher.publishVisionTask(assetUuid, userId);
 ```
 
 ### Worker 管线（幂等 + DB 状态机）
@@ -345,81 +350,120 @@ visionMessagePublisher.publishVisionTask(attachmentUuid, userId);
 
 处理顺序：
 
-1. 查 `attachment_visions`（`userId + attachmentUuid`）：若存在 `DONE` 直接 Ack
-2. 创建/复用识别实体：无记录则插入 `PENDING`；有 `PENDING/FAILED` 则复用
-3. 查 `note_attachments` 拿到 `mime + storageKey`
+1. 查 `asset_extractions`（`userId + assetUuid`）：若存在 `DONE` 直接 Ack
+2. 创建/复用提取实体：无记录则插入 `PENDING`；有 `PENDING/FAILED` 则复用
+3. 查 `assets` 拿到 `mime + storageKey`
 4. `assetStore.getResource(userId, storageKey)` 得到 `Resource`
 5. 调用 `visionService.analyzeImage(Resource, MimeType)`
-6. 成功：写入 `vision_text` 并标记 `DONE`
+6. 成功：写入 `content` 并标记 `DONE`（调用 `visionEntity.markDone(content)`）
 7. 失败：标记 `FAILED` 并更新，然后 re-throw 触发重试；重试耗尽进入 DLQ
 
-### 生产级关键坑：`attachment_visions.vision_text` 必须允许为 NULL
+### 生产级关键坑：`asset_extractions.content` 必须允许为 NULL
 
-Worker 会先插入 `PENDING` 再调用 AI，成功后才回填 `vision_text`。
-因此 `vision_text` 必须允许 NULL，否则会出现“INSERT PENDING 失败 → 重试 → DLQ”的死循环。
-
-DB 初始化脚本（`schema-pg.sql`）已包含修正：
-
-```sql
-ALTER TABLE attachment_visions
-    ALTER COLUMN vision_text DROP NOT NULL;
-```
+Worker 会先插入 `PENDING` 再调用 AI，成功后才回填 `content`。
+因此 `content` 必须允许 NULL，否则会出现"INSERT PENDING 失败 → 重试 → DLQ"的死循环。
+`schema-pg.sql` 中 `content TEXT` 无 NOT NULL 约束，已正确设计。
 
 ---
 
 ## 数据库设计
 
-### note_attachments 表（关键字段）
+### assets 表（关键字段）
 
-```sql
--- 新增字段（幂等 ALTER，可反复执行）
-ALTER TABLE note_attachments ADD COLUMN IF NOT EXISTS size             BIGINT NOT NULL DEFAULT 0;
-ALTER TABLE note_attachments ADD COLUMN IF NOT EXISTS original_file_name  TEXT;
-ALTER TABLE note_attachments ALTER COLUMN note_uuid DROP NOT NULL;  -- 允许独立上传
-```
-
-**字段说明**：
+统一存储任意格式（图片/PDF/视频/音频/文件）的物理文件元数据，替代旧的 `note_attachments`。
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `uuid` | UUID | 业务主键（IdType.INPUT，Java侧生成） |
-| `user_id` | BIGINT | 租户隔离（注意：现有系统用数值ID，非 UUID） |
-| `note_uuid` | UUID | 可为 NULL（独立上传先不绑定笔记） |
-| `size` | BIGINT | 文件字节数（前端展示 + 磁盘统计） |
-| `original_file_name` | TEXT | 上传时的原始文件名 |
+| `user_id` | BIGINT | 租户隔离 |
+| `note_uuid` | UUID | 可为 NULL（上传中尚未绑定笔记） |
+| `type` | VARCHAR | 格式分类：`image`/`pdf`/`video`/`audio`/`file` |
+| `source` | VARCHAR | 来源：`user`/`scrape`/`system_gen` |
+| `mime` | VARCHAR | MIME 类型（如 `image/png`） |
+| `size` | BIGINT | 文件字节数 |
+| `file_name` | TEXT | 上传时的原始文件名 |
+| `sha256` | CHAR(64) | 内容指纹，存储层去重 |
 | `storage_key` | TEXT | 相对路径键：`YYYY/MM/DD/{uuid}.{ext}` |
-| `storage_type` | VARCHAR | 当前固定 `"local"`，扩展时改为 `"s3"` |
-| `width` / `height` | INT | 图片尺寸（上传时仅读文件头提取，无 OOM 风险） |
+| `storage_type` | VARCHAR | `local`/`server`/`oss` |
+| `metadata` | JSONB | 物理元数据：`{"width":1920,"height":1080,"duration_seconds":120,"page_count":50}` |
+| `business_metadata` | JSONB | 业务/排版元数据预留：`{"caption":"...","layout":"full-width"}` |
 
-### NoteAttachment 实体注意事项
+### Asset 实体注意事项
 
 ```java
 // ★ 必须用 IdType.INPUT，否则 MyBatis-Plus 会误用自增策略
 @TableId(value = "uuid", type = IdType.INPUT)
 private UUID uuid;
 
-// storageType 在此模型中是 String 而非 enum，
-// 旧的 AttachmentModel 用 enum StorageType，新模型直接用字符串避免依赖旧包
-private String storageType;
+// ★ JSONB 字段必须使用 JsonbTypeHandler，不能用默认的 JacksonTypeHandler！
+// JacksonTypeHandler 输出 VARCHAR，PostgreSQL 拒绝隐式转换（BadSqlGrammarException）
+@TableField(value = "metadata", typeHandler = JsonbTypeHandler.class)
+private Map<String, Object> metadata;
+
+@TableField(value = "business_metadata", typeHandler = JsonbTypeHandler.class)
+private Map<String, Object> businessMetadata;
 ```
 
-### attachment_visions 表（关键字段）
+图片上传时 `metadata` 存放宽高：
+```java
+Map<String, Object> meta = new HashMap<>();
+meta.put("width", width);
+meta.put("height", height);
+asset.setMetadata(meta);
+```
 
-> 该表由异步识别 Worker 写入，用于让图片内容可被全文检索。
+### asset_extractions 表（关键字段）
 
-关键字段：
+> 由异步 Worker 写入，存储 AI 描述/PDF全文/视频转录等提取结果，替代旧的 `attachment_visions`。
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `uuid` | UUID | 识别记录业务 UUID（唯一） |
+| `uuid` | UUID | 提取记录业务 UUID |
 | `user_id` | BIGINT | 租户隔离 |
-| `attachment_uuid` | UUID | 关联 `note_attachments.uuid`（同一附件可多次识别，但默认 1:1） |
-| `model` | VARCHAR | 识别所用模型/用途标识（当前为 `vision-analyze`） |
+| `asset_uuid` | UUID | 关联 `assets.uuid` |
+| `note_uuid` | UUID | 冗余，便于按笔记关联查询 |
+| `content_type` | VARCHAR | 提取方式：`vision`/`ocr`/`pdf_text`/`transcript` |
+| `content` | TEXT | 提取结果（PENDING/FAILED 允许 NULL） |
+| `model` | VARCHAR | 识别所用模型名（溯源） |
 | `status` | VARCHAR | `PENDING` / `DONE` / `FAILED` |
-| `vision_text` | TEXT | 识别结果文本（必须允许 NULL，PENDING/FAILED 时为空） |
 
 对应模型文件：
 - [attachment/infra/persistence/vision/AttachmentVisionModel.java](../../backend/src/main/java/com/doublez/pocketmindserver/attachment/infra/persistence/vision/AttachmentVisionModel.java)
+
+---
+
+## ⚠️ Spring Boot 4.x 关键陷阱
+
+### 陷阱：PostgreSQL JSONB 字段插入报 BadSqlGrammarException
+
+**现象**：
+```
+org.postgresql.util.PSQLException: ERROR: column "metadata" is of type jsonb
+but expression is of type character varying
+```
+
+**根因**：MyBatis-Plus 内置 `JacksonTypeHandler` 调用 `ps.setString()`，JDBC 层类型为 VARCHAR，
+PostgreSQL 不允许隐式 VARCHAR→JSONB 转换。
+
+**修复**：使用自定义 `JsonbTypeHandler`，核心在于 `ps.setObject(i, jsonString, Types.OTHER)`，
+`Types.OTHER` 让 PostgreSQL JDBC 驱动将字符串识别为 jsonb：
+
+```java
+// shared/mybatis/JsonbTypeHandler.java
+@Override
+public void setNonNullParameter(PreparedStatement ps, int i,
+                                Map<String, Object> parameter,
+                                JdbcType jdbcType) throws SQLException {
+    try {
+        // Types.OTHER 告诉驱动「这是数据库原生类型」，PostgreSQL 将其识别为 jsonb
+        ps.setObject(i, MAPPER.writeValueAsString(parameter), Types.OTHER);
+    } catch (JsonProcessingException e) {
+        throw new SQLException("无法将 Map 序列化为 JSON: " + e.getMessage(), e);
+    }
+}
+```
+
+注意：无需引入 `org.postgresql:postgresql` compile 依赖，runtime scope 即可。
 
 ---
 
@@ -454,19 +498,70 @@ Response: { uuid, mime, size, width, height }
 
 ## 扩展指南
 
-### 接入 S3
+### 接入 S3（模式一：服务端代理，当前 SPI 可直接支持）
 
 1. 新建 `S3AssetStore implements AssetStore`
 2. 在 `saveFromFile` 中调用 `S3Client.putObject`
-3. 在 `getResource` 中返回 `UrlResource`（预签名 URL）或代理流
-4. 在 `createResourceRegion` 中使用 `GetObjectRequest.builder().range(...)` 精确拉取字节段
-5. 修改 `@Primary` 注解切换实现，或通过 `@ConditionalOnProperty` 按配置选择
-6. `storageType` 字段改写为 `"s3"`，历史数据继续用本地实现处理
+3. 在 `getResource` 中用 `S3Client.getObject` 下载到 `InputStreamResource` 再透传
+4. 在 `createResourceRegion` 中使用 `GetObjectRequest.builder().range("bytes=start-end")` 精确拉取
+5. 通过 `@ConditionalOnProperty("app.storage.type", havingValue="s3")` 按配置选择
+6. `storage_type` 字段改写为 `"s3"`，历史数据继续用本地实现处理
+
+> **⚠️ 代理模式的局限**：图片数据仍经过服务器（Client→Server→S3→Server→Client），
+> 上行耗带宽 CPU，下行翻倍延迟，不适合高并发生产环境。
+
+### 接入 S3（模式二：企业级直传，Pre-signed URL）
+
+这是真正的企业级方案，图片数据**完全不经过服务器**：
+
+**上传流程**：
+```
+前端 → POST /api/assets/presign  (告诉后端：我要传 images/pdf)
+后端 → 生成 N 个带时效 + 大小限制的 Pre-signed PUT URL，返回给前端
+前端 → 直接并发 PUT 到 OSS/S3（不经过服务器，零服务器带宽消耗）
+前端 → POST /api/assets/commit  (提交已上传成功的 storageKey 列表)
+后端 → 校验文件存在 + 写 assets 表 + 投 MQ
+```
+
+**下载流程**：
+```
+前端 → GET /api/assets/{uuid}/url  (需要访问图片)
+后端 → 校验归属，生成 Pre-signed GET URL（时效 15min）
+前端 → 直接用该 URL 访问 CDN/S3（零服务器带宽）
+```
+
+**Pre-signed URL 的安全参数**：
+- `ContentLengthRange`：限制最大文件大小（防恶意超大文件）
+- `ContentType`：锁定 MIME 类型（防上传可执行文件）
+- `Expires`：15 分钟时效（防盗链）
+- Key 前缀必须包含 `userId/`（租户隔离，防越权写入）
+
+**SPI 变化**：模式二需要 `AssetStore` 增加两个方法：
+```java
+// 生成上传用 Pre-signed PUT URL
+String generatePresignedPutUrl(String storageKey, String contentType, long maxSizeBytes, int expirySeconds);
+
+// 生成下载用 Pre-signed GET URL（或 CDN 签名 URL）
+String generatePresignedGetUrl(String storageKey, int expirySeconds);
+```
+
+此时 `saveFromFile` 和 `getResource`/`createResourceRegion` 对 S3 实现变为空操作，
+服务器端 HTTP 206 Range 功能移交给 CDN（性能更好）。
+
+**何时用哪种模式**：
+
+| | 代理模式 | Pre-signed 直传 |
+|---|---|---|
+| 实现复杂度 | 低，当前 SPI 直接支持 | 中，需新增 presign/commit 接口 |
+| 服务器带宽 | 全量消耗 | 零消耗 |
+| 适合场景 | 开发/小规模自建 | 生产/高并发/云厂商 OSS |
+| HTTP Range | 服务器实现 | CDN/S3 原生支持 |
 
 ### 接入视频流
 
 视频与图片同架构，区别：
 - Controller 须始终检测 Range（视频播放器必需）
-- `type` 字段改为 `"video"`
-- `width`/`height` 用于视频分辨率
+- `type` 字段为 `"video"`
+- `metadata` JSONB 存 `{"width":1920,"height":1080,"duration_seconds":120}`
 - `createResourceRegion` 逻辑完全复用，无需任何改动
+- 视频建议优先使用 Pre-signed 直传 + CDN 分发（视频文件体积通常 > 100MB）
