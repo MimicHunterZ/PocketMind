@@ -38,12 +38,12 @@ import java.util.UUID;
 @Slf4j
 @RestController
 @RequestMapping("/api/assets/images")
-public class AssetController {
+public class ImageAssetController {
 
     private final ImageUploadService uploadService;
     private final ImageServeService  serveService;
 
-    public AssetController(ImageUploadService uploadService, ImageServeService serveService) {
+    public ImageAssetController(ImageUploadService uploadService, ImageServeService serveService) {
         this.uploadService = uploadService;
         this.serveService  = serveService;
     }
@@ -92,12 +92,10 @@ public class AssetController {
 
         // 在 Controller 层判断 Range，保持 Service 职责单一
         if (!requestHeaders.getRange().isEmpty()) {
-            ResponseEntity<ResourceRegion> partial = serveService.servePartialImage(uuid, userId, requestHeaders);
-            return partial;
+            return serveService.servePartialImage(uuid, userId, requestHeaders);
         }
 
-        ResponseEntity<Resource> full = serveService.serveFullImage(uuid, userId);
-        return full;
+        return serveService.serveFullImage(uuid, userId);
     }
 
     private long parseUserId() {

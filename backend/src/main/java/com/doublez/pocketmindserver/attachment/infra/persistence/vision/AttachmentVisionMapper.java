@@ -11,7 +11,7 @@ import java.util.List;
 public interface AttachmentVisionMapper extends BaseMapper<AttachmentVisionModel> {
 
     @Select("""
-            SELECT * FROM attachment_visions
+            SELECT * FROM asset_extractions
             WHERE user_id = #{userId}
               AND status = 'PENDING'
               AND is_deleted = FALSE
@@ -23,7 +23,7 @@ public interface AttachmentVisionMapper extends BaseMapper<AttachmentVisionModel
             @Param("limit") int limit);
 
     @Select("""
-            SELECT * FROM attachment_visions
+            SELECT * FROM asset_extractions
             WHERE user_id = #{userId}
               AND updated_at > #{cursor}
             ORDER BY updated_at ASC

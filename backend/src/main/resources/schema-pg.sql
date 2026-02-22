@@ -135,53 +135,61 @@ CREATE TABLE IF NOT EXISTS note_tag_relation (
 CREATE INDEX IF NOT EXISTS idx_note_tag_relation_tag ON note_tag_relation(tag_id);
 
 -- ============================================================
--- 5. note_attachments（图片/PDF/文件元数据）
+-- 5. assets（物理资产表：图片/PDF/视频/文件等任意格式）
 -- ============================================================
-CREATE TABLE IF NOT EXISTS note_attachments (
-    id           BIGSERIAL   PRIMARY KEY,
-    uuid         UUID        NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    user_id      BIGINT      NOT NULL,
-    note_uuid    UUID        NOT NULL,
-
-    type         VARCHAR(20) NOT NULL,   -- 'image' | 'pdf' | 'file'
-    mime         VARCHAR(100),
-    -- storage_key 可能是本地相对路径(pocket_images/xxx.jpg)，也可能是 OSS key
-    storage_key  TEXT        NOT NULL,
-    storage_type VARCHAR(20) NOT NULL DEFAULT 'local',  -- 'local' | 'server' | 'oss'
-    sha256       CHAR(64),        -- 内容去重，相同 hash 复用同一文件
-    width        INT,             -- 图片宽（px）
-    height       INT,             -- 图片高（px）
-    source       VARCHAR(20) NOT NULL DEFAULT 'user',  -- 'user' | 'scrape'
-
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at   BIGINT      NOT NULL DEFAULT 0,
-    is_deleted   BOOLEAN     NOT NULL DEFAULT FALSE
-);
-
-CREATE INDEX IF NOT EXISTS idx_attachments_user_note  ON note_attachments(user_id, note_uuid);
-CREATE INDEX IF NOT EXISTS idx_attachments_sha256     ON note_attachments(user_id, sha256);
-CREATE INDEX IF NOT EXISTS idx_attachments_user_uuid  ON note_attachments(user_id, uuid);
-
--- 兼容旧库：为 note_attachments 添加图片资产子系统所需新列（幂等，可重复执行）
--- size：文件字节数，供前端展示和磁盘统计
-ALTER TABLE note_attachments ADD COLUMN IF NOT EXISTS size             BIGINT NOT NULL DEFAULT 0;
--- original_file_name：上传时客户端提供的原始文件名
-ALTER TABLE note_attachments ADD COLUMN IF NOT EXISTS original_file_name  TEXT;
--- note_uuid 改为允许 NULL（独立上传时先不绑定笔记）
-ALTER TABLE note_attachments ALTER COLUMN note_uuid DROP NOT NULL;
-
--- ============================================================
--- 6. attachment_visions（图片 AI 识别结果，使图片内容可被文本检索）
--- ============================================================
-CREATE TABLE IF NOT EXISTS attachment_visions (
+CREATE TABLE IF NOT EXISTS assets (
     id               BIGSERIAL   PRIMARY KEY,
     uuid             UUID        NOT NULL UNIQUE DEFAULT gen_random_uuid(),
     user_id          BIGINT      NOT NULL,
-    attachment_uuid  UUID        NOT NULL,   -- FK → note_attachments.uuid
+    -- 归属笔记（允许为 NULL：上传中尚未绑定笔记）
+    note_uuid        UUID,
 
-    model            VARCHAR(100) NOT NULL,  -- 识别所用模型名（溯源）
-    vision_text      TEXT,                  -- AI 图片描述（PENDING/FAILED 允许为 NULL），用于 FTS 检索
-    prompt_used      TEXT,
+    -- 格式分类：'image' | 'pdf' | 'video' | 'audio' | 'file'
+    type             VARCHAR(20) NOT NULL,
+    -- 来源：'user'（用户上传）| 'scrape'（爬虫抓取）| 'system_gen'（系统生成）
+    source           VARCHAR(20) NOT NULL DEFAULT 'user',
+
+    -- 物理属性
+    mime             VARCHAR(100) NOT NULL,
+    size             BIGINT       NOT NULL DEFAULT 0,
+    file_name        TEXT,                   -- 上传时的原始文件名
+    sha256           CHAR(64),               -- 内容指纹，存储层去重
+
+    -- 存储路径
+    storage_key      TEXT         NOT NULL,
+    storage_type     VARCHAR(20)  NOT NULL DEFAULT 'local',  -- 'local' | 'server' | 'oss'
+
+    -- 物理元数据（存放: {"width":1920,"height":1080,"duration_seconds":120,"page_count":50}）
+    metadata         JSONB        NOT NULL DEFAULT '{}'::jsonb,
+    -- 业务/排版元数据预留（存放: {"caption":"小猫","layout":"full-width"}）
+    business_metadata JSONB       NOT NULL DEFAULT '{}'::jsonb,
+
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at       BIGINT       NOT NULL DEFAULT 0,
+    is_deleted       BOOLEAN      NOT NULL DEFAULT FALSE
+);
+
+CREATE INDEX IF NOT EXISTS idx_assets_user_note  ON assets(user_id, note_uuid);
+CREATE INDEX IF NOT EXISTS idx_assets_sha256     ON assets(user_id, sha256);
+CREATE INDEX IF NOT EXISTS idx_assets_user_uuid  ON assets(user_id, uuid);
+CREATE INDEX IF NOT EXISTS idx_assets_type       ON assets(user_id, type);
+
+-- ============================================================
+-- 6. asset_extractions（异步内容提取结果：AI描述/PDF全文/视频转录）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS asset_extractions (
+    id               BIGSERIAL   PRIMARY KEY,
+    uuid             UUID        NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    user_id          BIGINT      NOT NULL,
+    asset_uuid       UUID        NOT NULL,   -- FK → assets.uuid
+    note_uuid        UUID,                   -- 冗余，便于按笔记关联查询
+
+    -- 提取方式：'vision'（AI图片描述）| 'ocr' | 'pdf_text' | 'transcript'（视频转录）
+    content_type     VARCHAR(20) NOT NULL DEFAULT 'vision',
+    -- 提取出的文本内容（PENDING/FAILED 允许为 NULL），用于全文检索和 AI RAG
+    content          TEXT,
+    -- 识别所用模型名（溯源）
+    model            VARCHAR(100),
     status           VARCHAR(20) NOT NULL DEFAULT 'PENDING',  -- PENDING/DONE/FAILED
 
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -189,16 +197,11 @@ CREATE TABLE IF NOT EXISTS attachment_visions (
     is_deleted       BOOLEAN     NOT NULL DEFAULT FALSE
 );
 
--- 兼容历史库：早期版本将 vision_text 设为 NOT NULL，会导致 PENDING 记录插入失败。
--- 这里在每次启动初始化时强制修正（spring.sql.init.mode=always）。
-ALTER TABLE attachment_visions
-    ALTER COLUMN vision_text DROP NOT NULL;
-
-CREATE INDEX IF NOT EXISTS idx_visions_attachment  ON attachment_visions(attachment_uuid);
-CREATE INDEX IF NOT EXISTS idx_visions_user        ON attachment_visions(user_id, status);
--- 图片描述全文搜索
-CREATE INDEX IF NOT EXISTS idx_visions_fts ON attachment_visions USING GIN (
-    to_tsvector('simple', COALESCE(vision_text, ''))
+CREATE INDEX IF NOT EXISTS idx_extractions_asset   ON asset_extractions(asset_uuid);
+CREATE INDEX IF NOT EXISTS idx_extractions_user    ON asset_extractions(user_id, status);
+-- 提取内容全文搜索
+CREATE INDEX IF NOT EXISTS idx_extractions_fts ON asset_extractions USING GIN (
+    to_tsvector('simple', COALESCE(content, ''))
 );
 
 -- ============================================================
@@ -262,7 +265,7 @@ CREATE INDEX IF NOT EXISTS idx_messages_parent ON chat_messages(parent_uuid);
 CREATE TABLE IF NOT EXISTS sync_change_log (
     id           BIGSERIAL   PRIMARY KEY,
     user_id      BIGINT      NOT NULL,
-    entity_type  VARCHAR(30) NOT NULL,   -- 'note'|'attachment'|'vision'|'chat_message'...
+    entity_type  VARCHAR(30) NOT NULL,   -- 'note'|'asset'|'asset_extraction'|'chat_message'...
     entity_uuid  UUID        NOT NULL,
     op           VARCHAR(10) NOT NULL,   -- 'upsert' | 'delete'
     updated_at   BIGINT      NOT NULL DEFAULT 0

@@ -27,8 +27,6 @@ public class AttachmentEntity {
     private String storageKey;
     private StorageType storageType;
     private final String sha256;
-    private final Integer width;
-    private final Integer height;
     private final AttachmentSource source;
 
     private long updatedAt;
@@ -46,8 +44,6 @@ public class AttachmentEntity {
             "storageKey",
             "storageType",
             "sha256",
-            "width",
-            "height",
             "source",
             "updatedAt",
             "deleted"
@@ -60,8 +56,6 @@ public class AttachmentEntity {
                             String storageKey,
                             StorageType storageType,
                             String sha256,
-                            Integer width,
-                            Integer height,
                             AttachmentSource source,
                             long updatedAt,
                             boolean deleted) {
@@ -73,8 +67,6 @@ public class AttachmentEntity {
         this.storageKey = Objects.requireNonNull(storageKey, "storageKey");
         this.storageType = storageType != null ? storageType : StorageType.LOCAL;
         this.sha256 = sha256;
-        this.width = width;
-        this.height = height;
         this.source = source != null ? source : AttachmentSource.USER;
         this.updatedAt = updatedAt;
         this.deleted = deleted;
@@ -83,8 +75,7 @@ public class AttachmentEntity {
     public static AttachmentEntity create(UUID uuid, long userId, UUID noteUuid,
                                            AttachmentType type, String mime,
                                            String storageKey, StorageType storageType,
-                                           String sha256, Integer width, Integer height,
-                                           AttachmentSource source) {
+                                           String sha256, AttachmentSource source) {
         return new AttachmentEntity(
             uuid,
             userId,
@@ -94,8 +85,6 @@ public class AttachmentEntity {
             storageKey,
             storageType,
             sha256,
-            width,
-            height,
             source,
             System.currentTimeMillis(),
             false

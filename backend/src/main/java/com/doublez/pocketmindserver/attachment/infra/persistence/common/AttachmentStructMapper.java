@@ -35,8 +35,16 @@ public interface AttachmentStructMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "isDeleted", source = "deleted")
+    @Mapping(target = "assetUuid", source = "assetUuid")
+    @Mapping(target = "content", source = "content")
+    @Mapping(target = "contentType", source = "contentType")
+    @Mapping(target = "noteUuid", source = "noteUuid")
     AttachmentVisionModel toVisionModel(AttachmentVisionEntity entity);
 
     @Mapping(target = "deleted", source = "isDeleted")
+    @Mapping(target = "assetUuid", source = "assetUuid")
+    @Mapping(target = "content", source = "content")
+    @Mapping(target = "contentType", source = "contentType")
+    @Mapping(target = "noteUuid", source = "noteUuid")
     AttachmentVisionEntity toVisionDomain(AttachmentVisionModel model);
 }

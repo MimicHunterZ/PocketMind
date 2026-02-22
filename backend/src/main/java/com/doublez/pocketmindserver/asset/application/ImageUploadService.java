@@ -1,8 +1,8 @@
 package com.doublez.pocketmindserver.asset.application;
 
 import com.doublez.pocketmindserver.asset.application.dto.UploadResultDTO;
-import com.doublez.pocketmindserver.asset.domain.NoteAttachment;
-import com.doublez.pocketmindserver.asset.domain.NoteAttachmentRepository;
+import com.doublez.pocketmindserver.asset.domain.Asset;
+import com.doublez.pocketmindserver.asset.domain.AssetRepository;
 import com.doublez.pocketmindserver.asset.spi.AssetStore;
 import com.doublez.pocketmindserver.mq.VisionMessagePublisher;
 import com.doublez.pocketmindserver.shared.web.ApiCode;
@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -60,11 +61,11 @@ public class ImageUploadService {
     private static final DateTimeFormatter DATE_PATH_FMT = DateTimeFormatter.ofPattern("yyyy/MM/dd");
 
     private final AssetStore               assetStore;
-    private final NoteAttachmentRepository  attachmentRepository;
-    private final VisionMessagePublisher    visionMessagePublisher;
+    private final AssetRepository          attachmentRepository;
+    private final VisionMessagePublisher   visionMessagePublisher;
 
     public ImageUploadService(AssetStore assetStore,
-                              NoteAttachmentRepository attachmentRepository,
+                              AssetRepository attachmentRepository,
                               VisionMessagePublisher visionMessagePublisher) {
         this.assetStore             = assetStore;
         this.attachmentRepository   = attachmentRepository;
@@ -107,8 +108,8 @@ public class ImageUploadService {
             // 5. 物理落盘
             assetStore.saveFromFile(userDir, storageKey, tempFile, mime);
 
-            // 6. 构建并持久化 NoteAttachment 实体
-            NoteAttachment entity = buildEntity(attachmentUuid, userId, mime, fileSize,
+            // 6. 构建并持久化 Asset 实体
+            Asset entity = buildEntity(attachmentUuid, userId, mime, fileSize,
                     originalName, storageKey, width, height);
             attachmentRepository.save(entity);
 
@@ -230,25 +231,29 @@ public class ImageUploadService {
     }
 
     /**
-     * 构建 NoteAttachment 实体，填充所有必须字段。
+     * 构建 Asset 实体，填充所有必须字段。
+     * 宽高写入 metadata JSONB，不作为独立列存储。
      */
-    private NoteAttachment buildEntity(UUID uuid, long userId, String mime, long size,
-                                       String originalFileName, String storageKey,
-                                       int width, int height) {
-        NoteAttachment e = new NoteAttachment();
+    private Asset buildEntity(UUID uuid, long userId, String mime, long size,
+                               String originalFileName, String storageKey,
+                               int width, int height) {
+        Asset e = new Asset();
         e.setUuid(uuid);
         e.setUserId(userId);
-        e.setNoteUuid(null);             // 独立上传时先不关联笔记
+        e.setNoteUuid(null);          // 独立上传时先不关联笔记
         e.setType("image");
+        e.setSource("user");
         e.setMime(mime);
         e.setSize(size);
-        e.setOriginalFileName(originalFileName);
+        e.setFileName(originalFileName);
         e.setStorageKey(storageKey);
         e.setStorageType("local");
-        e.setSha256(null);               // 暂不计算 sha256，按需开启
-        e.setWidth(width);
-        e.setHeight(height);
-        e.setSource("user");
+        e.setSha256(null);            // 暂不计算 sha256，按需开启
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("width", width);
+        meta.put("height", height);
+        e.setMetadata(meta);
+        e.setBusinessMetadata(new HashMap<>());
         e.setUpdatedAt(Instant.now().toEpochMilli());
         e.setIsDeleted(false);
         return e;

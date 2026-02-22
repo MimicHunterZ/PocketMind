@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Data
-@TableName("note_attachments")
+@TableName("assets")
 public class AttachmentModel {
 
     @TableId(type = IdType.AUTO)
@@ -24,8 +24,6 @@ public class AttachmentModel {
     private String storageKey;
     private StorageType storageType;
     private String sha256;
-    private Integer width;
-    private Integer height;
     private AttachmentSource source;
 
     @TableField(fill = FieldFill.INSERT)

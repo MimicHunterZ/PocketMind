@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Data
-@TableName("attachment_visions")
+@TableName("asset_extractions")
 public class AttachmentVisionModel {
 
     @TableId(type = IdType.AUTO)
@@ -16,10 +16,11 @@ public class AttachmentVisionModel {
 
     private UUID uuid;
     private Long userId;
-    private UUID attachmentUuid;
+    private UUID assetUuid;
+    private UUID noteUuid;
+    private String contentType;
+    private String content;
     private String model;
-    private String visionText;
-    private String promptUsed;
     private VisionStatus status;
 
     @TableField(fill = FieldFill.INSERT)

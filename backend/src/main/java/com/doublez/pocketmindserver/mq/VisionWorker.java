@@ -1,8 +1,8 @@
 package com.doublez.pocketmindserver.mq;
 
 import com.doublez.pocketmindserver.ai.application.VisionService;
-import com.doublez.pocketmindserver.asset.domain.NoteAttachment;
-import com.doublez.pocketmindserver.asset.domain.NoteAttachmentRepository;
+import com.doublez.pocketmindserver.asset.domain.Asset;
+import com.doublez.pocketmindserver.asset.domain.AssetRepository;
 import com.doublez.pocketmindserver.asset.spi.AssetStore;
 import com.doublez.pocketmindserver.attachment.domain.vision.AttachmentVisionEntity;
 import com.doublez.pocketmindserver.attachment.domain.vision.AttachmentVisionRepository;
@@ -37,7 +37,7 @@ public class VisionWorker {
     private static final String MODEL_LABEL = "vision-analyze";
 
     private final AttachmentVisionRepository attachmentVisionRepository;
-    private final NoteAttachmentRepository   noteAttachmentRepository;
+    private final AssetRepository            assetRepository;
     private final AssetStore                 assetStore;
     private final VisionService              visionService;
 
@@ -56,7 +56,7 @@ public class VisionWorker {
                 attachmentVisionRepository.findByAttachmentUuid(userId, attachmentUuid);
 
         if (existing.stream().anyMatch(e -> VisionStatus.DONE.equals(e.getStatus()))) {
-            log.warn("[VisionWorker] 幂等跳过（已存在 DONE 记录）- attachmentUuid: {}", attachmentUuid);
+            log.warn("[VisionWorker] 幂等跳过（已存在 DONE 记录）- assetUuid: {}", attachmentUuid);
             return;
         }
 
@@ -81,39 +81,39 @@ public class VisionWorker {
             log.debug("[VisionWorker] 复用已有实体 - uuid: {}, status: {}", visionEntity.getUuid(), visionEntity.getStatus());
         }
 
-        // ── 3. 加载附件元数据（查不到直接抛，不需要 markFailed） ─────────────
-        NoteAttachment attachment = noteAttachmentRepository
+        // ── 3. 加载资产元数据（查不到直接抛，不需要 markFailed） ─────────────
+        Asset asset = assetRepository
                 .findByUuidAndUserId(attachmentUuid, userId)
                 .orElseThrow(() -> new IllegalStateException(
-                        "附件记录不存在: attachmentUuid=" + attachmentUuid + ", userId=" + userId));
+                        "资产记录不存在: assetUuid=" + attachmentUuid + ", userId=" + userId));
 
         // ── 4. 获取存储资源 + AI 调用（统一 try-catch，任何异常都 markFailed）─
         try {
             Resource imageResource = assetStore.getResource(
                     String.valueOf(userId),
-                    attachment.getStorageKey()
+                    asset.getStorageKey()
             );
 
             MimeType mimeType;
             try {
-                mimeType = MimeTypeUtils.parseMimeType(attachment.getMime());
+                mimeType = MimeTypeUtils.parseMimeType(asset.getMime());
             } catch (Exception e) {
-                log.warn("[VisionWorker] MIME 解析失败（{}），降级为 image/jpeg - attachmentUuid: {}",
-                        attachment.getMime(), attachmentUuid);
+                log.warn("[VisionWorker] MIME 解析失败（{}），降级为 image/jpeg - assetUuid: {}",
+                        asset.getMime(), attachmentUuid);
                 mimeType = MimeTypeUtils.IMAGE_JPEG;
             }
 
             String visionText = visionService.analyzeImage(imageResource, mimeType);
 
-            visionEntity.markDone(visionText, null);
+            visionEntity.markDone(visionText);
             attachmentVisionRepository.update(visionEntity);
-            log.info("[VisionWorker] 识别成功 - attachmentUuid: {}, textLen: {}",
+            log.info("[VisionWorker] 识别成功 - assetUuid: {}, textLen: {}",
                     attachmentUuid, visionText.length());
 
         } catch (Exception e) {
             // 每次重试失败都 markFailed 并更新 DB，确保状态可被监控；
             // 重新抛出让 Spring Retry → RepublishMessageRecoverer 处理。
-            log.error("[VisionWorker] 管线异常，将触发重试 - attachmentUuid: {}, entityUuid: {}, error: {}",
+            log.error("[VisionWorker] 管线异常，将触发重试 - assetUuid: {}, entityUuid: {}, error: {}",
                     attachmentUuid, visionEntity.getUuid(), e.getMessage(), e);
             try {
                 visionEntity.markFailed();
@@ -122,7 +122,7 @@ public class VisionWorker {
                 log.error("[VisionWorker] markFailed 落库也失败 - entityUuid: {}, cause: {}",
                         visionEntity.getUuid(), updateEx.getMessage(), updateEx);
             }
-            throw new RuntimeException("Vision 管线失败: attachmentUuid=" + attachmentUuid, e);
+            throw new RuntimeException("Vision 管线失败: assetUuid=" + attachmentUuid, e);
         }
     }
 }

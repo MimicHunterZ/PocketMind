@@ -17,11 +17,12 @@ public class AttachmentVisionEntity {
 
     private final UUID uuid;
     private final long userId;
-    private final UUID attachmentUuid;
+    private final UUID assetUuid;
+    private final UUID noteUuid;
 
     private final String model;
-    private String visionText;
-    private String promptUsed;
+    private final String contentType;
+    private String content;
     private VisionStatus status;
 
     private long updatedAt;
@@ -33,41 +34,45 @@ public class AttachmentVisionEntity {
     @ConstructorProperties({
             "uuid",
             "userId",
-            "attachmentUuid",
+            "assetUuid",
+            "noteUuid",
             "model",
-            "visionText",
-            "promptUsed",
+            "contentType",
+            "content",
             "status",
             "updatedAt",
             "deleted"
     })
     public AttachmentVisionEntity(UUID uuid,
                                   long userId,
-                                  UUID attachmentUuid,
+                                  UUID assetUuid,
+                                  UUID noteUuid,
                                   String model,
-                                  String visionText,
-                                  String promptUsed,
+                                  String contentType,
+                                  String content,
                                   VisionStatus status,
                                   long updatedAt,
                                   boolean deleted) {
         this.uuid = Objects.requireNonNull(uuid, "uuid");
         this.userId = userId;
-        this.attachmentUuid = Objects.requireNonNull(attachmentUuid, "attachmentUuid");
+        this.assetUuid = Objects.requireNonNull(assetUuid, "assetUuid");
+        this.noteUuid = noteUuid;
         this.model = Objects.requireNonNull(model, "model");
-        this.visionText = visionText;
-        this.promptUsed = promptUsed;
+        this.contentType = contentType != null ? contentType : "vision";
+        this.content = content;
         this.status = status != null ? status : VisionStatus.PENDING;
         this.updatedAt = updatedAt;
         this.deleted = deleted;
     }
 
-    public static AttachmentVisionEntity create(UUID uuid, long userId, UUID attachmentUuid, String model) {
+    public static AttachmentVisionEntity create(UUID uuid, long userId, UUID assetUuid, String model) {
         return new AttachmentVisionEntity(
                 uuid,
                 userId,
-                attachmentUuid,
-                model,
+                assetUuid,
                 null,
+                model,
+                "vision",
                 null,
                 VisionStatus.PENDING,
                 System.currentTimeMillis(),
@@ -75,9 +80,8 @@ public class AttachmentVisionEntity {
         );
     }
 
-    public void markDone(String visionText, String promptUsed) {
-        this.visionText = Objects.requireNonNull(visionText, "visionText");
-        this.promptUsed = promptUsed;
+    public void markDone(String content) {
+        this.content = Objects.requireNonNull(content, "content");
         this.status = VisionStatus.DONE;
         this.updatedAt = System.currentTimeMillis();
     }

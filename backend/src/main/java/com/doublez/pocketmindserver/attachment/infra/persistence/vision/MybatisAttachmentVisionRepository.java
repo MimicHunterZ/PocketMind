@@ -61,7 +61,7 @@ public class MybatisAttachmentVisionRepository implements AttachmentVisionReposi
         return mapper.selectList(
                 new LambdaQueryWrapper<AttachmentVisionModel>()
                         .eq(AttachmentVisionModel::getUserId, userId)
-                        .eq(AttachmentVisionModel::getAttachmentUuid, attachmentUuid)
+                        .eq(AttachmentVisionModel::getAssetUuid, attachmentUuid)
                         .eq(AttachmentVisionModel::getIsDeleted, false)
         ).stream().map(structMapper::toVisionDomain).toList();
     }

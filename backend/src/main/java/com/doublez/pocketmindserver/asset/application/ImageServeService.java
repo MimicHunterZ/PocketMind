@@ -1,7 +1,7 @@
 package com.doublez.pocketmindserver.asset.application;
 
-import com.doublez.pocketmindserver.asset.domain.NoteAttachment;
-import com.doublez.pocketmindserver.asset.domain.NoteAttachmentRepository;
+import com.doublez.pocketmindserver.asset.domain.Asset;
+import com.doublez.pocketmindserver.asset.domain.AssetRepository;
 import com.doublez.pocketmindserver.asset.spi.AssetStore;
 import com.doublez.pocketmindserver.shared.web.ApiCode;
 import com.doublez.pocketmindserver.shared.web.BusinessException;
@@ -40,9 +40,9 @@ public class ImageServeService {
             CacheControl.maxAge(365, TimeUnit.DAYS).cachePrivate();
 
     private final AssetStore assetStore;
-    private final NoteAttachmentRepository attachmentRepository;
+    private final AssetRepository attachmentRepository;
 
-    public ImageServeService(AssetStore assetStore, NoteAttachmentRepository attachmentRepository) {
+    public ImageServeService(AssetStore assetStore, AssetRepository attachmentRepository) {
         this.assetStore = assetStore;
         this.attachmentRepository = attachmentRepository;
     }
@@ -55,7 +55,7 @@ public class ImageServeService {
      * @return 包含 Content-Type 和 Cache-Control 头的 200 响应
      */
     public ResponseEntity<Resource> serveFullImage(UUID attachmentUuid, long userId) {
-        NoteAttachment attachment = requireOwnedAttachment(attachmentUuid, userId);
+        Asset attachment = requireOwnedAttachment(attachmentUuid, userId);
         Resource resource = assetStore.getResource(String.valueOf(userId), attachment.getStorageKey());
 
         log.debug("[ImageServe] 200 全量响应: uuid={}, key={}", attachmentUuid, attachment.getStorageKey());
@@ -80,7 +80,7 @@ public class ImageServeService {
     public ResponseEntity<ResourceRegion> servePartialImage(
             UUID attachmentUuid, long userId, HttpHeaders requestHeaders) {
 
-        NoteAttachment attachment = requireOwnedAttachment(attachmentUuid, userId);
+        Asset attachment = requireOwnedAttachment(attachmentUuid, userId);
         ResourceRegion region = assetStore.createResourceRegion(
                 String.valueOf(userId), attachment.getStorageKey(), requestHeaders);
 
@@ -97,7 +97,7 @@ public class ImageServeService {
      * 从 DB 查询附件并校验归属权（越权防御）。
      * 若附件不存在或不属于该用户，抛出 404 BusinessException。
      */
-    private NoteAttachment requireOwnedAttachment(UUID attachmentUuid, long userId) {
+    private Asset requireOwnedAttachment(UUID attachmentUuid, long userId) {
         return attachmentRepository.findByUuidAndUserId(attachmentUuid, userId)
                 .orElseThrow(() -> new BusinessException(
                         ApiCode.RESOURCE_NOT_FOUND,
