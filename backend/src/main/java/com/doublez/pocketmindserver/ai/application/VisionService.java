@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Service;
+import org.springframework.util.MimeType;
 import org.springframework.util.StreamUtils;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.http.HttpStatus;
@@ -52,6 +53,31 @@ public class VisionService {
                         .text(userPrompt)
                         // 3. 传入图片，Spring AI 会自动将其转为 Base64 格式的 Data URL
                         .media(MimeTypeUtils.IMAGE_PNG, imageResource)
+                )
+                .call()
+                .content()));
+    }
+
+    /**
+     * 供异步 Worker 调用：直接传入已加载的 Spring Resource 和真实 MIME 类型。
+     *
+     * @param imageResource 图片资源（来自 AssetStore.getResource()）
+     * @param mimeType      真实 MIME，如 image/jpeg、image/png
+     * @return AI 识别出的图片内容描述文本
+     */
+    public String analyzeImage(Resource imageResource, MimeType mimeType) {
+        if (!imageResource.exists()) {
+            return "错误：文件不存在";
+        }
+
+        String systemPrompt = readPrompt(systemPromptResource);
+        String userPrompt   = readPrompt(userPromptResource);
+
+        return failoverRouter.executeVision("vision-analyze", client -> Objects.requireNonNull(client.prompt()
+                .system(s -> s.text(systemPrompt))
+                .user(u -> u
+                        .text(userPrompt)
+                        .media(mimeType, imageResource)
                 )
                 .call()
                 .content()));

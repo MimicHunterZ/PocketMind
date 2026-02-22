@@ -1,18 +1,13 @@
 package com.doublez.pocketmindserver.ai.api;
 
-import com.doublez.pocketmindserver.ai.api.dto.AiImageAnalyzeRequest;
 import com.doublez.pocketmindserver.ai.api.dto.AiAnalyseAcceptRequest;
 import com.doublez.pocketmindserver.ai.api.dto.AiAnalyseAcceptResponse;
 import com.doublez.pocketmindserver.ai.application.AiAnalysePollingService;
-import com.doublez.pocketmindserver.ai.application.VisionService;
 import com.doublez.pocketmindserver.shared.security.UserContext;
-import com.doublez.pocketmindserver.shared.web.ApiCode;
-import com.doublez.pocketmindserver.shared.web.BusinessException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,8 +16,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * AI 内容分析接口
- * 功能：接收用户问题和 URL，根据问题决定精准回答或内容总结
+ * AI 内容分析接口。
+ * 功能：接收用户问题和 URL，根据问题决定精准回答或内容总结。
  */
 @Slf4j
 @RestController
@@ -30,32 +25,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class AiController {
-    private final VisionService visionService;
 
     private final AiAnalysePollingService aiAnalysePollingService;
 
-        /**
-         * AI 分析（轮询模式）：立即返回 202 Accepted，客户端轮询。
-         */
-        @PostMapping(value = "/analyze", consumes = MediaType.APPLICATION_JSON_VALUE)
-        public ResponseEntity<AiAnalyseAcceptResponse> analyze(@Valid @RequestBody AiAnalyseAcceptRequest request) {
+    /**
+     * AI 分析（轮询模式）：立即返回 202 Accepted，客户端轮询。
+     */
+    @PostMapping(value = "/analyze", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<AiAnalyseAcceptResponse> analyze(@Valid @RequestBody AiAnalyseAcceptRequest request) {
         String userId = UserContext.getRequiredUserId();
         log.info("收到 AI 分析受理请求 - userId: {}, uuid: {}, url: {}, hasPreview: {}, hasQuestion: {}",
-            userId, request.uuid(), request.url(), request.hasPreviewContent(), request.hasUserQuestion());
+                userId, request.uuid(), request.url(), request.hasPreviewContent(), request.hasUserQuestion());
 
         aiAnalysePollingService.accept(userId, request);
         return ResponseEntity.accepted().body(new AiAnalyseAcceptResponse(request.uuid(), request.url()));
-        }
-
-    @PostMapping("/analyze/image")
-    public String analyzeImage(@Valid @RequestBody AiImageAnalyzeRequest request) {
-        String userId = UserContext.getRequiredUserId();
-        log.info("收到图片识别请求 - userId: {}, path: {}", userId, request.localImagePath());
-
-        String response = visionService.analyzeImage(request.localImagePath());
-        if(response == null){
-            throw new BusinessException(ApiCode.AI_RESPONSE_ERROR, HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-        return response;
     }
 }

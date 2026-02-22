@@ -4,6 +4,7 @@ import com.doublez.pocketmindserver.asset.application.dto.UploadResultDTO;
 import com.doublez.pocketmindserver.asset.domain.NoteAttachment;
 import com.doublez.pocketmindserver.asset.domain.NoteAttachmentRepository;
 import com.doublez.pocketmindserver.asset.spi.AssetStore;
+import com.doublez.pocketmindserver.mq.VisionMessagePublisher;
 import com.doublez.pocketmindserver.shared.web.ApiCode;
 import com.doublez.pocketmindserver.shared.web.BusinessException;
 import lombok.extern.slf4j.Slf4j;
@@ -58,12 +59,16 @@ public class ImageUploadService {
 
     private static final DateTimeFormatter DATE_PATH_FMT = DateTimeFormatter.ofPattern("yyyy/MM/dd");
 
-    private final AssetStore assetStore;
-    private final NoteAttachmentRepository attachmentRepository;
+    private final AssetStore               assetStore;
+    private final NoteAttachmentRepository  attachmentRepository;
+    private final VisionMessagePublisher    visionMessagePublisher;
 
-    public ImageUploadService(AssetStore assetStore, NoteAttachmentRepository attachmentRepository) {
-        this.assetStore = assetStore;
-        this.attachmentRepository = attachmentRepository;
+    public ImageUploadService(AssetStore assetStore,
+                              NoteAttachmentRepository attachmentRepository,
+                              VisionMessagePublisher visionMessagePublisher) {
+        this.assetStore             = assetStore;
+        this.attachmentRepository   = attachmentRepository;
+        this.visionMessagePublisher = visionMessagePublisher;
     }
 
     // 公共入口
@@ -109,7 +114,10 @@ public class ImageUploadService {
 
             log.info("[ImageUpload] 完成: uuid={}, storageKey={}, {}x{}", attachmentUuid, storageKey, width, height);
 
-            // 7. 返回含宽高的 DTO，以供前端立即渲染骨架屏占位
+            // 7. 异步投递 Vision 识别任务（图片落盘 + DB 落库均完成后才投递，保障幂等可重试）
+            visionMessagePublisher.publishVisionTask(attachmentUuid, userId);
+
+            // 8. 返回含宽高的 DTO，以供前端立即渲染骨架屏占位
             return new UploadResultDTO(attachmentUuid, mime, fileSize, width, height);
 
         } catch (IOException e) {

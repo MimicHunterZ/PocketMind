@@ -1,6 +1,10 @@
 spring:
   application:
     name: pocketmind-server
+  servlet:
+    multipart:
+      max-file-size: 10MB       # 单个文件的最大限制
+      max-request-size: 20MB    # 整个请求的最大限制
   datasource:
     url: jdbc:postgresql://localhost:5432/pocketmind
     username: your_username # 替换为你的数据库用户名

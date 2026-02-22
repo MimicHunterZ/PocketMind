@@ -180,7 +180,7 @@ CREATE TABLE IF NOT EXISTS attachment_visions (
     attachment_uuid  UUID        NOT NULL,   -- FK → note_attachments.uuid
 
     model            VARCHAR(100) NOT NULL,  -- 识别所用模型名（溯源）
-    vision_text      TEXT        NOT NULL,   -- AI 图片描述，用于 FTS 检索
+    vision_text      TEXT,                  -- AI 图片描述（PENDING/FAILED 允许为 NULL），用于 FTS 检索
     prompt_used      TEXT,
     status           VARCHAR(20) NOT NULL DEFAULT 'PENDING',  -- PENDING/DONE/FAILED
 
@@ -188,6 +188,11 @@ CREATE TABLE IF NOT EXISTS attachment_visions (
     updated_at       BIGINT      NOT NULL DEFAULT 0,
     is_deleted       BOOLEAN     NOT NULL DEFAULT FALSE
 );
+
+-- 兼容历史库：早期版本将 vision_text 设为 NOT NULL，会导致 PENDING 记录插入失败。
+-- 这里在每次启动初始化时强制修正（spring.sql.init.mode=always）。
+ALTER TABLE attachment_visions
+    ALTER COLUMN vision_text DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_visions_attachment  ON attachment_visions(attachment_uuid);
 CREATE INDEX IF NOT EXISTS idx_visions_user        ON attachment_visions(user_id, status);
