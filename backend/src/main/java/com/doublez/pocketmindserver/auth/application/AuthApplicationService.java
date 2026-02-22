@@ -13,7 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.UUID;
 
 @Service
@@ -42,7 +43,7 @@ public class AuthApplicationService {
         account.setUuid(UUID.randomUUID());
         account.setUsername(request.username());
         account.setPasswordHash(passwordEncoder.encode(request.password()));
-        account.setCreatedAt(LocalDateTime.now());
+        account.setCreatedAt(OffsetDateTime.now(ZoneId.of("Asia/Shanghai")));
         account.setUpdatedAt(System.currentTimeMillis());
 
         int inserted = userAccountRepository.insert(account);

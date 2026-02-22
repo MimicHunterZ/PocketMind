@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Data
@@ -21,7 +22,7 @@ public class UserAccount {
     private String passwordHash;
 
     @TableField("created_at")
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 
     @TableField("updated_at")
     private Long updatedAt;
