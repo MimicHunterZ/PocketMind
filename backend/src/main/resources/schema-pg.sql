@@ -162,6 +162,14 @@ CREATE INDEX IF NOT EXISTS idx_attachments_user_note  ON note_attachments(user_i
 CREATE INDEX IF NOT EXISTS idx_attachments_sha256     ON note_attachments(user_id, sha256);
 CREATE INDEX IF NOT EXISTS idx_attachments_user_uuid  ON note_attachments(user_id, uuid);
 
+-- 兼容旧库：为 note_attachments 添加图片资产子系统所需新列（幂等，可重复执行）
+-- size：文件字节数，供前端展示和磁盘统计
+ALTER TABLE note_attachments ADD COLUMN IF NOT EXISTS size             BIGINT NOT NULL DEFAULT 0;
+-- original_file_name：上传时客户端提供的原始文件名
+ALTER TABLE note_attachments ADD COLUMN IF NOT EXISTS original_file_name  TEXT;
+-- note_uuid 改为允许 NULL（独立上传时先不绑定笔记）
+ALTER TABLE note_attachments ALTER COLUMN note_uuid DROP NOT NULL;
+
 -- ============================================================
 -- 6. attachment_visions（图片 AI 识别结果，使图片内容可被文本检索）
 -- ============================================================

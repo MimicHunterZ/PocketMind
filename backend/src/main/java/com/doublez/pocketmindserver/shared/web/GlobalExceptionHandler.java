@@ -2,6 +2,7 @@ package com.doublez.pocketmindserver.shared.web;
 
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -67,6 +68,18 @@ public class GlobalExceptionHandler {
         // 生产和开发环境均不向前端暴露堆栈
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error(ApiCode.INTERNAL_ERROR, null, traceId));
+    }
+
+    /**
+     * Broken Pipe 容忍：客户端（移动端/浏览器）主动关闭连接时，Tomcat 抛出此异常。
+     * 图片加载中途取消、切换页面等均会触发。
+     * 仅打印 WARN 日志，严禁打印堆栈，避免大量图片加载场景下的日志雪崩。
+     */
+    @ExceptionHandler(ClientAbortException.class)
+    public ResponseEntity<Void> handleClientAbort(ClientAbortException e) {
+        log.warn("[AssetServe] 客户端主动关闭连接，传输中止: {}", e.getMessage());
+        // 499 = Client Closed Request（Nginx 惯例，表示客户端主动断开）
+        return ResponseEntity.status(499).build();
     }
 
     /**

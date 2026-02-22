@@ -3,6 +3,8 @@ package com.doublez.pocketmindserver.shared.web;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.core.MethodParameter;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.support.ResourceRegion;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.server.ServerHttpRequest;
@@ -35,6 +37,10 @@ public class ApiResponseAdvice implements ResponseBodyAdvice<Object> {
                                   ServerHttpRequest request,
                                   ServerHttpResponse response) {
         if (body instanceof ApiResponse<?>) {
+            return body;
+        }
+        // 二进制资源（图片/文件流），不做 JSON 包装直接透传
+        if (body instanceof Resource || body instanceof ResourceRegion) {
             return body;
         }
 

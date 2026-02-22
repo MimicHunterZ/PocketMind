@@ -23,6 +23,12 @@ public enum ApiCode {
     CHAT_MESSAGE_UPDATE_FAILED(502007, "消息更新失败"),
     ATTACHMENT_SAVE_FAILED(502005, "附件保存失败"),
     VISION_SAVE_FAILED(502006, "Vision 记录保存失败"),
+
+    // 图片资产子系统
+    ASSET_UPLOAD_FAILED(503001, "图片上传失败"),
+    ASSET_INVALID_FORMAT(503002, "不支持的图片格式"),
+    ASSET_NOT_FOUND(503003, "图片资产不存在或无权访问"),
+
     INTERNAL_ERROR(500000, "服务器内部错误");
 
     private final int code;
