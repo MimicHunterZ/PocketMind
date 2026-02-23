@@ -77,4 +77,11 @@ public class MybatisChatSessionRepository implements ChatSessionRepository {
         return mapper.findChangedSince(userId, query.cursor(), query.limit())
                 .stream().map(chatStructMapper::toSessionDomain).toList();
     }
+
+    @Override
+    public void deleteByUuidAndUserId(UUID uuid, long userId) {
+        mapper.delete(new LambdaQueryWrapper<ChatSessionModel>()
+                .eq(ChatSessionModel::getUuid, uuid)
+                .eq(ChatSessionModel::getUserId, userId));
+    }
 }

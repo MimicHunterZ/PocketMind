@@ -47,19 +47,45 @@ public class AiFailoverRouter {
     }
 
     /**
-     * 文本/通用对话：primary -> secondary -> fallback。
+     * 文本/通用对话：primary -> secondary -> fallback（同步/非流式场景）。
      */
     public <T> T executeChat(String purpose, Function<ChatClient, T> call) {
-        ChatClient secondary = chatSecondaryChatClientProvider == null ? null : chatSecondaryChatClientProvider.getIfAvailable();
-        ChatClient fallback = chatFallbackChatClientProvider == null ? null : chatFallbackChatClientProvider.getIfAvailable();
+        return execute(purpose, buildChatClientChain(), call);
+    }
 
-        if (secondary != null) {
-            if (fallback != null) {
-                return execute(purpose, List.of(chatPrimaryChatClient, secondary, fallback), call);
-            }
-            return execute(purpose, List.of(chatPrimaryChatClient, secondary), call);
+    /**
+     * 文本对话（响应式流版本）：primary -> secondary -> fallback。
+     * <p>
+     * 与同步版本的区别：{@link ChatClient} 的 stream() 返回惰性 {@link Flux}，
+     * 在订阅之前不会发起网络请求，因此同步 try/catch 无法捕获流内错误。
+     * 此方法使用 Reactor 的 {@code onErrorResume} 进行链式降级：
+     * 仅当订阅时真正出错，才触发下一个客户端重试。
+     * </p>
+     */
+    public Flux<String> executeChatStream(String purpose, Function<ChatClient, Flux<String>> call) {
+        List<ChatClient> clients = buildChatClientChain();
+        Flux<String> chain = call.apply(clients.get(0));
+        for (int i = 1; i < clients.size(); i++) {
+            final int tier = i;
+            final ChatClient next = clients.get(i);
+            chain = chain.onErrorResume(e -> {
+                log.warn("AI 流式调用失败，降级至第 {} 层 - purpose: {}, error: {}",
+                        tier, purpose, e.getClass().getSimpleName());
+                return call.apply(next);
+            });
         }
-        return execute(purpose, List.of(chatPrimaryChatClient), call);
+        return chain;
+    }
+
+    /** 按配置构建 chat 降级链（primary -> secondary? -> fallback?）。 */
+    private List<ChatClient> buildChatClientChain() {
+        List<ChatClient> list = new java.util.ArrayList<>();
+        list.add(chatPrimaryChatClient);
+        ChatClient secondary = chatSecondaryChatClientProvider.getIfAvailable();
+        if (secondary != null) list.add(secondary);
+        ChatClient fallback = chatFallbackChatClientProvider.getIfAvailable();
+        if (fallback != null) list.add(fallback);
+        return list;
     }
 
     /**

@@ -20,4 +20,9 @@ public interface ChatSessionRepository {
     List<ChatSessionEntity> findByNoteUuid(long userId, UUID noteUuid);
 
     List<ChatSessionEntity> findChangedSince(long userId, SyncCursorQuery query);
+
+    /**
+     * 按 UUID + userId 软删除会话（逻辑删除，触发 @TableLogic）。
+     */
+    void deleteByUuidAndUserId(UUID uuid, long userId);
 }
