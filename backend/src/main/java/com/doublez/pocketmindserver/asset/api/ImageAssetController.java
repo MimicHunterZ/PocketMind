@@ -63,13 +63,14 @@ public class ImageAssetController {
     @PostMapping(consumes = "multipart/form-data")
     public UploadResultDTO uploadImage(
             @RequestPart("file") MultipartFile file,
-            @RequestParam(value = "noteUuid", required = false) UUID noteUuid) {
+            @RequestParam(value = "noteUuid", required = false) UUID noteUuid,
+            @RequestParam(value = "sortOrder", defaultValue = "0") int sortOrder) {
 
         long userId = parseUserId();
-        log.info("[AssetController] 上传请求: userId={}, originalName={}, size={}B, noteUuid={}",
-                userId, file.getOriginalFilename(), file.getSize(), noteUuid);
+        log.info("[AssetController] 上传请求: userId={}, originalName={}, size={}B, noteUuid={}, sortOrder={}",
+                userId, file.getOriginalFilename(), file.getSize(), noteUuid, sortOrder);
 
-        UploadResultDTO result = uploadService.upload(file, userId);
+        UploadResultDTO result = uploadService.upload(file, userId, sortOrder);
 
         if (noteUuid != null) {
             assetQueryService.bindToNote(result.uuid(), userId, noteUuid);

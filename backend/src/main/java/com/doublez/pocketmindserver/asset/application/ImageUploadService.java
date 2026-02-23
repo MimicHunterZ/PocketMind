@@ -80,7 +80,7 @@ public class ImageUploadService {
      * @param userId 当前登录用户 ID（来自 UserContext）
      * @return 包含 uuid / width / height / size / mime 的 DTO
      */
-    public UploadResultDTO upload(MultipartFile file, long userId) {
+    public UploadResultDTO upload(MultipartFile file, long userId, int sortOrder) {
         // 1. 入参校验
         String originalName = file.getOriginalFilename();
         String ext          = extractAndValidateExtension(originalName);
@@ -110,7 +110,7 @@ public class ImageUploadService {
 
             // 6. 构建并持久化 Asset 实体
             Asset entity = buildEntity(attachmentUuid, userId, mime, fileSize,
-                    originalName, storageKey, width, height);
+                    originalName, storageKey, width, height, sortOrder);
             attachmentRepository.save(entity);
 
             log.info("[ImageUpload] 完成: uuid={}, storageKey={}, {}x{}", attachmentUuid, storageKey, width, height);
@@ -236,7 +236,7 @@ public class ImageUploadService {
      */
     private Asset buildEntity(UUID uuid, long userId, String mime, long size,
                                String originalFileName, String storageKey,
-                               int width, int height) {
+                               int width, int height, int sortOrder) {
         Asset e = new Asset();
         e.setUuid(uuid);
         e.setUserId(userId);
@@ -254,6 +254,7 @@ public class ImageUploadService {
         meta.put("height", height);
         e.setMetadata(meta);
         e.setBusinessMetadata(new HashMap<>());
+        e.setSortOrder(sortOrder);
         e.setUpdatedAt(Instant.now().toEpochMilli());
         e.setIsDeleted(false);
         return e;

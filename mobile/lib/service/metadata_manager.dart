@@ -1,6 +1,5 @@
 import 'package:any_link_preview/any_link_preview.dart';
 import 'package:pocketmind/api/link_preview_api_service.dart';
-import 'package:pocketmind/api/resource_pm_service.dart';
 import 'package:pocketmind/api/models/note_metadata.dart';
 import 'package:pocketmind/service/scraper/platform_scraper_interface.dart';
 import 'package:pocketmind/service/scraper/platform_scraper_service.dart';
@@ -23,15 +22,12 @@ class MetadataManager {
   static const String _tag = 'MetadataManager';
   final ImageStorageHelper _imageHelper = ImageStorageHelper();
   final LinkPreviewApiService? _linkPreviewApi;
-  final ResourcePmService? _resourceService;
   final PlatformScraperService? _platformScraperService;
 
   MetadataManager({
     LinkPreviewApiService? linkPreviewApi,
-    ResourcePmService? resourceService,
     PlatformScraperService? platformScraperService,
   }) : _linkPreviewApi = linkPreviewApi,
-       _resourceService = resourceService,
        _platformScraperService = platformScraperService;
 
   /// 获取并处理链接元数据
@@ -66,21 +62,7 @@ class MetadataManager {
 
       if (urls.isEmpty) return results;
 
-      // 策略1: 优先尝试后端 API（批量处理）
-      final backendUrls = urls
-          .where((u) => LinkPreviewConfig.shouldUseBackendService(u))
-          .toList();
-      if (backendUrls.isNotEmpty) {
-        final backendMetaDatas = await _fetchResourceContentByUrls(backendUrls);
-        results.addAll(backendMetaDatas);
-        // 移除已成功获取的
-        urls = urls.where((u) => !results.containsKey(u)).toList();
-        PMlog.d(_tag, '从后端服务成功获取 ${backendMetaDatas.length} 个元数据');
-      }
-
-      if (urls.isEmpty) return results;
-
-      // 策略2 & 3: 并发处理剩余的 URL
+      // 策略1 & 2: 并发处理剩余的 URL
       await Future.wait(
         urls.map((url) async {
           NoteMetadata? result;
@@ -121,48 +103,6 @@ class MetadataManager {
     } catch (e) {
       PMlog.e(_tag, '批量元数据处理失败, error: $e');
       return results;
-    }
-  }
-
-  /// 按需从后端拉取完整的笔记详情，并返回以 URL 为 Key 的 Map
-  ///
-  /// - 成功：返回 `Map<String, ResourceStatusItem>`
-  /// - 失败/无数据：返回空 Map {} (建议返回空 Map 而非 null，避免外部频繁判空)
-  Future<Map<String, NoteMetadata>> _fetchResourceContentByUrls(
-    List<String> urls,
-  ) async {
-    List<String> trueHttpsUrls = [];
-    if (_resourceService == null) return {};
-    // 过滤
-    for (var url in urls) {
-      if (UrlHelper.containsHttpsUrl(url)) {
-        trueHttpsUrls.add(url);
-      }
-    }
-
-    if (trueHttpsUrls.isEmpty) return {};
-
-    try {
-      final lists = await _resourceService.statusByUrls(trueHttpsUrls);
-
-      // todo 处理没有返回的url
-      if (lists.isEmpty) return {};
-      final noteMetadatas = <NoteMetadata>[];
-      for (final item in lists) {
-        final metadata = NoteMetadata(
-          title: item.title,
-          previewContent: item.previewContent,
-          aiSummary: item.aiSummary,
-          url: item.url,
-          resourceStatus: item.status,
-          source: MetadataSource.backend,
-        );
-        noteMetadatas.add(metadata);
-      }
-      return {for (var item in noteMetadatas) item.url: item};
-    } catch (e) {
-      PMlog.w(_tag, 'fetchResourceContentByUrl failed: $e');
-      return {};
     }
   }
 

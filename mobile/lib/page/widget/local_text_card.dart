@@ -45,7 +45,7 @@ class _LocalTextCardState extends ConsumerState<LocalTextCard> {
   TextCardVariant _determineVariant() {
     final title = widget.note.title?.trim() ?? '';
     final content = widget.note.content?.trim() ?? '';
-    final tag = widget.note.tag?.toLowerCase() ?? '';
+    final tag = widget.note.tags.join(',').toLowerCase();
     final hasTitle =
         ref.watch(appConfigProvider).titleEnabled && title.isNotEmpty;
 
@@ -149,8 +149,8 @@ class _SnippetCard extends StatelessWidget {
           ),
 
           // 底部标签
-          if (note.tag != null && note.tag!.isNotEmpty)
-            _TagsFooter(tags: note.tag!, colorScheme: colorScheme),
+          if (note.tags.isNotEmpty)
+            _TagsFooter(tags: note.tags, colorScheme: colorScheme),
         ],
       ),
     );
@@ -216,7 +216,7 @@ class _QuoteCard extends StatelessWidget {
           child: Column(
             children: [
               // 分类标签
-              if (note.tag != null && note.tag!.isNotEmpty)
+              if (note.tags.isNotEmpty)
                 Container(
                   margin: EdgeInsets.only(bottom: 16.w),
                   padding: EdgeInsets.symmetric(
@@ -228,7 +228,7 @@ class _QuoteCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20.r),
                   ),
                   child: Text(
-                    note.tag!.split(',').first.trim().toUpperCase(),
+                    note.tags.first.trim().toUpperCase(),
                     style: TextStyle(
                       fontSize: 9.sp,
                       fontWeight: FontWeight.w700,
@@ -326,7 +326,7 @@ class _HeadlineCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    if (note.tag != null && note.tag!.isNotEmpty)
+                    if (note.tags.isNotEmpty)
                       Container(
                         padding: EdgeInsets.symmetric(
                           horizontal: 8.w,
@@ -339,7 +339,7 @@ class _HeadlineCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(4.r),
                         ),
                         child: Text(
-                          note.tag!.split(',').first.trim().toUpperCase(),
+                          note.tags.first.trim().toUpperCase(),
                           style: TextStyle(
                             fontSize: 9.sp,
                             fontWeight: FontWeight.w700,
@@ -435,7 +435,7 @@ class _EssayCard extends StatelessWidget {
         children: [
           // 顶部：标签 + 日期
           _TagDateHeader(
-            tags: note.tag,
+            tags: note.tags,
             date: formattedDate,
             colorScheme: colorScheme,
           ),
@@ -518,7 +518,7 @@ class _DateHeader extends StatelessWidget {
 
 /// 标签 + 日期头部
 class _TagDateHeader extends StatelessWidget {
-  final String? tags;
+  final List<String> tags;
   final String date;
   final ColorScheme colorScheme;
 
@@ -534,13 +534,12 @@ class _TagDateHeader extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (tags != null && tags!.isNotEmpty)
+        if (tags.isNotEmpty)
           Flexible(
             child: Wrap(
               spacing: 6.w,
               runSpacing: 4.w,
-              children: tags!
-                  .split(',')
+              children: tags
                   .take(2)
                   .map(
                     (tag) =>
@@ -590,7 +589,7 @@ class _TagBadge extends StatelessWidget {
 
 /// 标签底部
 class _TagsFooter extends StatelessWidget {
-  final String tags;
+  final List<String> tags;
   final ColorScheme colorScheme;
 
   const _TagsFooter({required this.tags, required this.colorScheme});
@@ -608,7 +607,6 @@ class _TagsFooter extends StatelessWidget {
       child: Wrap(
         spacing: 8.w,
         children: tags
-            .split(',')
             .map(
               (tag) => Text(
                 '#${tag.trim()}',

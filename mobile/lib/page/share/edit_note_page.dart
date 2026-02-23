@@ -88,7 +88,8 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
       content: _contentController.text,
       url: widget.webUrl,
       categoryId: _selectedCategoryId, // 使用选中的分类ID
-      tag: _tagController.text,
+      // todo
+      tags: _tagController.text.split(','),
     );
 
     if (_scheduledTime != null) {

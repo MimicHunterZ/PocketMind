@@ -312,8 +312,7 @@ class _ClassicListContentSection extends StatelessWidget {
 
 // 扩展方法定义
 extension NotePreviewExtension on Note {
-  String? get firstPreviewImage =>
-      previewImageUrls.isNotEmpty ? previewImageUrls.first : null;
+  String? get firstPreviewImage => previewImageUrl;
 
   bool get hasNoTitle => (previewTitle == null || previewTitle!.isEmpty);
 

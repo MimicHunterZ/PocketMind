@@ -152,6 +152,9 @@ class AppConstants {
   /// 分享待处理 URL 列表键
   static const String keyNeedCallbackUrl = 'needCallBackUrl';
 
+  /// 存储待前台轮询 AI 分析结果的 noteUuid 列表。
+  static const String keyPendingAiAnalysis = 'pending_ai_analysis';
+
   /// 分享 URL 重试计数字典键（JSON Map<String,int>）
   static const String keyShareUrlRetryCountMap = 'share_url_retry_count_map';
 

@@ -8,17 +8,17 @@ part of 'note_api_service.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// 笔记 API 服务 Provider - 全局单例
+/// 笔记 AI 分析提交服务 Provider
 
 @ProviderFor(noteApiService)
 const noteApiServiceProvider = NoteApiServiceProvider._();
 
-/// 笔记 API 服务 Provider - 全局单例
+/// 笔记 AI 分析提交服务 Provider
 
 final class NoteApiServiceProvider
     extends $FunctionalProvider<NoteApiService, NoteApiService, NoteApiService>
     with $Provider<NoteApiService> {
-  /// 笔记 API 服务 Provider - 全局单例
+  /// 笔记 AI 分析提交服务 Provider
   const NoteApiServiceProvider._()
     : super(
         from: null,

@@ -47,9 +47,8 @@ class ImmersiveImage extends StatelessWidget {
 
         final image = DecoratedBox(
           decoration: BoxDecoration(color: bg),
-          // 需求：图片从组件最顶上开始
           child: Align(
-            alignment: Alignment.topCenter,
+            alignment: Alignment.center,
             child: PMImage(
               pathOrUrl: pathOrUrl,
               fit: BoxFit.contain,
@@ -111,8 +110,14 @@ class _ImmersiveImageCarouselState extends State<ImmersiveImageCarousel> {
     final cached = ImagePrefetcher.getCachedMaxHeightOverWidth(widget.images);
     if (cached != null) {
       _maxHeightOverWidth = cached;
-    } else {
-      // ignore: discarded_futures
+    }
+    // _resolveMaxHeightRatio() 在 didChangeDependencies 中调用，确保 MediaQuery 可用
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_maxHeightOverWidth == null && !_resolving) {
       _resolveMaxHeightRatio();
     }
   }
@@ -128,7 +133,6 @@ class _ImmersiveImageCarouselState extends State<ImmersiveImageCarousel> {
       if (cached != null) {
         _maxHeightOverWidth = cached;
       } else {
-        // ignore: discarded_futures
         _resolveMaxHeightRatio();
       }
     }

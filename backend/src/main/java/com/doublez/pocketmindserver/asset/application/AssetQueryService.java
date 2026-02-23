@@ -86,6 +86,7 @@ public class AssetQueryService {
         }
         return new AssetDTO(asset.getUuid(), asset.getMime(), width, height
                 ,asset.getType(), asset.getSize(),asset.getFileName(),asset.getStorageType(),
+                asset.getSortOrder() != null ? asset.getSortOrder() : 0,
                 asset.getCreatedAt());
     }
 }

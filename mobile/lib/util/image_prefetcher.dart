@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:pocketmind/page/widget/pm_image.dart';
@@ -28,6 +29,37 @@ class ImagePrefetcher {
 
   static double? getCachedMaxHeightOverWidth(List<String> images) {
     return _ratioCache[ratioKeyFor(images)];
+  }
+
+  /// 从存储的 metadataJson 中解析宽高，直接填充轮播比例缓存。
+  ///
+  /// 成功则跳过图片解码步骤，避免详情页进入时出现 loading 跳动。
+  /// 仅当所有图片都有有效尺寸时才写入缓存；如果某张缺失则保留解码逻辑。
+  /// [paths]          - 轮播图片路径列表
+  /// [metadataJsonList] - 每张图片对应的 metadataJson （可为 null）
+  static void seedRatioFromJson(
+    List<String> paths,
+    List<String?> metadataJsonList,
+  ) {
+    if (paths.isEmpty || paths.length != metadataJsonList.length) return;
+    final key = ratioKeyFor(paths);
+    if (_ratioCache.containsKey(key)) return;
+
+    final ratios = <double>[];
+    for (final json in metadataJsonList) {
+      if (json == null) return; // 某张无数据，放弃预填，保留解码路径
+      try {
+        final m = jsonDecode(json) as Map<String, dynamic>;
+        final w = m['width'] as int?;
+        final h = m['height'] as int?;
+        if (w == null || h == null || w <= 0) return;
+        ratios.add(h / w);
+      } catch (_) {
+        return; // JSON 异常，放弃预填
+      }
+    }
+    if (ratios.isEmpty) return;
+    _putRatio(key, ratios.reduce((a, b) => a > b ? a : b));
   }
 
   static void _putRatio(String key, double ratio) {

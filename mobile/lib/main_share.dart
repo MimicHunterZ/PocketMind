@@ -5,6 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
 import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/model/note.dart';
+import 'package:pocketmind/model/note_asset.dart';
+import 'package:pocketmind/model/chat_session.dart';
+import 'package:pocketmind/model/chat_message.dart';
 import 'package:pocketmind/page/share/edit_note_page.dart';
 import 'package:pocketmind/page/share/share_success_page.dart';
 import 'package:pocketmind/page/widget/flowing_background.dart';
@@ -12,7 +15,9 @@ import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/providers/auth_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';
+import 'package:pocketmind/data/repositories/isar_note_repository.dart';
 import 'package:pocketmind/service/call_back_dispatcher.dart';
+import 'package:pocketmind/service/metadata_manager.dart';
 import 'package:pocketmind/service/note_service.dart';
 import 'package:pocketmind/service/notification_service.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
@@ -55,7 +60,13 @@ Future<void> mainShare() async {
   final dir = await getApplicationDocumentsDirectory();
 
   // 2. 打开 Isar 实例,和主示例相同，要不然存的地方就不一样了
-  isar = await Isar.open([NoteSchema, CategorySchema], directory: dir.path);
+  isar = await Isar.open([
+    NoteSchema,
+    CategorySchema,
+    NoteAssetSchema,
+    ChatSessionSchema,
+    ChatMessageSchema,
+  ], directory: dir.path);
 
   final notificationSvc = NotificationService();
   await notificationSvc.init();
@@ -94,7 +105,8 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
   int _noteId = -1;
   String? url;
 
-  late final NoteService noteService;
+  // 非 final：热引擎第二次分享时需要重建
+  late NoteService noteService;
 
   @override
   void initState() {
@@ -110,6 +122,29 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _notifyEngineReady();
     });
+  }
+
+  /// 热引擎场景：Isar 已被 _dismissUI 关闭，重新打开并重建 NoteService。
+  /// Providers 中的 isarProvider 是 keepAlive + overrideWithValue，
+  /// 运行时无法修改，所以直接绕过 Provider 链手动构建。
+  Future<void> _ensureReady() async {
+    if (!isar.isOpen) {
+      PMlog.d(tag, '检测到 Isar 已关闭，正在重新打开...');
+      final dir = await getApplicationDocumentsDirectory();
+      isar = await Isar.open([
+        NoteSchema,
+        CategorySchema,
+        NoteAssetSchema,
+        ChatSessionSchema,
+        ChatMessageSchema,
+      ], directory: dir.path);
+      noteService = NoteService(
+        IsarNoteRepository(isar),
+        MetadataManager(),
+        ref.read(sharedPreferencesProvider),
+      );
+      PMlog.d(tag, 'Isar 重新打开，NoteService 已重建');
+    }
   }
 
   // 通知原生端 Flutter 引擎已准备好
@@ -138,9 +173,9 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
       PMlog.e(tag, 'processPendingUrls 失败，将继续关闭分享页');
     } finally {
       try {
-        PMlog.d(tag, 'Closing Isar (share)...');
+        // 必须关闭，否则主 App 进入时 Isar 锁无法释放导致黑屏
         await isar.close();
-        PMlog.d(tag, 'Isar closed (share).');
+        PMlog.d(tag, 'Isar (share) closed.');
       } catch (e) {
         PMlog.w(tag, 'Isar close fail: $e');
       }
@@ -192,6 +227,9 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
         PMlog.d(tag, 'showShare: title=$title, url=$url, content= $url');
 
         try {
+          // 热引擎场景：确保 Isar 已打开
+          await _ensureReady();
+
           // 1. 直接保存数据到数据库
           _noteId = await noteService.addNote(
             title: title,

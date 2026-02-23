@@ -34,11 +34,11 @@ class Note {
   // 也不会有多少浪费，这样不需要再进行转化了
   final category = IsarLink<Category>();
 
-  String? tag;
+  /// 标签列表
+  List<String> tags = [];
 
-  /// 链接预览图片列表（多图支持）
-  /// 首页预览取第一张图展示
-  List<String> previewImageUrls = [];
+  /// 链接/爬虫抓取后的首张预览图路径（用于卡片封面展示），多图存 NoteAsset 集合
+  String? previewImageUrl;
 
   /// 链接预览标题
   String? previewTitle;
@@ -70,8 +70,8 @@ class Note {
     int? updatedAt,
     bool? isDeleted,
     int? categoryId,
-    String? tag,
-    List<String>? previewImageUrls,
+    List<String>? tags,
+    String? previewImageUrl,
     String? previewTitle,
     String? previewDescription,
     String? previewContent,
@@ -89,8 +89,8 @@ class Note {
       ..updatedAt = updatedAt ?? this.updatedAt
       ..isDeleted = isDeleted ?? this.isDeleted
       ..categoryId = categoryId ?? this.categoryId
-      ..tag = tag ?? this.tag
-      ..previewImageUrls = previewImageUrls ?? this.previewImageUrls
+      ..tags = tags ?? this.tags
+      ..previewImageUrl = previewImageUrl ?? this.previewImageUrl
       ..previewTitle = previewTitle ?? this.previewTitle
       ..previewDescription = previewDescription ?? this.previewDescription
       ..previewContent = previewContent ?? this.previewContent

@@ -80,6 +80,9 @@ public class Asset {
     @TableField(value = "business_metadata", typeHandler = JsonbTypeHandler.class)
     private Map<String, Object> businessMetadata;
 
+    /** 画廊排序（0 = 无序/默认），同笔记下按 sort_order ASC 排列 */
+    private Integer sortOrder;
+
     @TableField(fill = FieldFill.INSERT)
     private Instant createdAt;
 

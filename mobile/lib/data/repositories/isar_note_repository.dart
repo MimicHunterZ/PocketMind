@@ -16,6 +16,11 @@ class IsarNoteRepository {
 
   IsarNoteRepository(this._isar);
 
+  /// 按 UUID 查找笔记。
+  Future<Note?> findByUuid(String uuid) async {
+    return _isar.notes.getByUuid(uuid);
+  }
+
   Future<int> save(Note note, {bool updateTimestamp = true}) async {
     PMlog.d(
       _tag,
@@ -85,14 +90,18 @@ class IsarNoteRepository {
           }
 
           // 删除预览图片文件（如果有且是本地的）
-          for (final previewUrl in note.previewImageUrls) {
-            if (previewUrl.startsWith(AppConstants.localImagePathPrefix)) {
-              try {
-                await ImageStorageHelper().deleteImage(previewUrl);
-                PMlog.d(_tag, 'Deleted preview image: $previewUrl');
-              } catch (e) {
-                PMlog.w(_tag, 'Failed to delete preview image $previewUrl: $e');
-              }
+          if (note.previewImageUrl != null &&
+              note.previewImageUrl!.startsWith(
+                AppConstants.localImagePathPrefix,
+              )) {
+            try {
+              await ImageStorageHelper().deleteImage(note.previewImageUrl!);
+              PMlog.d(_tag, 'Deleted preview image: ${note.previewImageUrl}');
+            } catch (e) {
+              PMlog.w(
+                _tag,
+                'Failed to delete preview image ${note.previewImageUrl}: $e',
+              );
             }
           }
 
@@ -239,7 +248,7 @@ class IsarNoteRepository {
       final notes = await _isar.notes
           .filter()
           .isDeletedEqualTo(false)
-          .tagContains(query, caseSensitive: false)
+          .tagsElementContains(query, caseSensitive: false)
           .sortByTimeDesc() // 添加排序（最新的在前）
           .findAll();
       return notes;
@@ -289,7 +298,7 @@ class IsarNoteRepository {
                 .or()
                 .previewTitleContains(query, caseSensitive: false)
                 .or()
-                .tagContains(query, caseSensitive: false)
+                .tagsElementContains(query, caseSensitive: false)
                 .or()
                 .aiSummaryContains(query, caseSensitive: false),
           )

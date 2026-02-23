@@ -235,10 +235,6 @@ class SyncManager {
           // 检查是否有本地图片路径 (url 字段或 previewImageUrl 字段)
           final url = change['url'] as String?;
           final previewImageUrl = change['previewImageUrl'] as String?;
-          final previewImageUrls =
-              (change['previewImageUrls'] as List<dynamic>?)
-                  ?.map((e) => e as String)
-                  .toList();
 
           void checkAndAddImagePath(String? path) {
             if (path != null && UrlHelper.isLocalImagePath(path)) {
@@ -252,7 +248,6 @@ class SyncManager {
 
           checkAndAddImagePath(url);
           checkAndAddImagePath(previewImageUrl);
-          previewImageUrls?.forEach(checkAndAddImagePath);
         } else if (entityType == 'category') {
           final result = await _applyCategoryChange(change);
           if (result == _ChangeResult.added) {

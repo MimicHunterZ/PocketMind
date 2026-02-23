@@ -1,19 +1,27 @@
+﻿import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:pocketmind/api/api_constants.dart';
 import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/model/note.dart';
+import 'package:pocketmind/model/note_asset.dart';
+import 'package:pocketmind/model/chat_session.dart';
+import 'package:pocketmind/model/chat_message.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';
 import 'package:pocketmind/service/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
+import '../api/asset_api_service.dart';
 import '../api/note_api_service.dart';
 import '../api/models/note_metadata.dart';
 import '../providers/note_providers.dart';
+import '../providers/pm_service_providers.dart';
+import '../util/image_storage_helper.dart';
 import '../util/logger_service.dart';
 import '../util/platform_detector.dart';
 
@@ -39,6 +47,9 @@ void callbackDispatcher() {
       final isar = await Isar.open([
         NoteSchema,
         CategorySchema,
+        NoteAssetSchema,
+        ChatSessionSchema,
+        ChatMessageSchema,
       ], directory: dir.path);
 
       final prefs = await SharedPreferences.getInstance();
@@ -137,17 +148,15 @@ Future<void> scrapeAndSave(
   String? userQuestion,
   NotificationService notificationService,
 ) async {
-  final List<String> successUrls = []; // 主要渠道（平台爬虫/后端）成功的 URL
-  final List<String> failedUrls = []; // 真正失败的 URL（所有策略都失败）
-  final List<String> fallbackUrls = []; // 使用兜底策略成功的 URL（主要渠道失败）
-  final List<String> successPreviews = []; // 成功的内容预览（平台: 标题前几个字）
-  final List<String> fallbackPreviews = []; // 兜底成功的内容预览
+  final List<String> successUrls = [];
+  final List<String> failedUrls = [];
+  final List<String> successPreviews = [];
   String? lastErrorMessage;
 
   try {
     final noteService = ref.read(noteServiceProvider);
 
-    // 0. 抓取开始：显式标记为抓取中，UI 仅根据该标记显示加载态
+    // 0. 标记为抓取中
     final processingNotes = await noteService.findNotesWithUrls(urls);
     for (final note in processingNotes) {
       await noteService.persistResourceStatus(
@@ -156,219 +165,175 @@ Future<void> scrapeAndSave(
       );
     }
 
-    // 1. 批量获取元数据
+    // 1. 客户端尝试抓取（主要用于小红书/知乎/Bilibili 等平台特定网站）
     final metadataResults = await ref
         .read(metadataManagerProvider)
         .fetchAndProcessMetadata(urls);
 
-    // 2. 批量查找数据库中的笔记
+    // 2. 查找对应笔记
     final notes = await noteService.findNotesWithUrls(urls);
 
     final noteApiService = ref.read(noteApiServiceProvider);
-    final needCleanUrls = <String>[];
+    final assetApiService = ref.read(assetApiServiceProvider);
 
-    // 3. 遍历找到的笔记进行处理
     for (final note in notes) {
       final url = note.url;
+      if (url == null) continue;
 
-      // 校验：URL 不为空，且元数据抓取结果中包含该 URL
-      if (url != null && metadataResults.containsKey(url)) {
-        final metaDataNote = metadataResults[url];
+      final metaData = metadataResults[url];
+      final bool isFromPlatformScraper =
+          metaData?.source == MetadataSource.platformScraper;
+      final previewContent =
+          metaData?.previewContent ?? metaData?.previewDescription;
+      final bool hasClientContent =
+          previewContent != null && previewContent.isNotEmpty;
 
-        // 更新基础元数据
-        note.previewContent =
-            metaDataNote?.previewContent ?? metaDataNote?.previewDescription;
-        note.previewTitle = metaDataNote?.title;
-        note.previewImageUrls =
-            metaDataNote?.imageUrls ?? note.previewImageUrls;
-
-        // 生成内容预览字符串：[平台] 内容前15个字...
-        final platform = _getPlatformName(url, metaDataNote?.source);
-        // 优先使用内容，其次标题
-        final content =
-            metaDataNote?.previewContent ??
-            metaDataNote?.previewDescription ??
-            metaDataNote?.title ??
-            note.title;
-        final contentPreview = _truncateText(content, 15);
-        final preview = '[$platform] $contentPreview';
-
-        // 根据数据来源分类
-        if (metaDataNote?.isFromPrimarySource ?? false) {
-          // 来自主要渠道（平台爬虫/后端），算作成功
-          await noteService.persistResourceStatus(
-            note,
-            AppConstants.resourceStatusCrawled,
-          );
-
-          successUrls.add(url);
-          successPreviews.add(preview);
-          needCleanUrls.add(url);
-          PMlog.d(tag, '笔记 $url 从主要渠道成功获取元数据');
-        } else {
-          // 来自兜底渠道（LinkPreview API/本地解析）
-          // 需要发失败通知
-          await noteService.persistResourceStatus(
-            note,
-            AppConstants.resourceStatusPending,
-          );
-
-          fallbackUrls.add(url);
-          fallbackPreviews.add(preview);
-          PMlog.d(tag, '笔记 $url 使用兜底策略获取元数据，来源: ${metaDataNote?.source}');
+      try {
+        // 更新客户端抓取到的基础元数据（如有）
+        if (metaData != null) {
+          if (note.previewTitle == null) note.previewTitle = metaData.title;
+          if (note.previewContent == null && hasClientContent) {
+            note.previewContent = previewContent;
+          }
+          // 将元数据中的第一张图路径设为预览图
+          if (note.previewImageUrl == null && metaData.imageUrls.isNotEmpty) {
+            note.previewImageUrl = metaData.imageUrls.first;
+          }
         }
 
-        // AI 分析逻辑
-        try {
-          // 只有当有内容需要分析时才调用
-          if (note.previewContent == null || note.previewContent!.isEmpty) {
-            PMlog.w(tag, '笔记 $url 内容为空，跳过 AI 分析');
-            continue;
-          }
-
-          PMlog.d(tag, '$url 有待处理的 AI 问题，开始调用 AI 分析');
-
-          final aiResponse = await noteApiService.analyzeContent(
-            uuid: note.uuid!,
-            title: note.title,
-            content: note.previewContent!,
-            userQuestion: userQuestion,
-          );
-
-          // 根据模式保存结果
-          if (aiResponse.isSummaryMode) {
-            // SUMMARY 模式
-            if (aiResponse.summary != null) {
-              note.aiSummary = aiResponse.summary;
-            }
-          } else if (aiResponse.isQaMode) {
-            // QA 模式
-            final qaContent =
-                'Q: ${aiResponse.userQuestion ?? note.pendingAiQuestion}\n\nA: ${aiResponse.qaAnswer ?? ''}';
-            note.aiSummary = qaContent;
-          }
-
-          // 统一处理标签追加逻辑 (支持 SUMMARY 和 QA 模式)
-          if (aiResponse.tags.isNotEmpty) {
-            final existingTags = note.tag ?? '';
-            final newTagsSet = aiResponse.tags.toSet();
-
-            // 如果已有标签，避免重复
-            if (existingTags.isNotEmpty) {
-              final currentTagsList = existingTags.split(',');
-              newTagsSet.removeAll(currentTagsList);
-            }
-
-            if (newTagsSet.isNotEmpty) {
-              final newTagsStr = newTagsSet.join(',');
-              note.tag = existingTags.isEmpty
-                  ? newTagsStr
-                  : '$existingTags,$newTagsStr';
+        // 仅平台爬虫成功时才有本地图片需要上传
+        if (isFromPlatformScraper &&
+            metaData != null &&
+            metaData.imageUrls.isNotEmpty) {
+          await ImageStorageHelper().init();
+          final isar = ref.read(isarProvider);
+          int sortOrder = 0;
+          for (final relativePath in metaData.imageUrls) {
+            try {
+              final file = ImageStorageHelper().getFileByRelativePath(
+                relativePath,
+              );
+              if (await file.exists()) {
+                final res = await assetApiService.uploadImage(
+                  file,
+                  noteUuid: note.uuid!,
+                  sortOrder: sortOrder,
+                );
+                final noteAsset = NoteAsset()
+                  ..noteUuid = note.uuid!
+                  ..assetUuid = res.uuid
+                  ..type = 'image'
+                  ..mime = res.mime
+                  ..fileSize = res.size
+                  ..sortOrder = sortOrder
+                  ..localPath = relativePath
+                  ..serverUrl = '${ApiConstants.assetsImages}/${res.uuid}'
+                  ..metadataJson = jsonEncode({
+                    'width': res.width,
+                    'height': res.height,
+                  })
+                  ..createdAt = DateTime.now();
+                await isar.writeTxn(() async {
+                  await isar.noteAssets.put(noteAsset);
+                });
+                sortOrder++;
+                PMlog.d(tag, '图片上传并创建 NoteAsset: $relativePath');
+              }
+            } catch (e) {
+              PMlog.e(tag, '图片上传失败，静默跳过: $relativePath, e=$e');
             }
           }
-
-          PMlog.d(tag, '笔记 $url AI 分析完成，mode=${aiResponse.mode}');
-
-          // AI 分析完成后再次保存
-          await ref.read(noteRepositoryProvider).save(note);
-        } catch (e) {
-          // AI 分析失败静默处理，不阻塞其他笔记的处理
-          PMlog.e(tag, '笔记 $url AI 分析失败: $e');
         }
-      } else if (url != null) {
-        // 元数据抓取完全失败（所有策略都失败了）
-        // 这是真正的失败，需要通知用户
+
+        // 提交 AI 分析，入队等待前台轮询
+        // - 平台爬虫成功 / 有客户端内容 → 后端直接分析已有内容
+        // - 通用网址 → 后端自行抓取再分析
+        await noteApiService.submitAnalysis(
+          uuid: note.uuid!,
+          url: url,
+          previewTitle: metaData?.title,
+          previewContent: hasClientContent ? previewContent : null,
+          userQuestion: userQuestion,
+        );
+
+        // 将 noteUuid 入队，应用进前台时由 AiPollingService 轮询回写
+        final prefs = ref.read(sharedPreferencesProvider);
+        await _enqueueAiAnalysis(prefs, note.uuid!);
+
+        // 元数据处理完成，标记 CRAWLED
+        await noteService.persistResourceStatus(
+          note,
+          AppConstants.resourceStatusCrawled,
+        );
+        await ref.read(noteRepositoryProvider).save(note);
+
+        final platform = _getPlatformName(url, metaData?.source);
+        final content = note.previewTitle ?? note.previewContent;
+        successUrls.add(url);
+        successPreviews.add('[$platform] ${_truncateText(content, 15)}');
+        PMlog.d(tag, '笔记处理成功: $url');
+      } catch (e) {
+        PMlog.e(tag, '笔记处理失败: $url, e=$e');
         await noteService.persistResourceStatus(
           note,
           AppConstants.resourceStatusPending,
         );
-
         failedUrls.add(url);
-        lastErrorMessage = '无法获取链接预览信息';
-        PMlog.w(tag, '笔记 $url 元数据抓取失败（所有策略）');
+        lastErrorMessage = e.toString().length > 80
+            ? e.toString().substring(0, 80)
+            : e.toString();
       }
     }
 
-    // 检查是否有 URL 没有找到对应的笔记
+    // 检查是否有 URL 没有找到对应笔记
     for (final url in urls) {
-      if (!successUrls.contains(url) &&
-          !failedUrls.contains(url) &&
-          !fallbackUrls.contains(url)) {
+      if (!successUrls.contains(url) && !failedUrls.contains(url)) {
         failedUrls.add(url);
         lastErrorMessage = '未找到对应的笔记记录';
       }
     }
 
-    PMlog.d(tag, '开始消除 URLs: $needCleanUrls');
-    PMlog.d(
-      tag,
-      '抓取结果统计: 主要渠道成功=${successUrls.length}, 兜底成功=${fallbackUrls.length}, 失败=${failedUrls.length}',
-    );
+    PMlog.d(tag, '处理结果统计: 成功=${successUrls.length}, 失败=${failedUrls.length}');
 
-    // 将“兜底成功（但主链路失败）+ 真正失败”统一计入失败重试次数
-    final retryFailedUrls = {...fallbackUrls, ...failedUrls}.toList();
-
-    // 失败 URL 增加失败计数，达到上限后直接标记 FAILED 并从待处理队列移除
+    // 失败 URL 增加失败计数，达到上限后标记 FAILED 并停止重试
     final reachedMaxRetryUrls = await noteService.increaseRetryCountForUrls(
-      retryFailedUrls,
+      failedUrls,
     );
     if (reachedMaxRetryUrls.isNotEmpty) {
       await noteService.markUrlsAsFailedAndStopRetry(reachedMaxRetryUrls);
-      fallbackUrls.removeWhere(reachedMaxRetryUrls.contains);
       failedUrls.removeWhere(reachedMaxRetryUrls.contains);
       await notifyRetryExhausted(notificationService, reachedMaxRetryUrls);
       PMlog.w(tag, 'URL 达到最大重试次数，已标记失败并停止重试: $reachedMaxRetryUrls');
     }
 
-    // 仅清理本次主要渠道成功 URL；失败 URL/兜底 URL 保留在待处理队列，直到达到上限或用户忽略
-    await noteService.removePendingUrls(needCleanUrls);
+    // 清理主要成功 URL
+    await noteService.removePendingUrls(successUrls);
 
     final prefs = ref.read(sharedPreferencesProvider);
     await prefs.reload();
-    final remainingUrls =
-        prefs.getStringList(AppConstants.keyNeedCallbackUrl) ?? [];
-    PMlog.d(
-      tag,
-      'Pending URLs processed and cleared. Remaining: $remainingUrls',
-    );
 
     // 发送抓取结果通知
-    // 逻辑：
-    // - 主要渠道成功 → 成功通知（显示平台和内容预览）
-    // - 兜底成功 = 主要渠道失败 → 失败通知（显示平台和内容预览）
-    // - 完全失败 → 失败通知
-
-    // 合并所有需要发送失败通知的 URL（兜底成功 + 真正失败）
-    final allFailedUrls = [...fallbackUrls, ...failedUrls];
-    final allFailedPreviews = [...fallbackPreviews];
-
-    if (successUrls.isNotEmpty && allFailedUrls.isEmpty) {
-      // 全部主要渠道成功
+    if (successUrls.isNotEmpty && failedUrls.isEmpty) {
       await notificationService.showScrapeResultNotification(
         resultType: ScrapeResultType.success,
         successCount: successUrls.length,
         contentPreviews: successPreviews,
       );
-    } else if (successUrls.isNotEmpty && allFailedUrls.isNotEmpty) {
-      // 部分成功（有主要渠道成功，也有失败/兜底）
+    } else if (successUrls.isNotEmpty && failedUrls.isNotEmpty) {
       await notificationService.showScrapeResultNotification(
         resultType: ScrapeResultType.partialSuccess,
         successCount: successUrls.length,
-        failedCount: allFailedUrls.length,
-        failedUrls: allFailedUrls,
-        contentPreviews: [...successPreviews, ...allFailedPreviews],
+        failedCount: failedUrls.length,
+        failedUrls: failedUrls,
+        contentPreviews: successPreviews,
         errorMessage: lastErrorMessage,
       );
-    } else if (allFailedUrls.isNotEmpty) {
-      // 没有主要渠道成功，都是失败/兜底
+    } else if (failedUrls.isNotEmpty) {
       await notificationService.showScrapeResultNotification(
         resultType: ScrapeResultType.failed,
-        failedCount: allFailedUrls.length,
-        failedUrls: allFailedUrls,
-        contentPreviews: allFailedPreviews.isNotEmpty
-            ? allFailedPreviews
-            : null,
-        errorMessage: lastErrorMessage ?? '主要渠道抓取失败，已使用兜底策略',
+        failedCount: failedUrls.length,
+        failedUrls: failedUrls,
+        errorMessage: lastErrorMessage ?? '分析失败，请检查网络后重试',
       );
     }
   } catch (e) {
@@ -477,4 +442,20 @@ String _truncateText(String? text, int maxLength) {
   if (text == null || text.isEmpty) return '无标题';
   if (text.length <= maxLength) return text;
   return '${text.substring(0, maxLength)}...';
+}
+
+/// 将 noteUuid 加入 AI 分析待轮询队列。
+Future<void> _enqueueAiAnalysis(
+  SharedPreferences prefs,
+  String noteUuid,
+) async {
+  await prefs.reload();
+  final pending = List<String>.from(
+    prefs.getStringList(AppConstants.keyPendingAiAnalysis) ?? [],
+  );
+  if (!pending.contains(noteUuid)) {
+    pending.add(noteUuid);
+    await prefs.setStringList(AppConstants.keyPendingAiAnalysis, pending);
+    PMlog.d(tag, '已入队 AI 待轮询: $noteUuid');
+  }
 }

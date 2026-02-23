@@ -21,11 +21,15 @@ import 'package:uuid/uuid.dart';
 import 'package:workmanager/workmanager.dart';
 import 'model/category.dart';
 import 'model/note.dart';
+import 'model/note_asset.dart';
+import 'model/chat_session.dart';
+import 'model/chat_message.dart';
 import 'lan_sync/model/sync_log.dart';
 import 'data/repositories/isar_category_repository.dart';
 import 'util/logger_service.dart';
 import 'lan_sync/lan_sync_service.dart';
 import 'package:pocketmind/providers/note_providers.dart';
+import 'package:pocketmind/providers/pm_service_providers.dart';
 
 // 这会强制构建系统将 main_share.dart 编译到应用中
 // 防止另一个入口没有被引用
@@ -58,6 +62,9 @@ Future<void> main() async {
     NoteSchema,
     CategorySchema,
     SyncLogSchema,
+    NoteAssetSchema,
+    ChatSessionSchema,
+    ChatMessageSchema,
   ], directory: dir.path);
 
   // 确保初始化默认分类数据
@@ -115,6 +122,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     // 启动时检查是否有待处理的 URL 回调
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(noteServiceProvider).processPendingUrls();
+      // 检查并轮询待处理的 AI 分析结果
+      ref.read(aiPollingServiceProvider).pollAll();
     });
   }
 
@@ -130,6 +139,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       PMlog.d('MyApp', 'App resumed, checking pending URLs');
       ref.read(noteServiceProvider).processPendingUrls();
+      ref.read(aiPollingServiceProvider).pollAll();
     }
   }
 

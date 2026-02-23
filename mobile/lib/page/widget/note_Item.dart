@@ -83,8 +83,8 @@ class _NoteItemState extends ConsumerState<NoteItem>
       final imagesToPrewarm = <String>[];
       if (isLocalImage && widget.note.url != null) {
         imagesToPrewarm.add(widget.note.url!);
-      } else if (isHttpsUrl && widget.note.previewImageUrls.isNotEmpty) {
-        imagesToPrewarm.addAll(widget.note.previewImageUrls);
+      } else if (isHttpsUrl && widget.note.previewImageUrl != null) {
+        imagesToPrewarm.add(widget.note.previewImageUrl!);
       }
 
       if (imagesToPrewarm.isNotEmpty) {

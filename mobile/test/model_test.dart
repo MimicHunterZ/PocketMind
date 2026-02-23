@@ -11,7 +11,7 @@ void main() {
       expect(note.content, null);
       expect(note.url, null);
       expect(note.categoryId, 1);
-      expect(note.tag, null);
+      expect(note.tags, isEmpty);
     });
 
     test('Note 带参数初始化测试', () {
@@ -20,13 +20,13 @@ void main() {
         ..content = '测试内容'
         ..url = 'https://example.com'
         ..categoryId = 2
-        ..tag = 'important';
+        ..tags = ['important'];
 
       expect(note.title, '测试标题');
       expect(note.content, '测试内容');
       expect(note.url, 'https://example.com');
       expect(note.categoryId, 2);
-      expect(note.tag, 'important');
+      expect(note.tags, ['important']);
     });
 
     test('Note 时间戳测试', () {
@@ -196,25 +196,25 @@ void main() {
     });
   });
 
-  group('Note tag 字段测试', () {
+  group('Note tags 字段测试', () {
     test('单个 tag', () {
-      final note = Note()..tag = 'important';
-      expect(note.tag, 'important');
+      final note = Note()..tags = ['important'];
+      expect(note.tags, ['important']);
     });
 
-    test('tag 为空', () {
-      final note = Note()..tag = '';
-      expect(note.tag, '');
-    });
-
-    test('tag 为 null', () {
+    test('tags 为空列表', () {
       final note = Note();
-      expect(note.tag, null);
+      expect(note.tags, isEmpty);
+    });
+
+    test('多个 tag', () {
+      final note = Note()..tags = ['tag1', 'tag2'];
+      expect(note.tags, ['tag1', 'tag2']);
     });
 
     test('tag 包含特殊字符', () {
-      final note = Note()..tag = 'tag-with-dash_and_underscore';
-      expect(note.tag, 'tag-with-dash_and_underscore');
+      final note = Note()..tags = ['tag-with-dash_and_underscore'];
+      expect(note.tags, ['tag-with-dash_and_underscore']);
     });
   });
 }

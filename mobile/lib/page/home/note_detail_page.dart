@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocketmind/model/note.dart';
+import 'package:pocketmind/model/note_asset.dart';
 import 'package:pocketmind/providers/category_providers.dart';
 import 'package:pocketmind/providers/app_config_provider.dart';
 import 'package:pocketmind/providers/note_providers.dart';
+import 'package:pocketmind/util/image_prefetcher.dart';
 import 'package:pocketmind/util/responsive_breakpoints.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widget/creative_toast.dart';
@@ -163,6 +165,17 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
     ColorScheme colorScheme,
     TextTheme textTheme,
   ) {
+    final noteAssets =
+        ref.watch(noteAssetImagesProvider(state.note.uuid ?? '')).value ?? [];
+    final previewImages = noteAssets
+        .map((a) => a.localPath ?? a.serverUrl ?? '')
+        .where((s) => s.isNotEmpty)
+        .toList();
+    // 如果全部资产都有存储的宽高，直接预填轮播比例缓存，避免画廊启动时 loading 跳动
+    ImagePrefetcher.seedRatioFromJson(
+      previewImages,
+      noteAssets.map((a) => a.metadataJson).toList(),
+    );
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -192,6 +205,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
               onLaunchUrl: _launchUrl,
               isDesktop: true,
               titleEnabled: ref.watch(appConfigProvider).titleEnabled,
+              previewImages: previewImages,
             ),
           ),
         ),
@@ -243,6 +257,17 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
     ColorScheme colorScheme,
     TextTheme textTheme,
   ) {
+    final noteAssets =
+        ref.watch(noteAssetImagesProvider(state.note.uuid ?? '')).value ?? [];
+    final previewImages = noteAssets
+        .map((a) => a.localPath ?? a.serverUrl ?? '')
+        .where((s) => s.isNotEmpty)
+        .toList();
+    // 如果全部资产都有存储的宽高，直接预填轮播比例缓存，避免画廊启动时 loading 跳动
+    ImagePrefetcher.seedRatioFromJson(
+      previewImages,
+      noteAssets.map((a) => a.metadataJson).toList(),
+    );
     return SingleChildScrollView(
       controller: _scrollController,
       padding: EdgeInsets.only(bottom: 80.h),
@@ -268,6 +293,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
             onLaunchUrl: _launchUrl,
             isDesktop: false,
             titleEnabled: ref.watch(appConfigProvider).titleEnabled,
+            previewImages: previewImages,
           ),
 
           SizedBox(height: 24.h),

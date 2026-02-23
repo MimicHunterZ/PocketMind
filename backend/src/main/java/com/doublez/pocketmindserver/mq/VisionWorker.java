@@ -34,6 +34,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class VisionWorker {
 
+    // todo
     private static final String MODEL_LABEL = "vision-analyze";
 
     private final AttachmentVisionRepository attachmentVisionRepository;

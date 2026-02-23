@@ -48,10 +48,10 @@ const NoteSchema = CollectionSchema(
       name: r'previewDescription',
       type: IsarType.string,
     ),
-    r'previewImageUrls': PropertySchema(
+    r'previewImageUrl': PropertySchema(
       id: 7,
-      name: r'previewImageUrls',
-      type: IsarType.stringList,
+      name: r'previewImageUrl',
+      type: IsarType.string,
     ),
     r'previewTitle': PropertySchema(
       id: 8,
@@ -63,7 +63,7 @@ const NoteSchema = CollectionSchema(
       name: r'resourceStatus',
       type: IsarType.string,
     ),
-    r'tag': PropertySchema(id: 10, name: r'tag', type: IsarType.string),
+    r'tags': PropertySchema(id: 10, name: r'tags', type: IsarType.stringList),
     r'time': PropertySchema(id: 11, name: r'time', type: IsarType.dateTime),
     r'title': PropertySchema(id: 12, name: r'title', type: IsarType.string),
     r'updatedAt': PropertySchema(
@@ -173,11 +173,10 @@ int _noteEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
-  bytesCount += 3 + object.previewImageUrls.length * 3;
   {
-    for (var i = 0; i < object.previewImageUrls.length; i++) {
-      final value = object.previewImageUrls[i];
-      bytesCount += value.length * 3;
+    final value = object.previewImageUrl;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
     }
   }
   {
@@ -192,10 +191,11 @@ int _noteEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
+  bytesCount += 3 + object.tags.length * 3;
   {
-    final value = object.tag;
-    if (value != null) {
-      bytesCount += 3 + value.length * 3;
+    for (var i = 0; i < object.tags.length; i++) {
+      final value = object.tags[i];
+      bytesCount += value.length * 3;
     }
   }
   {
@@ -232,10 +232,10 @@ void _noteSerialize(
   writer.writeString(offsets[4], object.pendingAiQuestion);
   writer.writeString(offsets[5], object.previewContent);
   writer.writeString(offsets[6], object.previewDescription);
-  writer.writeStringList(offsets[7], object.previewImageUrls);
+  writer.writeString(offsets[7], object.previewImageUrl);
   writer.writeString(offsets[8], object.previewTitle);
   writer.writeString(offsets[9], object.resourceStatus);
-  writer.writeString(offsets[10], object.tag);
+  writer.writeStringList(offsets[10], object.tags);
   writer.writeDateTime(offsets[11], object.time);
   writer.writeString(offsets[12], object.title);
   writer.writeLong(offsets[13], object.updatedAt);
@@ -258,10 +258,10 @@ Note _noteDeserialize(
   object.pendingAiQuestion = reader.readStringOrNull(offsets[4]);
   object.previewContent = reader.readStringOrNull(offsets[5]);
   object.previewDescription = reader.readStringOrNull(offsets[6]);
-  object.previewImageUrls = reader.readStringList(offsets[7]) ?? [];
+  object.previewImageUrl = reader.readStringOrNull(offsets[7]);
   object.previewTitle = reader.readStringOrNull(offsets[8]);
   object.resourceStatus = reader.readStringOrNull(offsets[9]);
-  object.tag = reader.readStringOrNull(offsets[10]);
+  object.tags = reader.readStringList(offsets[10]) ?? [];
   object.time = reader.readDateTimeOrNull(offsets[11]);
   object.title = reader.readStringOrNull(offsets[12]);
   object.updatedAt = reader.readLong(offsets[13]);
@@ -292,13 +292,13 @@ P _noteDeserializeProp<P>(
     case 6:
       return (reader.readStringOrNull(offset)) as P;
     case 7:
-      return (reader.readStringList(offset) ?? []) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 8:
       return (reader.readStringOrNull(offset)) as P;
     case 9:
       return (reader.readStringOrNull(offset)) as P;
     case 10:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readStringList(offset) ?? []) as P;
     case 11:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 12:
@@ -1664,12 +1664,30 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition>
-  previewImageUrlsElementEqualTo(String value, {bool caseSensitive = true}) {
+  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'previewImageUrl'),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'previewImageUrl'),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.equalTo(
-          property: r'previewImageUrls',
+          property: r'previewImageUrl',
           value: value,
           caseSensitive: caseSensitive,
         ),
@@ -1677,9 +1695,8 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition>
-  previewImageUrlsElementGreaterThan(
-    String value, {
+  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlGreaterThan(
+    String? value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
@@ -1687,7 +1704,7 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
       return query.addFilterCondition(
         FilterCondition.greaterThan(
           include: include,
-          property: r'previewImageUrls',
+          property: r'previewImageUrl',
           value: value,
           caseSensitive: caseSensitive,
         ),
@@ -1695,9 +1712,8 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition>
-  previewImageUrlsElementLessThan(
-    String value, {
+  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlLessThan(
+    String? value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
@@ -1705,7 +1721,7 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
       return query.addFilterCondition(
         FilterCondition.lessThan(
           include: include,
-          property: r'previewImageUrls',
+          property: r'previewImageUrl',
           value: value,
           caseSensitive: caseSensitive,
         ),
@@ -1713,10 +1729,9 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition>
-  previewImageUrlsElementBetween(
-    String lower,
-    String upper, {
+  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlBetween(
+    String? lower,
+    String? upper, {
     bool includeLower = true,
     bool includeUpper = true,
     bool caseSensitive = true,
@@ -1724,7 +1739,7 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.between(
-          property: r'previewImageUrls',
+          property: r'previewImageUrl',
           lower: lower,
           includeLower: includeLower,
           upper: upper,
@@ -1735,12 +1750,14 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition>
-  previewImageUrlsElementStartsWith(String value, {bool caseSensitive = true}) {
+  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.startsWith(
-          property: r'previewImageUrls',
+          property: r'previewImageUrl',
           value: value,
           caseSensitive: caseSensitive,
         ),
@@ -1748,12 +1765,14 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition>
-  previewImageUrlsElementEndsWith(String value, {bool caseSensitive = true}) {
+  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.endsWith(
-          property: r'previewImageUrls',
+          property: r'previewImageUrl',
           value: value,
           caseSensitive: caseSensitive,
         ),
@@ -1761,12 +1780,14 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition>
-  previewImageUrlsElementContains(String value, {bool caseSensitive = true}) {
+  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlContains(
+    String value, {
+    bool caseSensitive = true,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.contains(
-          property: r'previewImageUrls',
+          property: r'previewImageUrl',
           value: value,
           caseSensitive: caseSensitive,
         ),
@@ -1774,12 +1795,14 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition>
-  previewImageUrlsElementMatches(String pattern, {bool caseSensitive = true}) {
+  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlMatches(
+    String pattern, {
+    bool caseSensitive = true,
+  }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.matches(
-          property: r'previewImageUrls',
+          property: r'previewImageUrl',
           wildcard: pattern,
           caseSensitive: caseSensitive,
         ),
@@ -1787,77 +1810,18 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition>
-  previewImageUrlsElementIsEmpty() {
+  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlIsEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
-        FilterCondition.equalTo(property: r'previewImageUrls', value: ''),
+        FilterCondition.equalTo(property: r'previewImageUrl', value: ''),
       );
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition>
-  previewImageUrlsElementIsNotEmpty() {
+  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
-        FilterCondition.greaterThan(property: r'previewImageUrls', value: ''),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlsLengthEqualTo(
-    int length,
-  ) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(r'previewImageUrls', length, true, length, true);
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlsIsEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(r'previewImageUrls', 0, true, 0, true);
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlsIsNotEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(r'previewImageUrls', 0, false, 999999, true);
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition>
-  previewImageUrlsLengthLessThan(int length, {bool include = false}) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(r'previewImageUrls', 0, true, length, include);
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition>
-  previewImageUrlsLengthGreaterThan(int length, {bool include = false}) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'previewImageUrls',
-        length,
-        include,
-        999999,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> previewImageUrlsLengthBetween(
-    int lower,
-    int upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'previewImageUrls',
-        lower,
-        includeLower,
-        upper,
-        includeUpper,
+        FilterCondition.greaterThan(property: r'previewImageUrl', value: ''),
       );
     });
   }
@@ -2186,30 +2150,14 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> tagIsNull() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        const FilterCondition.isNull(property: r'tag'),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> tagIsNotNull() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        const FilterCondition.isNotNull(property: r'tag'),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> tagEqualTo(
-    String? value, {
+  QueryBuilder<Note, Note, QAfterFilterCondition> tagsElementEqualTo(
+    String value, {
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.equalTo(
-          property: r'tag',
+          property: r'tags',
           value: value,
           caseSensitive: caseSensitive,
         ),
@@ -2217,8 +2165,8 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> tagGreaterThan(
-    String? value, {
+  QueryBuilder<Note, Note, QAfterFilterCondition> tagsElementGreaterThan(
+    String value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
@@ -2226,7 +2174,7 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
       return query.addFilterCondition(
         FilterCondition.greaterThan(
           include: include,
-          property: r'tag',
+          property: r'tags',
           value: value,
           caseSensitive: caseSensitive,
         ),
@@ -2234,8 +2182,8 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> tagLessThan(
-    String? value, {
+  QueryBuilder<Note, Note, QAfterFilterCondition> tagsElementLessThan(
+    String value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
@@ -2243,7 +2191,7 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
       return query.addFilterCondition(
         FilterCondition.lessThan(
           include: include,
-          property: r'tag',
+          property: r'tags',
           value: value,
           caseSensitive: caseSensitive,
         ),
@@ -2251,9 +2199,9 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> tagBetween(
-    String? lower,
-    String? upper, {
+  QueryBuilder<Note, Note, QAfterFilterCondition> tagsElementBetween(
+    String lower,
+    String upper, {
     bool includeLower = true,
     bool includeUpper = true,
     bool caseSensitive = true,
@@ -2261,7 +2209,7 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.between(
-          property: r'tag',
+          property: r'tags',
           lower: lower,
           includeLower: includeLower,
           upper: upper,
@@ -2272,14 +2220,14 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> tagStartsWith(
+  QueryBuilder<Note, Note, QAfterFilterCondition> tagsElementStartsWith(
     String value, {
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.startsWith(
-          property: r'tag',
+          property: r'tags',
           value: value,
           caseSensitive: caseSensitive,
         ),
@@ -2287,14 +2235,14 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> tagEndsWith(
+  QueryBuilder<Note, Note, QAfterFilterCondition> tagsElementEndsWith(
     String value, {
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.endsWith(
-          property: r'tag',
+          property: r'tags',
           value: value,
           caseSensitive: caseSensitive,
         ),
@@ -2302,14 +2250,14 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> tagContains(
+  QueryBuilder<Note, Note, QAfterFilterCondition> tagsElementContains(
     String value, {
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.contains(
-          property: r'tag',
+          property: r'tags',
           value: value,
           caseSensitive: caseSensitive,
         ),
@@ -2317,14 +2265,14 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> tagMatches(
+  QueryBuilder<Note, Note, QAfterFilterCondition> tagsElementMatches(
     String pattern, {
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.matches(
-          property: r'tag',
+          property: r'tags',
           wildcard: pattern,
           caseSensitive: caseSensitive,
         ),
@@ -2332,18 +2280,73 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> tagIsEmpty() {
+  QueryBuilder<Note, Note, QAfterFilterCondition> tagsElementIsEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
-        FilterCondition.equalTo(property: r'tag', value: ''),
+        FilterCondition.equalTo(property: r'tags', value: ''),
       );
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> tagIsNotEmpty() {
+  QueryBuilder<Note, Note, QAfterFilterCondition> tagsElementIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
-        FilterCondition.greaterThan(property: r'tag', value: ''),
+        FilterCondition.greaterThan(property: r'tags', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> tagsLengthEqualTo(
+    int length,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'tags', length, true, length, true);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> tagsIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'tags', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> tagsIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'tags', 0, false, 999999, true);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> tagsLengthLessThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'tags', 0, true, length, include);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> tagsLengthGreaterThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'tags', length, include, 999999, true);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> tagsLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'tags',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
       );
     });
   }
@@ -3068,6 +3071,18 @@ extension NoteQuerySortBy on QueryBuilder<Note, Note, QSortBy> {
     });
   }
 
+  QueryBuilder<Note, Note, QAfterSortBy> sortByPreviewImageUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'previewImageUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> sortByPreviewImageUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'previewImageUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<Note, Note, QAfterSortBy> sortByPreviewTitle() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'previewTitle', Sort.asc);
@@ -3089,18 +3104,6 @@ extension NoteQuerySortBy on QueryBuilder<Note, Note, QSortBy> {
   QueryBuilder<Note, Note, QAfterSortBy> sortByResourceStatusDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'resourceStatus', Sort.desc);
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterSortBy> sortByTag() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'tag', Sort.asc);
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterSortBy> sortByTagDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'tag', Sort.desc);
     });
   }
 
@@ -3262,6 +3265,18 @@ extension NoteQuerySortThenBy on QueryBuilder<Note, Note, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Note, Note, QAfterSortBy> thenByPreviewImageUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'previewImageUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> thenByPreviewImageUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'previewImageUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<Note, Note, QAfterSortBy> thenByPreviewTitle() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'previewTitle', Sort.asc);
@@ -3283,18 +3298,6 @@ extension NoteQuerySortThenBy on QueryBuilder<Note, Note, QSortThenBy> {
   QueryBuilder<Note, Note, QAfterSortBy> thenByResourceStatusDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'resourceStatus', Sort.desc);
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterSortBy> thenByTag() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'tag', Sort.asc);
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterSortBy> thenByTagDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'tag', Sort.desc);
     });
   }
 
@@ -3421,9 +3424,14 @@ extension NoteQueryWhereDistinct on QueryBuilder<Note, Note, QDistinct> {
     });
   }
 
-  QueryBuilder<Note, Note, QDistinct> distinctByPreviewImageUrls() {
+  QueryBuilder<Note, Note, QDistinct> distinctByPreviewImageUrl({
+    bool caseSensitive = true,
+  }) {
     return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(r'previewImageUrls');
+      return query.addDistinctBy(
+        r'previewImageUrl',
+        caseSensitive: caseSensitive,
+      );
     });
   }
 
@@ -3446,11 +3454,9 @@ extension NoteQueryWhereDistinct on QueryBuilder<Note, Note, QDistinct> {
     });
   }
 
-  QueryBuilder<Note, Note, QDistinct> distinctByTag({
-    bool caseSensitive = true,
-  }) {
+  QueryBuilder<Note, Note, QDistinct> distinctByTags() {
     return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(r'tag', caseSensitive: caseSensitive);
+      return query.addDistinctBy(r'tags');
     });
   }
 
@@ -3540,10 +3546,9 @@ extension NoteQueryProperty on QueryBuilder<Note, Note, QQueryProperty> {
     });
   }
 
-  QueryBuilder<Note, List<String>, QQueryOperations>
-  previewImageUrlsProperty() {
+  QueryBuilder<Note, String?, QQueryOperations> previewImageUrlProperty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'previewImageUrls');
+      return query.addPropertyName(r'previewImageUrl');
     });
   }
 
@@ -3559,9 +3564,9 @@ extension NoteQueryProperty on QueryBuilder<Note, Note, QQueryProperty> {
     });
   }
 
-  QueryBuilder<Note, String?, QQueryOperations> tagProperty() {
+  QueryBuilder<Note, List<String>, QQueryOperations> tagsProperty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'tag');
+      return query.addPropertyName(r'tags');
     });
   }
 

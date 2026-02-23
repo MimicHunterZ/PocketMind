@@ -113,6 +113,22 @@ class ImageStorageHelper {
         return null;
       }
 
+      // 修正扩展名：检测实际格式（防止 CDN URL 无扩展名时默认 .jpg 但实为 WebP 等格式）
+      final actualExt = await _detectExtensionFromMagicBytes(file);
+      if (actualExt.isNotEmpty &&
+          actualExt != p.extension(fileName).toLowerCase()) {
+        final correctedFileName =
+            p.basenameWithoutExtension(fileName) + actualExt;
+        final correctedRelativePath = '$_folderName/$correctedFileName';
+        final correctedPath = p.join(_rootDir!, _folderName, correctedFileName);
+        await file.rename(correctedPath);
+        PMlog.d(
+          tag,
+          '格式修正: ${p.extension(fileName)} → $actualExt, $relativePath -> $correctedRelativePath',
+        );
+        return correctedRelativePath;
+      }
+
       PMlog.d(tag, '图片下载成功: $url -> $relativePath');
       return relativePath;
     } catch (e) {
@@ -190,6 +206,50 @@ class ImageStorageHelper {
     } catch (e) {
       PMlog.e(tag, '删除图片失败: $relativePath, e:$e');
     }
+  }
+
+  /// 从文件头魔数字节检测实际图片格式，返回扩展名（含点号，如 '.webp'），检测失败时返回空字符串
+  Future<String> _detectExtensionFromMagicBytes(File file) async {
+    try {
+      final raf = await file.open();
+      final bytes = await raf.read(12);
+      await raf.close();
+      if (bytes.length >= 4) {
+        // WebP: RIFF????WEBP
+        if (bytes[0] == 0x52 &&
+            bytes[1] == 0x49 &&
+            bytes[2] == 0x46 &&
+            bytes[3] == 0x46 &&
+            bytes.length >= 12 &&
+            bytes[8] == 0x57 &&
+            bytes[9] == 0x45 &&
+            bytes[10] == 0x42 &&
+            bytes[11] == 0x50) {
+          return '.webp';
+        }
+        // JPEG: FF D8 FF
+        if (bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) {
+          return '.jpg';
+        }
+        // PNG: 89 50 4E 47
+        if (bytes[0] == 0x89 &&
+            bytes[1] == 0x50 &&
+            bytes[2] == 0x4E &&
+            bytes[3] == 0x47) {
+          return '.png';
+        }
+        // GIF87a / GIF89a: 47 49 46 38
+        if (bytes[0] == 0x47 &&
+            bytes[1] == 0x49 &&
+            bytes[2] == 0x46 &&
+            bytes[3] == 0x38) {
+          return '.gif';
+        }
+      }
+    } catch (e) {
+      PMlog.w(tag, '魔数检测失败: $e');
+    }
+    return '';
   }
 
   /// 获取所有存储的图片路径（相对路径）

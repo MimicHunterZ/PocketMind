@@ -16,6 +16,7 @@ public record AssetDTO(
         Long size,
         String fileName,
         String storageType,
+        int sortOrder,
         Instant createdAt
 ) {
 }

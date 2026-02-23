@@ -45,8 +45,8 @@ class NoteService {
     String? content,
     String? url,
     int categoryId = AppConstants.homeCategoryId,
-    String? tag,
-    List<String>? previewImageUrls,
+    List<String> tags = const [],
+    String? previewImageUrl,
     String? previewTitle,
     String? previewDescription,
     String? aiSummary,
@@ -63,8 +63,8 @@ class NoteService {
       ..url = url
       ..categoryId = categoryId
       ..time = DateTime.now()
-      ..tag = tag
-      ..previewImageUrls = previewImageUrls ?? []
+      ..tags = tags
+      ..previewImageUrl = previewImageUrl
       ..previewTitle = previewTitle
       ..previewDescription = previewDescription
       ..aiSummary = aiSummary
@@ -100,8 +100,8 @@ class NoteService {
     String? content,
     String? url,
     int? categoryId,
-    String? tag,
-    List<String>? previewImageUrls,
+    List<String>? tags,
+    String? previewImageUrl,
     String? previewTitle,
     String? previewContent,
     String? previewDescription,
@@ -125,9 +125,9 @@ class NoteService {
     existingNote.content = content ?? existingNote.content;
     existingNote.url = url ?? existingNote.url;
     existingNote.categoryId = categoryId ?? existingNote.categoryId;
-    existingNote.tag = tag ?? existingNote.tag;
-    existingNote.previewImageUrls =
-        previewImageUrls ?? existingNote.previewImageUrls;
+    if (tags != null) existingNote.tags = tags;
+    existingNote.previewImageUrl =
+        previewImageUrl ?? existingNote.previewImageUrl;
     existingNote.previewTitle = previewTitle ?? existingNote.previewTitle;
     existingNote.previewDescription =
         previewDescription ?? existingNote.previewDescription;
@@ -181,11 +181,9 @@ class NoteService {
       await _imageHelper.deleteImage(url);
     }
 
-    // 删除所有本地预览图片
-    for (final previewUrl in note.previewImageUrls) {
-      if (_isLocalImage(previewUrl)) {
-        await _imageHelper.deleteImage(previewUrl);
-      }
+    // 删除预览图片（单张）
+    if (note.previewImageUrl != null && _isLocalImage(note.previewImageUrl!)) {
+      await _imageHelper.deleteImage(note.previewImageUrl!);
     }
 
     // 2. 从数据库删除

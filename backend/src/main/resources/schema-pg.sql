@@ -164,6 +164,9 @@ CREATE TABLE IF NOT EXISTS assets (
     -- 业务/排版元数据预留（存放: {"caption":"小猫","layout":"full-width"}）
     business_metadata JSONB       NOT NULL DEFAULT '{}'::jsonb,
 
+    -- 画廊排序（0 = 无序/默认；同笔记下按 sort_order ASC 排列）
+    sort_order        INTEGER      NOT NULL DEFAULT 0,
+
     created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at       BIGINT       NOT NULL DEFAULT 0,
     is_deleted       BOOLEAN      NOT NULL DEFAULT FALSE
@@ -173,6 +176,7 @@ CREATE INDEX IF NOT EXISTS idx_assets_user_note  ON assets(user_id, note_uuid);
 CREATE INDEX IF NOT EXISTS idx_assets_sha256     ON assets(user_id, sha256);
 CREATE INDEX IF NOT EXISTS idx_assets_user_uuid  ON assets(user_id, uuid);
 CREATE INDEX IF NOT EXISTS idx_assets_type       ON assets(user_id, type);
+CREATE INDEX IF NOT EXISTS idx_assets_note_order ON assets(note_uuid, sort_order ASC);
 
 -- ============================================================
 -- 6. asset_extractions（异步内容提取结果：AI描述/PDF全文/视频转录）

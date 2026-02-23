@@ -20,6 +20,7 @@ class NoteOriginalDataSection extends StatelessWidget {
   final Function(String) onLaunchUrl;
   final bool isDesktop;
   final bool titleEnabled;
+  final List<String> previewImages;
 
   const NoteOriginalDataSection({
     super.key,
@@ -36,6 +37,7 @@ class NoteOriginalDataSection extends StatelessWidget {
     required this.onLaunchUrl,
     required this.isDesktop,
     required this.titleEnabled,
+    this.previewImages = const [],
   });
 
   @override
@@ -60,10 +62,7 @@ class NoteOriginalDataSection extends StatelessWidget {
     // 如果是网络链接且预览图已加载，使用预览图
     if (isHttpsUrl && !isLocalImage) {
       isNetworkImage = true;
-      // 使用 previewImageUrls（多张图片）
-      if (note.previewImageUrls.isNotEmpty) {
-        displayImages.addAll(note.previewImageUrls);
-      }
+      displayImages.addAll(previewImages);
     }
 
     final hasImages = displayImages.isNotEmpty;

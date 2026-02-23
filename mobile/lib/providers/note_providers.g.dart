@@ -63,6 +63,143 @@ final class NoteRepositoryProvider
 
 String _$noteRepositoryHash() => r'2230305745bfbe04e0c422da4f823e2d777bb3cb';
 
+/// NoteAssetRepository Provider
+
+@ProviderFor(noteAssetRepository)
+const noteAssetRepositoryProvider = NoteAssetRepositoryProvider._();
+
+/// NoteAssetRepository Provider
+
+final class NoteAssetRepositoryProvider
+    extends
+        $FunctionalProvider<
+          IsarNoteAssetRepository,
+          IsarNoteAssetRepository,
+          IsarNoteAssetRepository
+        >
+    with $Provider<IsarNoteAssetRepository> {
+  /// NoteAssetRepository Provider
+  const NoteAssetRepositoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'noteAssetRepositoryProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$noteAssetRepositoryHash();
+
+  @$internal
+  @override
+  $ProviderElement<IsarNoteAssetRepository> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  IsarNoteAssetRepository create(Ref ref) {
+    return noteAssetRepository(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(IsarNoteAssetRepository value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<IsarNoteAssetRepository>(value),
+    );
+  }
+}
+
+String _$noteAssetRepositoryHash() =>
+    r'ab765abd489ce802ef8c6aff0f12ffea5dc7f3e9';
+
+/// 查询指定笔记下所有资产实时流（携带尺寸信息供画廊使用）
+
+@ProviderFor(noteAssetImages)
+const noteAssetImagesProvider = NoteAssetImagesFamily._();
+
+/// 查询指定笔记下所有资产实时流（携带尺寸信息供画廊使用）
+
+final class NoteAssetImagesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<NoteAsset>>,
+          List<NoteAsset>,
+          Stream<List<NoteAsset>>
+        >
+    with $FutureModifier<List<NoteAsset>>, $StreamProvider<List<NoteAsset>> {
+  /// 查询指定笔记下所有资产实时流（携带尺寸信息供画廊使用）
+  const NoteAssetImagesProvider._({
+    required NoteAssetImagesFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'noteAssetImagesProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$noteAssetImagesHash();
+
+  @override
+  String toString() {
+    return r'noteAssetImagesProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<List<NoteAsset>> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<List<NoteAsset>> create(Ref ref) {
+    final argument = this.argument as String;
+    return noteAssetImages(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is NoteAssetImagesProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$noteAssetImagesHash() => r'c9c0da3b847e08d0547fa0196ff92667b85d34b9';
+
+/// 查询指定笔记下所有资产实时流（携带尺寸信息供画廊使用）
+
+final class NoteAssetImagesFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<List<NoteAsset>>, String> {
+  const NoteAssetImagesFamily._()
+    : super(
+        retry: null,
+        name: r'noteAssetImagesProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// 查询指定笔记下所有资产实时流（携带尺寸信息供画廊使用）
+
+  NoteAssetImagesProvider call(String noteUuid) =>
+      NoteAssetImagesProvider._(argument: noteUuid, from: this);
+
+  @override
+  String toString() => r'noteAssetImagesProvider';
+}
+
 /// MetadataManager Provider - 业务层
 /// 负责链接元数据解析和图片本地化
 
@@ -111,7 +248,7 @@ final class MetadataManagerProvider
   }
 }
 
-String _$metadataManagerHash() => r'41e4b0265968f29432728b69f9403255f8f6ff71';
+String _$metadataManagerHash() => r'ef7cdc608b7746f76237ee79ceebc5ad500f0dc3';
 
 /// NoteService Provider - 业务层
 
@@ -545,7 +682,7 @@ final class NoteDetailProvider
   }
 }
 
-String _$noteDetailHash() => r'd143dac11c30d468d3ce9eee353451030391e96b';
+String _$noteDetailHash() => r'f4a8e6d6da7ccfba522ce4dfb66adc914de59c77';
 
 final class NoteDetailFamily extends $Family
     with

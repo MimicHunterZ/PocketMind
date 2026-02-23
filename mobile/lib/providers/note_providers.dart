@@ -4,6 +4,8 @@ import 'package:pocketmind/providers/shared_preferences_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/data/repositories/isar_note_repository.dart';
+import 'package:pocketmind/data/repositories/isar_note_asset_repository.dart';
+import 'package:pocketmind/model/note_asset.dart';
 import 'package:pocketmind/providers/nav_providers.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/service/note_service.dart';
@@ -26,16 +28,28 @@ IsarNoteRepository noteRepository(Ref ref) {
   return IsarNoteRepository(isar);
 }
 
+/// NoteAssetRepository Provider
+@Riverpod(keepAlive: true)
+IsarNoteAssetRepository noteAssetRepository(Ref ref) {
+  final isar = ref.watch(isarProvider);
+  return IsarNoteAssetRepository(isar);
+}
+
+/// 查询指定笔记下所有资产实时流（携带尺寸信息供画廊使用）
+@riverpod
+Stream<List<NoteAsset>> noteAssetImages(Ref ref, String noteUuid) {
+  if (noteUuid.isEmpty) return Stream.value([]);
+  return ref.watch(noteAssetRepositoryProvider).watchByNoteUuid(noteUuid);
+}
+
 /// MetadataManager Provider - 业务层
 /// 负责链接元数据解析和图片本地化
 @Riverpod(keepAlive: true)
 MetadataManager metadataManager(Ref ref) {
   final apiService = ref.watch(linkPreviewServiceProvider);
-  final resourceService = ref.watch(resourcePmServiceProvider);
   final platformScraperService = ref.watch(platformScraperServiceProvider);
   return MetadataManager(
     linkPreviewApi: apiService,
-    resourceService: resourceService,
     platformScraperService: platformScraperService,
   );
 }
@@ -141,13 +155,7 @@ class NoteDetail extends _$NoteDetail {
 
   @override
   NoteDetailState build(Note initialNote) {
-    final tags =
-        initialNote.tag
-            ?.split(',')
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toList() ??
-        [];
+    final tags = List<String>.from(initialNote.tags);
     return NoteDetailState(note: initialNote, tags: tags);
   }
 
@@ -162,7 +170,7 @@ class NoteDetail extends _$NoteDetail {
       title: title ?? state.note.title,
       content: content ?? state.note.content,
       categoryId: categoryId ?? state.note.categoryId,
-      tag: tags?.join(',') ?? state.note.tag,
+      tags: tags ?? state.note.tags,
     );
 
     state = state.copyWith(note: updatedNote, tags: tags ?? state.tags);
@@ -200,7 +208,7 @@ class NoteDetail extends _$NoteDetail {
             content: state.note.content,
             url: state.note.url,
             categoryId: state.note.categoryId,
-            tag: state.note.tag,
+            tags: state.note.tags,
             previewTitle: state.note.previewTitle,
             previewDescription: state.note.previewDescription,
             updatedAt: state.note.updatedAt,
