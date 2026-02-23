@@ -40,11 +40,11 @@ public class ImageServeService {
             CacheControl.maxAge(365, TimeUnit.DAYS).cachePrivate();
 
     private final AssetStore assetStore;
-    private final AssetRepository attachmentRepository;
+    private final AssetRepository AssetRepository;
 
-    public ImageServeService(AssetStore assetStore, AssetRepository attachmentRepository) {
+    public ImageServeService(AssetStore assetStore, AssetRepository AssetRepository) {
         this.assetStore = assetStore;
-        this.attachmentRepository = attachmentRepository;
+        this.AssetRepository = AssetRepository;
     }
 
     /**
@@ -55,7 +55,7 @@ public class ImageServeService {
      * @return 包含 Content-Type 和 Cache-Control 头的 200 响应
      */
     public ResponseEntity<Resource> serveFullImage(UUID attachmentUuid, long userId) {
-        Asset attachment = requireOwnedAttachment(attachmentUuid, userId);
+        Asset attachment = requireOwnedAsset(attachmentUuid, userId);
         Resource resource = assetStore.getResource(String.valueOf(userId), attachment.getStorageKey());
 
         log.debug("[ImageServe] 200 全量响应: uuid={}, key={}", attachmentUuid, attachment.getStorageKey());
@@ -80,7 +80,7 @@ public class ImageServeService {
     public ResponseEntity<ResourceRegion> servePartialImage(
             UUID attachmentUuid, long userId, HttpHeaders requestHeaders) {
 
-        Asset attachment = requireOwnedAttachment(attachmentUuid, userId);
+        Asset attachment = requireOwnedAsset(attachmentUuid, userId);
         ResourceRegion region = assetStore.createResourceRegion(
                 String.valueOf(userId), attachment.getStorageKey(), requestHeaders);
 
@@ -97,8 +97,8 @@ public class ImageServeService {
      * 从 DB 查询附件并校验归属权（越权防御）。
      * 若附件不存在或不属于该用户，抛出 404 BusinessException。
      */
-    private Asset requireOwnedAttachment(UUID attachmentUuid, long userId) {
-        return attachmentRepository.findByUuidAndUserId(attachmentUuid, userId)
+    private Asset requireOwnedAsset(UUID attachmentUuid, long userId) {
+        return AssetRepository.findByUuidAndUserId(attachmentUuid, userId)
                 .orElseThrow(() -> new BusinessException(
                         ApiCode.RESOURCE_NOT_FOUND,
                         HttpStatus.NOT_FOUND,

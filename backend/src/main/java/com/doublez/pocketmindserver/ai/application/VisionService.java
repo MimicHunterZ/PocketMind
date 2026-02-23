@@ -35,6 +35,7 @@ public class VisionService {
         this.userPromptResource = userPromptResource;
     }
 
+    //todo 删除
     public String analyzeImage(String localImagePath) {
         // 1. 读取本地文件
         var imageResource = new FileSystemResource(localImagePath);

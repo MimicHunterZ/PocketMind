@@ -71,24 +71,41 @@ public class AiAnalysePollingService {
 
     /**
      * 第一阶段：受理请求（写库 + 快路径触发 AI / 慢路径投递抓取 MQ）。
+     * 幂等设计：笔记已存在时执行 update，不存在时执行 insert；避免重复提交返回 500。
      */
     public void accept(String userIdStr, AiAnalyseAcceptRequest request) {
         Objects.requireNonNull(request, "request");
         long userId = parseUserId(userIdStr);
 
-        NoteEntity note = NoteEntity.create(request.uuid(), userId);
-
-        note.attachSourceUrl(request.url());
-        note.clearSummary();
-
-        if (request.previewTitle() != null || request.previewDescription() != null || request.hasPreviewContent()) {
-            note.completeFetch(request.previewTitle(), request.previewDescription(), request.previewContent());
+        // 幂等：先查询，存在则更新，不存在才新建
+        Optional<NoteEntity> existingOpt = noteRepository.findByUuidAndUserId(request.uuid(), userId);
+        NoteEntity note;
+        if (existingOpt.isPresent()) {
+            note = existingOpt.get();
+            note.attachSourceUrl(request.url());
+            note.clearSummary();
+            if (request.previewTitle() != null || request.previewDescription() != null || request.hasPreviewContent()) {
+                note.completeFetch(request.previewTitle(), request.previewDescription(), request.previewContent());
+            }
+            noteRepository.update(note);
+            log.info("笔记已存在，执行 update: uuid={}", request.uuid());
         } else {
-            // 只标记 PENDING，等待 Consumer 更新
-            note.pendingForFetch();
-        }
+            note = NoteEntity.create(request.uuid(), userId);
+            note.attachSourceUrl(request.url());
+            note.clearSummary();
 
-        noteRepository.save(note);
+            if ((request.title() != null && !request.title().isBlank())
+                    || (request.content() != null && !request.content().isBlank())) {
+                note.updateContent(request.title(), request.content());
+            }
+
+            if (request.previewTitle() != null || request.previewDescription() != null || request.hasPreviewContent()) {
+                note.completeFetch(request.previewTitle(), request.previewDescription(), request.previewContent());
+            } else {
+                note.pendingForFetch();
+            }
+            noteRepository.save(note);
+        }
 
         if (request.hasPreviewContent()) {
             taskExecutor.execute(() -> process(

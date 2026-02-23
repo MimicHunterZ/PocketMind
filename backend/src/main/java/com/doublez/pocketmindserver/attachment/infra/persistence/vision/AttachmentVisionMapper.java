@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
+import java.util.UUID;
 
 @Mapper
 public interface AttachmentVisionMapper extends BaseMapper<AttachmentVisionModel> {
@@ -33,4 +34,27 @@ public interface AttachmentVisionMapper extends BaseMapper<AttachmentVisionModel
             @Param("userId") long userId,
             @Param("cursor") long cursor,
             @Param("limit") int limit);
+
+    @Select("""
+            SELECT * FROM asset_extractions
+            WHERE user_id = #{userId}
+              AND note_uuid = #{noteUuid}
+              AND status = 'DONE'
+              AND is_deleted = FALSE
+            ORDER BY created_at ASC
+            """)
+    List<AttachmentVisionModel> findDoneByNoteUuid(
+            @Param("userId") long userId,
+            @Param("noteUuid") UUID noteUuid);
+
+    @Select("""
+            SELECT * FROM asset_extractions
+            WHERE user_id = #{userId}
+              AND asset_uuid = #{assetUuid}
+              AND is_deleted = FALSE
+            ORDER BY created_at ASC
+            """)
+    List<AttachmentVisionModel> findAllByAssetsUuid(
+            @Param("userId") long userId,
+            @Param("assetUuid") UUID noteUuid);
 }

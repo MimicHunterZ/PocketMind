@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -17,14 +18,19 @@ public record AiAnalyseAcceptRequest(
         UUID uuid,
         @NotBlank(message = "url 不能为空")
         String url,
+        // 帖子的title
         String previewTitle,
+        // 帖子的内容：content（或 description）
         String previewDescription,
-        @JsonAlias({"previewDescribe"})
         String previewContent,
-        String userQuestion
+        String userQuestion,
+        // 用户记录的title
+        String title,
+        // 用户记录的content
+        String content
 ) {
     public boolean hasPreviewContent() {
-        return previewContent != null && !previewContent.isBlank();
+        return (previewContent != null && !previewContent.isBlank()) || (previewDescription != null && !previewDescription.isBlank());
     }
 
     public boolean hasUserQuestion() {

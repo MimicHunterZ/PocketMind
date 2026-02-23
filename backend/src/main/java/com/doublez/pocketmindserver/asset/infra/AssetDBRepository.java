@@ -1,6 +1,7 @@
 package com.doublez.pocketmindserver.asset.infra;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.doublez.pocketmindserver.asset.domain.Asset;
 import com.doublez.pocketmindserver.asset.domain.AssetMapper;
 import com.doublez.pocketmindserver.asset.domain.AssetRepository;
@@ -9,6 +10,7 @@ import com.doublez.pocketmindserver.shared.web.BusinessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -43,5 +45,25 @@ public class AssetDBRepository implements AssetRepository {
                         .eq(Asset::getUserId, userId)
         );
         return Optional.ofNullable(model);
+    }
+
+    @Override
+    public List<Asset> findByNoteUuidAndUserId(UUID noteUuid, long userId) {
+        return mapper.selectList(
+                new LambdaQueryWrapper<Asset>()
+                        .eq(Asset::getNoteUuid, noteUuid)
+                        .eq(Asset::getUserId, userId)
+        );
+    }
+
+    @Override
+    public boolean bindNoteUuid(UUID assetUuid, long userId, UUID noteUuid) {
+        int rows = mapper.update(
+                new LambdaUpdateWrapper<Asset>()
+                        .eq(Asset::getUuid, assetUuid)
+                        .eq(Asset::getUserId, userId)
+                        .set(Asset::getNoteUuid, noteUuid)
+        );
+        return rows > 0;
     }
 }

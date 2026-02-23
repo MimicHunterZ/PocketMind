@@ -1,6 +1,6 @@
 package com.doublez.pocketmindserver.asset.application;
 
-import com.doublez.pocketmindserver.asset.application.dto.UploadResultDTO;
+import com.doublez.pocketmindserver.asset.api.dto.UploadResultDTO;
 import com.doublez.pocketmindserver.asset.domain.Asset;
 import com.doublez.pocketmindserver.asset.domain.AssetRepository;
 import com.doublez.pocketmindserver.asset.spi.AssetStore;

@@ -118,6 +118,13 @@
             <artifactId>mcp-json-jackson3</artifactId>
             <version>0.18.1</version>
         </dependency>
+
+        <!-- TwelveMonkeys: 扩展 ImageIO 对 WebP 等格式的原生支持 -->
+        <dependency>
+            <groupId>com.twelvemonkeys.imageio</groupId>
+            <artifactId>imageio-webp</artifactId>
+            <version>3.12.0</version>
+        </dependency>
     </dependencies>
 
     <dependencyManagement>

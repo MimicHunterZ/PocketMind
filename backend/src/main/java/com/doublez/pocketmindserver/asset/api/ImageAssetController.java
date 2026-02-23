@@ -1,19 +1,18 @@
 package com.doublez.pocketmindserver.asset.api;
 
+import com.doublez.pocketmindserver.asset.api.dto.AssetDTO;
+import com.doublez.pocketmindserver.asset.application.AssetQueryService;
 import com.doublez.pocketmindserver.asset.application.ImageServeService;
 import com.doublez.pocketmindserver.asset.application.ImageUploadService;
-import com.doublez.pocketmindserver.asset.application.dto.UploadResultDTO;
+import com.doublez.pocketmindserver.asset.api.dto.UploadResultDTO;
 import com.doublez.pocketmindserver.shared.security.UserContext;
-import com.doublez.pocketmindserver.shared.web.ApiResponse;
-import com.doublez.pocketmindserver.shared.web.TraceIdContext;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.support.ResourceRegion;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -42,10 +41,14 @@ public class ImageAssetController {
 
     private final ImageUploadService uploadService;
     private final ImageServeService  serveService;
+    private final AssetQueryService  assetQueryService;
 
-    public ImageAssetController(ImageUploadService uploadService, ImageServeService serveService) {
-        this.uploadService = uploadService;
-        this.serveService  = serveService;
+    public ImageAssetController(ImageUploadService uploadService,
+                                ImageServeService serveService,
+                                AssetQueryService assetQueryService) {
+        this.uploadService     = uploadService;
+        this.serveService      = serveService;
+        this.assetQueryService = assetQueryService;
     }
 
     /**
@@ -58,15 +61,22 @@ public class ImageAssetController {
      * @return 包含 uuid/mime/size/width/height 的标准响应
      */
     @PostMapping(consumes = "multipart/form-data")
-    public ApiResponse<UploadResultDTO> uploadImage(
-            @RequestPart("file") MultipartFile file) {
+    public UploadResultDTO uploadImage(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(value = "noteUuid", required = false) UUID noteUuid) {
 
         long userId = parseUserId();
-        log.info("[AssetController] 上传请求: userId={}, originalName={}, size={}B",
-                userId, file.getOriginalFilename(), file.getSize());
+        log.info("[AssetController] 上传请求: userId={}, originalName={}, size={}B, noteUuid={}",
+                userId, file.getOriginalFilename(), file.getSize(), noteUuid);
 
         UploadResultDTO result = uploadService.upload(file, userId);
-        return ApiResponse.ok(result, TraceIdContext.currentTraceId());
+
+        if (noteUuid != null) {
+            assetQueryService.bindToNote(result.uuid(), userId, noteUuid);
+            log.info("[AssetController] 上传后直接绑定: assetUuid={}, noteUuid={}", result.uuid(), noteUuid);
+        }
+
+        return result;
     }
 
     /**
@@ -79,23 +89,36 @@ public class ImageAssetController {
      * <p>注意：该接口不经过 {@link com.doublez.pocketmindserver.shared.web.ApiResponseAdvice}
      * 的统一包装，因为响应 body 是二进制资源流，不适合 JSON 封装。</p>
      *
-     * @param uuid           路径中的附件 UUID
+     * @param assetsUuid           路径中的附件 UUID
      * @param requestHeaders 来自请求的 HttpHeaders（含 Range 信息）
      * @return 200 全量 或 206 分段响应（ResponseEntity 绕过统一包装）
      */
-    @GetMapping("/{uuid}")
+    @GetMapping("/{assetsUuid}")
     public ResponseEntity<?> getImage(
-            @PathVariable("uuid") UUID uuid,
+            @PathVariable("assetsUuid") UUID assetsUuid,
             @RequestHeader HttpHeaders requestHeaders) {
 
         long userId = parseUserId();
 
         // 在 Controller 层判断 Range，保持 Service 职责单一
         if (!requestHeaders.getRange().isEmpty()) {
-            return serveService.servePartialImage(uuid, userId, requestHeaders);
+            return serveService.servePartialImage(assetsUuid, userId, requestHeaders);
         }
 
-        return serveService.serveFullImage(uuid, userId);
+        return serveService.serveFullImage(assetsUuid, userId);
+    }
+
+    /**
+     * 
+     * @param noteUuid 笔记 UUID
+     * @return 该笔记下的所有图片资产元数据列表
+     */
+    @GetMapping("/metadata/{noteUuid}")
+    public List<AssetDTO> getImageMetadata(
+            @PathVariable("noteUuid") UUID noteUuid) {
+
+        long userId = parseUserId();
+        return assetQueryService.listByNote(noteUuid,userId);
     }
 
     private long parseUserId() {

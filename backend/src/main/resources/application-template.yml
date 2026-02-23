@@ -74,6 +74,10 @@ pocketmind:
       max-payload-length: 1200
       log-tool-context: true
 app:
+  base-url: http://localhost:8080  # 替换为生产环境实际地址，供拼接图片访问 URL
+  storage:
+    local:
+      root-dir: /app/data/assets   # Docker 挂载路径
   exception:
     show-stacktrace: true
 

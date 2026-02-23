@@ -1,7 +1,9 @@
 package com.doublez.pocketmindserver.note.api;
 
+import com.doublez.pocketmindserver.asset.application.AssetQueryService;
 import com.doublez.pocketmindserver.note.api.dto.PostResponse;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
+import com.doublez.pocketmindserver.note.infra.persistence.note.NoteTagRelationMapper;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
 import com.doublez.pocketmindserver.shared.security.UserContext;
 import com.doublez.pocketmindserver.shared.web.ApiCode;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -22,6 +25,7 @@ public class PostController {
 
     private final NoteRepository noteRepository;
     private final ChatSessionRepository chatSessionRepository;
+    private final NoteTagRelationMapper noteTagRelationMapper;
 
     @GetMapping("/{uuid}")
     public PostResponse getPost(@PathVariable("uuid") UUID uuid) {
@@ -36,6 +40,12 @@ public class PostController {
                 .map(s -> s.getUuid())
                 .orElse(null);
 
+        // 查询 AI 标签
+        List<String> tags = noteTagRelationMapper.findTagsByNoteUuid(userId, uuid)
+                .stream()
+                .map(t -> t.getName())
+                .toList();
+
         return new PostResponse(
                 note.getUuid(),
                 note.getSourceUrl(),
@@ -44,7 +54,8 @@ public class PostController {
                 sessionUuid,
                 note.getResourceStatus(),
                 note.getPreviewTitle(),
-                note.getPreviewDescription()
+                note.getPreviewDescription(),
+                tags
         );
     }
 
