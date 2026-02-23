@@ -3,13 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocketmind/model/note.dart';
-import 'package:pocketmind/model/note_asset.dart';
 import 'package:pocketmind/providers/category_providers.dart';
 import 'package:pocketmind/providers/app_config_provider.dart';
+import 'package:pocketmind/providers/chat_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/util/image_prefetcher.dart';
 import 'package:pocketmind/util/responsive_breakpoints.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../router/route_paths.dart';
 import '../widget/creative_toast.dart';
 import '../widget/note_detail/note_detail_top_bar.dart';
 import '../widget/note_detail/note_detail_sidebar.dart';
@@ -145,6 +146,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
                   style: CategoryBadgeStyle.normal,
                 ),
               ),
+              goToSession: _goToSessionPressed,
             ),
 
             // 主内容区域
@@ -387,6 +389,46 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
+    }
+  }
+
+  /// 跳转到与该笔记关联的 AI 会话。
+  ///
+  /// 流程：本地 Isar 已有会话 → 直接跳转；
+  ///      本地无会话 → 从服务端同步 → 仍无 → 创建新会话 → 跳转。
+  void _goToSessionPressed() async {
+    final noteUuid = widget.note.uuid;
+    if (noteUuid == null || noteUuid.isEmpty) return;
+
+    // 直接查 Isar 仓库（比读 Stream Provider 的 .asData 更可靠，不受时序影响）
+    final repo = ref.read(chatSessionRepositoryProvider);
+
+    // 1. 本地 Isar 优先
+    final localSessions = await repo.findByNoteUuid(noteUuid);
+
+    String sessionUuid;
+    if (localSessions.isNotEmpty) {
+      sessionUuid = localSessions.first.uuid;
+    } else {
+      // 2. 从服务端同步该笔记的会话
+      try {
+        await ref.read(chatServiceProvider).syncSessions(noteUuid: noteUuid);
+      } catch (_) {}
+      final syncedSessions = await repo.findByNoteUuid(noteUuid);
+
+      if (syncedSessions.isNotEmpty) {
+        sessionUuid = syncedSessions.first.uuid;
+      } else {
+        // 3. 服务端也无会话 → 新建
+        final session = await ref
+            .read(chatServiceProvider)
+            .createSession(noteUuid: noteUuid);
+        sessionUuid = session.uuid;
+      }
+    }
+
+    if (mounted) {
+      context.push(RoutePaths.chatOf(sessionUuid));
     }
   }
 }

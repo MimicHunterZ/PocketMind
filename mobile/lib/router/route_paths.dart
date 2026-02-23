@@ -17,4 +17,10 @@ class RoutePaths {
 
   /// 平台账号管理
   static const String platformAccounts = '/settings/platform-accounts';
+
+  /// 聊天页 - 参数 :sessionUuid
+  static const String chat = '/chat/:sessionUuid';
+
+  /// 生成聊天页路径
+  static String chatOf(String sessionUuid) => '/chat/$sessionUuid';
 }

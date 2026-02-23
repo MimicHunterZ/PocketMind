@@ -16,4 +16,16 @@ class ApiConstants {
 
   /// 图片资产（上传 POST，绑定 PATCH /{uuid}/bind）
   static const String assetsImages = '/api/assets/images';
+
+  // Chat 会话 & 消息
+
+  /// 会话列表 / 创建会话（GET / POST）
+  static const String chatSessions = '/api/ai/sessions';
+
+  /// 单个会话操作基础路径（拼接 /{uuid}）
+  static String chatSession(String uuid) => '/api/ai/sessions/$uuid';
+
+  /// 会话消息列表 / 发送消息（GET / POST）
+  static String chatMessages(String sessionUuid) =>
+      '/api/ai/sessions/$sessionUuid/messages';
 }

@@ -7,6 +7,9 @@ class NoteDetailTopBar extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
+  /// 跳转到 AI 会话页的回调
+  final VoidCallback goToSession;
+
   /// 顶部栏中间区域（用于放置分类/时间等信息）。
   final Widget? middle;
 
@@ -19,6 +22,7 @@ class NoteDetailTopBar extends StatelessWidget {
     required this.onShare,
     required this.onEdit,
     required this.onDelete,
+    required this.goToSession,
     this.middle,
     this.rightLeading,
   });
@@ -41,10 +45,10 @@ class NoteDetailTopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // 返回按钮 - 带文字提示
+          // 返回按钮
           _buildNavButton(
             icon: Icons.arrow_back_rounded,
-            label: '返回',
+            label: '',
             onPressed: onBack,
             colorScheme: colorScheme,
           ),
@@ -58,29 +62,25 @@ class NoteDetailTopBar extends StatelessWidget {
             children: [
               if (rightLeading != null) ...[
                 rightLeading!,
-                SizedBox(width: 8.w),
+                SizedBox(width: 4.w),
               ],
-              // _buildNavButton(
-              //   icon: Icons.share_outlined,
-              //   label: '分享',
-              //   onPressed: onShare,
-              //   colorScheme: colorScheme,
-              // ),
-              // _buildNavButton(
-              //   icon: Icons.edit_outlined,
-              //   label: '编辑',
-              //   onPressed: onEdit,
-              //   colorScheme: colorScheme,
-              // ),
+              // AI 会话入口
+              _buildNavButton(
+                icon: Icons.auto_awesome_outlined,
+                label: '',
+                onPressed: goToSession,
+                colorScheme: colorScheme,
+                accentColor: colorScheme.tertiary,
+              ),
               Container(
                 width: 1,
                 height: 20.h,
-                margin: EdgeInsets.symmetric(horizontal: 8.w),
+                margin: EdgeInsets.symmetric(horizontal: 4.w),
                 color: colorScheme.outlineVariant.withValues(alpha: 0.3),
               ),
               _buildNavButton(
                 icon: Icons.delete_outline,
-                label: '删除',
+                label: '',
                 onPressed: onDelete,
                 colorScheme: colorScheme,
                 isDestructive: true,
@@ -99,10 +99,11 @@ class NoteDetailTopBar extends StatelessWidget {
     required VoidCallback onPressed,
     required ColorScheme colorScheme,
     bool isDestructive = false,
+    Color? accentColor,
   }) {
     final color = isDestructive
         ? colorScheme.error.withValues(alpha: 0.8)
-        : colorScheme.secondary;
+        : (accentColor ?? colorScheme.secondary);
     final hoverColor = isDestructive
         ? colorScheme.error.withValues(alpha: 0.1)
         : colorScheme.surfaceContainerHighest.withValues(alpha: 0.1);
@@ -114,22 +115,24 @@ class NoteDetailTopBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(8.r),
         hoverColor: hoverColor,
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 18.sp, color: color),
-              SizedBox(width: 4.w),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w500,
-                  color: color,
+          padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+          child: label.isEmpty
+              ? Icon(icon, size: 20.sp, color: color)
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 18.sp, color: color),
+                    SizedBox(width: 4.w),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w500,
+                        color: color,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );

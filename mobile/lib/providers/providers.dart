@@ -26,6 +26,9 @@ export 'nav_providers.dart';
 // UI Providers
 export 'ui_providers.dart';
 
+// Chat Providers
+export 'chat_providers.dart';
+
 // 注意：sync_service 和 API service providers 通常在各自的模块中使用
 // 如需使用，请单独导入：
 // import 'package:pocketmind/sync/sync_service.dart';

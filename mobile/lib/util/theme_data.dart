@@ -273,7 +273,11 @@ final ThemeData calmBeigeTheme = ThemeData(
     shape: StadiumBorder(),
     elevation: 4,
   ),
-  extensions: const <ThemeExtension<dynamic>>[lightShareColors, lightAppColors],
+  extensions: const <ThemeExtension<dynamic>>[
+    lightShareColors,
+    lightAppColors,
+    lightChatBubbleColors,
+  ],
 );
 
 // 暗色模式
@@ -398,5 +402,122 @@ final ThemeData quietNightTheme = ThemeData(
     shape: StadiumBorder(),
     elevation: 4,
   ),
-  extensions: const <ThemeExtension<dynamic>>[darkShareColors, darkAppColors],
+  extensions: const <ThemeExtension<dynamic>>[
+    darkShareColors,
+    darkAppColors,
+    darkChatBubbleColors,
+  ],
+);
+// 聊天气泡颜色 - 供 ChatPage 使用
+
+class ChatBubbleColors extends ThemeExtension<ChatBubbleColors> {
+  const ChatBubbleColors({
+    required this.userBubble,
+    required this.userBubbleText,
+    required this.assistantBubble,
+    required this.assistantBubbleText,
+    required this.timeLabelBackground,
+    required this.timeLabelText,
+    required this.inputBarBackground,
+    required this.streamingDot,
+  });
+
+  /// 用户气泡背景色
+  final Color userBubble;
+
+  /// 用户气泡文字色
+  final Color userBubbleText;
+
+  /// AI 气泡背景色
+  final Color assistantBubble;
+
+  /// AI 气泡文字色
+  final Color assistantBubbleText;
+
+  /// 居中时间标签背景
+  final Color timeLabelBackground;
+
+  /// 居中时间标签文字
+  final Color timeLabelText;
+
+  /// 底部输入栏背景
+  final Color inputBarBackground;
+
+  /// 流式打字动画点颜色
+  final Color streamingDot;
+
+  @override
+  ChatBubbleColors copyWith({
+    Color? userBubble,
+    Color? userBubbleText,
+    Color? assistantBubble,
+    Color? assistantBubbleText,
+    Color? timeLabelBackground,
+    Color? timeLabelText,
+    Color? inputBarBackground,
+    Color? streamingDot,
+  }) {
+    return ChatBubbleColors(
+      userBubble: userBubble ?? this.userBubble,
+      userBubbleText: userBubbleText ?? this.userBubbleText,
+      assistantBubble: assistantBubble ?? this.assistantBubble,
+      assistantBubbleText: assistantBubbleText ?? this.assistantBubbleText,
+      timeLabelBackground: timeLabelBackground ?? this.timeLabelBackground,
+      timeLabelText: timeLabelText ?? this.timeLabelText,
+      inputBarBackground: inputBarBackground ?? this.inputBarBackground,
+      streamingDot: streamingDot ?? this.streamingDot,
+    );
+  }
+
+  @override
+  ChatBubbleColors lerp(ThemeExtension<ChatBubbleColors>? other, double t) {
+    if (other is! ChatBubbleColors) return this;
+    return ChatBubbleColors(
+      userBubble: Color.lerp(userBubble, other.userBubble, t)!,
+      userBubbleText: Color.lerp(userBubbleText, other.userBubbleText, t)!,
+      assistantBubble: Color.lerp(assistantBubble, other.assistantBubble, t)!,
+      assistantBubbleText: Color.lerp(
+        assistantBubbleText,
+        other.assistantBubbleText,
+        t,
+      )!,
+      timeLabelBackground: Color.lerp(
+        timeLabelBackground,
+        other.timeLabelBackground,
+        t,
+      )!,
+      timeLabelText: Color.lerp(timeLabelText, other.timeLabelText, t)!,
+      inputBarBackground: Color.lerp(
+        inputBarBackground,
+        other.inputBarBackground,
+        t,
+      )!,
+      streamingDot: Color.lerp(streamingDot, other.streamingDot, t)!,
+    );
+  }
+
+  static ChatBubbleColors of(BuildContext context) =>
+      Theme.of(context).extension<ChatBubbleColors>()!;
+}
+
+const lightChatBubbleColors = ChatBubbleColors(
+  userBubble: Color(0xFFD97757), // 赤陶橙 - 与主题 tertiary 一致
+  userBubbleText: Color(0xFFFFFFFF),
+  assistantBubble: Color(0xFFFFFFFF), // 纯白卡片
+  assistantBubbleText: Color(0xFF3A3A35),
+  timeLabelBackground: Color(0xFFE8E4DF),
+  timeLabelText: Color(0xFF9B9691),
+  inputBarBackground: Color(0xFFFFFFFF),
+  streamingDot: Color(0xFFD97757),
+);
+
+const darkChatBubbleColors = ChatBubbleColors(
+  userBubble: Color(0xFFE58F6F), // 暖橙 - 与暗色 tertiary 一致
+  userBubbleText: Color(0xFF09090B),
+  assistantBubble: Color(0xFF2C2C2E), // 稍亮于 scaffold 背景
+  assistantBubbleText: Color(0xFFA1A1AA),
+  timeLabelBackground: Color(0xFF2A2A2C),
+  timeLabelText: Color(0xFF71717A),
+  inputBarBackground: Color(0xFF2C2C2E),
+  streamingDot: Color(0xFFE58F6F),
 );
