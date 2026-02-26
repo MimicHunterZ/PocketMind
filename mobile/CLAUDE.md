@@ -1,414 +1,125 @@
-# CLAUDE.md
+doc# PocketMind Copilot Instructions
+
+你是 PocketMind 项目的专家级 AI 架构师。PocketMind 是一个“第二大脑”生态系统，包含 Flutter 移动端（本地优先）和 Spring Boot 后端（AI 服务中心）。
+
+## 🏗️ 项目架构与职责定义
+
+### 1. 后端 (Spring Boot) - 严格分层规范
+
+* **包路径**: `com.doublez.pocketmindserver`
+#### Controller 层 (API 调度规范)
+Controller 应作为极薄的“协议适配层”，严禁涉及任何业务逻辑。
+
+* **依赖约束**:
+    * **强禁令**: 禁止注入 `Mapper` 或 `Repository`。
+    * **准入**: 仅允许注入 `Service` 接口。
+* **核心职责**:
+    1.  **参数校验**: 使用 JSR-303/JSR-380 注解（如 `@Validated`, `@NotBlank`）进行入参合法性检查。
+    2.  **流量分发**: 仅负责调用 Service 执行业务。
+* **设计原则**: 保持方法纯粹，单个 API 逻辑代码原则上不应超过 30 行。
+
+#### Service 层 (核心业务规范)
+* **接口规范**: 必须采用 `Interface + Impl` 模式，便于 AOP 代理及 Mock 测试。
+* **事务管理**: 
+    * 多表操作、跨服务调用必须标注 `@Transactional(rollbackFor = Exception.class)`。
+    * 禁止在长耗时（如 AI 调用、文件上传）方法上开启大事务，应采用声明式事务细化边界。
+* **数据流转**: 
+    * 接收 `DTO`，向 Repository 请求 `Entity`。
+    * 业务逻辑处理完成后，将 `Entity` 转换为 `VO/DTO` 返回给 Controller。
+* **解耦要求**: 禁止直接调用 `BaseMapper` 的方法，必须通过 `Repository` 获取数据。
+
+#### Persistence 层 (持久化与 Repository 模式)
+为了实现“存储中立”并优化 MyBatis-Plus 的使用，引入 Repository 抽象。
+* mybatis-plus 需要和 springboot4.0 对齐，文档使用  `Context7 MCP` 获取
+* **Repository 职责**:
+    * 作为 Service 与 Mapper 之间的缓冲带。
+    * 屏蔽 MyBatis-Plus 的 `QueryWrapper` 等原生 API 侵入 Service 层。
+    * Service 仅调用如 `userRepository.findById(id)`，而不关心底层是 LambdaQuery 还是 XML。
+* **实体映射**:
+    * `Entity` 类必须开启 `Lombok` 注解（`@Data`, `@Accessors(chain = true)`）。
+    * 必须使用 `@TableName` 指定表名，避免由于类名修改导致的 SQL 错误。
+* **SQL 优化禁令**:
+    * **严禁 `SELECT *`**: 必须在 Mapper 或 Wrapper 中通过 `.select("id", "name", ...)` 或 `LambdaQueryWrapper.select()` 明确字段。
+    * **索引覆盖**: 数据库分析工具确认索引命中情况。
+
+#### 技术栈交互细节 (Spring Boot 4.x & MP)
+* **响应式支持**: 结合 Spring Boot 4.x，优先考虑使用 `Project Loom` (虚拟线程) 优化 IO 密集型操作。
+* **自动填充**: 强制实现 `MetaObjectHandler`，自动处理 `create_time` 和 `update_time`。
+* **物理删除隔离**: 核心业务表必须使用 `logic-delete`（逻辑删除），配置 `mybatis-plus.global-config.db-config.logic-delete-field`。
+
+#### **AI 模块**:
+* 基于 **Spring AI**。
+1. 提示词工程
+  语法强制：所有动态变量必须使用 <variable_name> 格式。严禁使用 {{ }} 或 { }。
+  外部化管理：禁止在 Java 类中硬编码 String。
+  路径：src/main/resources/prompts/{biz_domain}/{scene_name}.st
+  注入方式：使用 org.springframework.core.io.Resource 配合 @Value 注入，不能硬编码。
+2. 流式传输协议 (SSE Standard)
+响应式流处理需严格遵守 W3C SSE 规范，确保前端解析不掉帧、不报错：
+返回类型：必须声明为 Flux<ServerSentEvent<String>>。
+事件生命周期：
+  [Data]: 业务增量内容，通过 .data(chunk) 发送。
+  [Control]: 必须处理结束标识，发送 [DONE] 信号或特定事件类型，避免前端长连接挂死。
+  [Error]: 发生异常时，包装为 event: error 类型的 SSE 消息，而非直接抛出 HTTP 500。
+  字符编码：强制 Content-Type: text/event-stream; charset=UTF-8。
+3. ai调用使用项目封装的 aifailoverRouter 进行调用。
+4. prompt 构建使用 PromptBuilder 工具类进行构建，禁止直接字符串拼接。
+
+#### 异步任务与调度
+1. 使用 JDK21 的虚拟线程处理高并发 AI 调用，避免传统线程池资源耗尽。
+
+
+### 2. 移动端 (Flutter)
+#### 视觉语言与 UI 审美 (The Soul)
+追求“杂志感”不仅仅是排版，更是对留白与光影的精确控制。
+所有相关ui设计字段必须在 theme_data.dart 中定义，禁止在组件中硬编码颜色、字体大小等设计元素。
+使用系统组件前请先查看项目里是否已有封装（mobile\lib\page\widget），禁止直接使用原生组件（如 TextField、Container）进行复杂 UI 构建。
+
+#### 数据架构与序列化 (Data & State)
+拒绝样板代码，强制使用自动化工具链确保不可变性。
+
+| 场景 | 推荐方案 | 核心理由 |
+| :--- | :--- | :--- |
+| **状态/模型** | `@freezed` | 提供完美的 `copyWith`、`union types` 及值相等性判断。 |
+| **简单 DTO** | `@JsonSerializable` | 轻量级序列化，适用于不需要不可变特性的临时对象。 |
+| **时间处理** | `TimestampConverter` | 强制统一。禁止在 UI 层处理 `DateTime` 逻辑，后端下发与本地存储均使用 **毫秒时间戳**。 |
+
+任何涉及 @freezed、@JsonSerializable 或 Riverpod 刷新的操作，必须触发构建：
+`flutter pub run build_runner watch --delete-conflicting-outputs`
+* **禁止项**: 严禁手动编写 `fromJson` / `toJson`。任何手动修改产生的 Mapping 错误在 Code Review 中将被视为一级 Bug。
+
+#### 网络层抽象
+依赖注入: 必须通过 Riverpod Provider 注入 API Service。
+
+拦截器隔离: 认证令牌（Auth Token）、日志记录、多语言 Header 必须在 Dio 拦截器中统一实现。
+
+路径: 所有接口定义存放于 lib/api/，禁止在 UI 逻辑中出现 dio.get('/url')。
+* **状态管理 (使用 Riverpod3.0 不清楚具体改动查看 context7 mcp)**:
+
+* **数据库 (Isar)**:
+* 遵循“持久化驱动展示”原则：UI 订阅 Isar 的 `Watch` 流，业务操作直接修改数据库，UI 自动响应变化。
+* 所有写操作必须封装在 `isar.writeTxn` 中。
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
-
-PocketMind is a Flutter mobile note management application that allows users to easily collect ideas from anywhere with AI enhancement capabilities (planned). The app supports cross-device synchronization via LAN and includes a share extension for quick note capture.
+## 🚨 核心开发规约
 
-## Architecture
-
-### Clean Architecture Pattern
-
-The codebase follows a clean architecture approach with clear separation of concerns:
-
-- **domain/**: Business entities and repository interfaces (pure Dart, no dependencies)
-  - `entities/`: Domain models (NoteEntity, CategoryEntity)
-  - `repositories/`: Abstract repository interfaces defining data operations
-
-- **data/**: Data layer implementations
-  - `repositories/`: Concrete repository implementations using Isar database
-    - Conversion logic between entities and models is encapsulated within repositories
-
-- **model/**: Isar database models with code generation
-  - `note.dart`, `category.dart`: Database schemas with `@collection` annotations
-  - Generated files: `*.g.dart` (created by build_runner)
-
-- **providers/**: Riverpod state management
-  - Uses `riverpod_annotation` with code generation
-  - Infrastructure providers (Isar, SharedPreferences, NotificationService)
-  - Feature providers (notes, categories, navigation, app config)
-  - Generated files: `*_providers.g.dart`
-
-- **page/**: UI layer organized by feature
-  - `home/`: Main app screens (HomeScreen, SettingsPage, NoteDetailPage)
-  - `share/`: Share extension UI (EditNotePage, ShareSuccessPage)
-  - `widget/`: Reusable UI components
-
-- **service/**: Business logic services
-  - `note_service.dart`: Note CRUD operations
-  - `notification_service.dart`: Local notifications
-  - `lan_sync/`: LAN synchronization system
-
-- **api/**: External API integrations
-  - HTTP client configuration
-  - Link preview service
-
-- **util/**: Utilities and helpers
-  - Logging, theme data, image storage, URL parsing
+### 1. 编码风格
 
-### Dual Entry Points
+* **注释**: 所有的代码注释、文档注释必须使用 **中文**。
+* **异常处理**: 移动端使用 `Result<T, Exception>` 包装异步返回；后端使用 `BusinessException` 配合全局异常处理器。
+* **UI 审美**: 遵循简约主义与杂志感（Magazine Style）设计。强调 Typography（优先使用 LXGW WenKai 字体）和玻璃拟态（Glassmorphism）。
 
-The app has two separate entry points:
+## 🛠️ Developer Workflows
 
-1. **main.dart**: Primary app entry point
-   - Initializes Isar database with schemas: Note, Category, SyncLog
-   - Runs UUID migration for legacy data
-   - Sets up ProviderScope with overrides for Isar, SharedPreferences, NotificationService
-   - Launches HomeScreen
+### Mobile
+- **Run**: `cd mobile && flutter run`
+- **Code Generation**: `cd mobile && flutter pub run build_runner watch --delete-conflicting-outputs` (Run once this after changing Isar models or Mockito mocks).
+- **Tests**: `flutter test` (Unit), `flutter test integration_test` (Integration).
 
-2. **main_share.dart**: Share extension entry point (Android)
-   - Separate Flutter engine for share functionality
-   - Handles incoming shared content via MethodChannel
-   - Provides quick note capture UI
-   - Uses state machine: waiting → success → editing
+### Backend
+- **Run**: `cd backend && ./mvnw spring-boot:run`
 
-### State Management
-
-Uses **Riverpod 3.0** with code generation:
-- Providers defined with `@riverpod` annotation
-- Infrastructure providers are `keepAlive: true` singletons
-- Feature providers use `Notifier` pattern for complex state
-- Run `dart run build_runner build` to generate provider code
-
-### Network & HTTP
-
-- **Rule**: NEVER use `Dio` directly in business logic or utility classes.
-- **HttpClient**: Always use the encapsulated `HttpClient` from `package:pocketmind/api/http_client.dart`.
-- **Usage**: Access the Dio instance via `HttpClient().dio`.
-
-## 🏗️ 核心架构准则 (Core Architecture Rules)
-
-### 1. 单一职责原则 (Single Responsibility)
-- **UI 层**: 仅负责展示数据和转发用户交互。严禁包含路径解析、网络请求或复杂的业务逻辑。
-- **Service 层**: 业务逻辑的编排者。负责调度 Manager 和 Repository，处理跨实体的业务流程。
-- **Manager 层**: 专门的数据加工厂（如 `MetadataManager`）。负责具体的协议解析、资源本地化等，不直接操作数据库。
-
-### 2. 持久化驱动展示 (Persistence Driven)
-- UI 必须通过订阅数据库（Isar）的变化来更新。
-- 严禁在 UI 内存中维护复杂的临时状态，所有业务结果必须先落库，再通过流（Stream）反馈给 UI。
-
-### 3. 失败静默与重试机制
-- 元数据抓取或资源本地化失败时，**严禁**向数据库写入错误占位数据（如 "No Title" 或错误提示文字）。
-- 数据库字段应保持为 `null`。UI 层根据字段为 `null` 且非加载状态，显示“预览失败，请检查网络连接”。
-- 这种设计确保了数据的纯净性，并允许用户在下次进入页面时自动或手动触发重试。
-### 4. 数据类序列化规则
-- **禁止手写**: 禁止手写 `fromJson()`, `toJson()`, `copyWith()`, `toString()` 方法
-- **使用 json_serializable**: 对于需要 JSON 序列化的可变数据类，使用 `@JsonSerializable()` 注解
-- **使用 freezed**: 对于不可变数据类（如 UI 状态模型），使用 `@freezed` 注解，自动生成 `copyWith()`, `==`, `hashCode`, `toString()` 等
-- **DateTime 处理**: 使用 `@JsonKey` 指定自定义序列化器处理 DateTime:
-  ```dart
-  @JsonKey(fromJson: _dateTimeFromJson, toJson: _dateTimeToJson)
-  DateTime createdAt;
-  ```
-- **生成代码**: 所有序列化代码由 `build_runner` watch 自动生成到 `*.g.dart` 文件
-- **字段可变性判断**: 如果字段需要在对象创建后修改（如任务队列中的状态变化），使用可变类 + json_serializable；否则使用 freezed
-### Database
-
-**Isar Community Edition** (NoSQL embedded database):
-- Schemas: Note, Category, SyncLog
-- Models in `model/` directory with `@collection` annotations
-- Supports queries, indexes, and reactive streams
-- Run `dart run build_runner build` to generate Isar schemas
-
-### LAN Synchronization
-
-Sophisticated peer-to-peer sync system in `lib/lan_sync/`:
-- **UDP Discovery**: Broadcasts device presence on LAN
-- **WebSocket Server/Client**: Bidirectional real-time sync
-- **Conflict Resolution**: Last-write-wins with UUID-based tracking
-- **Sync Engine**: Handles data merging and change detection
-- **Deterministic Connection**: Uses device ID comparison to decide which peer initiates
-
-Key components:
-- `lan_sync_service.dart`: Main service coordinating all sync operations
-- `sync_websocket_server.dart`: Accepts incoming connections
-- `sync_websocket_client.dart`: Connects to remote peers
-- `lan_sync_engine.dart`: Handles sync logic and conflict resolution
-- `udp_lan_discovery.dart`: Peer discovery via UDP broadcasts
-
-## Common Development Commands
-
-### Code Generation
-
-```bash
-# Generate all code (Riverpod providers, Isar schemas, etc.)
-dart run build_runner build
-
-# Watch mode for continuous generation during development
-dart run build_runner watch
-
-# Clean generated files before rebuilding
-dart run build_runner build --delete-conflicting-outputs
-```
-
-### Running the App
-
-```bash
-# Run on connected device/emulator
-flutter run
-
-# Run with specific device
-flutter run -d <device-id>
-
-# Run in release mode
-flutter run --release
-```
-
-### Testing
-
-```bash
-# Run all tests
-flutter test
-
-# Run specific test file
-flutter test test/url_helper_test.dart
-
-# Run tests with coverage
-flutter test --coverage
-
-# Run integration tests
-flutter test test/integration_test.dart
-```
-
-### Building
-
-```bash
-# Build APK (Android)
-flutter build apk
-
-# Build app bundle (Android)
-flutter build appbundle
-
-# Build iOS
-flutter build ios
-
-# Generate launcher icons
-dart run flutter_launcher_icons
-```
-
-### Linting
-
-```bash
-# Analyze code
-flutter analyze
-
-# Format code
-dart format lib/ test/
-```
-
-### Dependency Management
-
-```bash
-# Get dependencies
-flutter pub get
-
-# Update dependencies
-flutter pub upgrade
-
-# Check for outdated packages
-flutter pub outdated
-```
-
-## Key Technical Details
-
-### UUID Migration
-
-The app includes automatic UUID migration (`_migrateUuidsIfNeeded` in main.dart) that runs on startup to ensure all Notes and Categories have UUIDs for cross-device sync. This is a one-time migration for legacy data.
-
-### Proxy Configuration
-
-The app supports HTTP proxy configuration stored in SharedPreferences:
-- `proxy_enabled`: Boolean flag
-- `proxy_host`: Proxy server address
-- `proxy_port`: Proxy server port
-- Applied globally via `HttpOverrides.global` in main.dart
-
-### Image Storage
-
-Images are stored locally using `ImageStorageHelper`:
-- Handles content URIs from Android share intents
-- Converts and saves images to app's document directory
-- Used by share extension for image attachments
-
-### Responsive Design
-
-Uses `flutter_screenutil` for responsive layouts:
-- Desktop (>600px width): 1280x720 design size
-- Mobile (≤600px width): 400x869 design size
-- Adapts text sizes and layouts automatically
-
-### Theme System
-
-Two built-in themes in `util/theme_data.dart`:
-- `calmBeigeTheme`: Light theme with warm beige tones
-- `quietNightTheme`: Dark theme
-- Follows system theme mode by default
-
-### Notification System
-
-Local notifications via `flutter_local_notifications`:
-- Timezone-aware scheduling
-- Initialized in main.dart
-- Provided globally via `notificationServiceProvider`
-
-## Important Patterns
-
-### Repository Pattern
-
-All data access goes through repository interfaces:
-- Domain layer defines abstract interfaces
-- Data layer provides Isar implementations
-- Conversion between entities and models is handled by private methods within repositories
-- Services use repositories, never direct database access
-
-### Provider Overrides
-
-Infrastructure providers (Isar, SharedPreferences, NotificationService) are overridden in main() with actual instances. This allows for dependency injection and testing.
-
-### Stream-based Reactivity
-
-UI components use Riverpod's `watch` to reactively update when data changes. Repositories expose `Stream<T>` methods for real-time updates from Isar.
-
-### Share Extension Architecture
-
-The share extension uses a state machine pattern with three states:
-- **waiting**: Transparent, waiting for share intent
-- **success**: Shows success animation after saving
-- **editing**: Full editor for adding details
-
-Communication with native Android code via MethodChannel (`com.doublez.pocketmind/share`).
-
-## Testing Notes
-
-- Unit tests in `test/` directory
-- Widget tests use `flutter_test` package
-- Mock dependencies with `mockito` package
-- Integration tests cover full user flows
-- Test files mirror lib/ structure
-
-## Code Generation Files
-
-Never manually edit these generated files:
-- `*.g.dart`: Generated by build_runner
-- `*_providers.g.dart`: Generated by riverpod_generator
-- `*.freezed.dart`: Generated by freezed
-- Always regenerate after modifying source files with annotations
-
-## Code Refactoring Tasks (2025-12-20)
-
-This section tracks ongoing code quality improvements and refactoring tasks.
-
-### Task List
-
-#### Phase 1: Add Freezed Support (High Priority)
-- [x] Task 1.1: Add Freezed dependencies to pubspec.yaml
-- [x] Task 1.2: Migrate NoteEntity to use Freezed
-- [x] Task 1.3: Migrate CategoryEntity to use Freezed
-- [x] Task 1.4: Migrate AppConfigState to use Freezed
-- [x] Task 1.5: Migrate LanSyncState to use Freezed
-
-#### Phase 2: Code Organization (Medium Priority)
-- [x] Task 2.1: Create unified constants file (lib/core/constants.dart)
-- [x] Task 2.2: Standardize provider file naming (跳过 - 当前命名约定合理)
-- [x] Task 2.3: Refactor LanSyncNotifier (跳过 - 等同步功能稳定后再重构)
-
-#### Phase 3: Error Handling (Medium Priority)
-- [x] Task 3.1: Create Result/Either type for error handling
-- [x] Task 3.2: Create Domain-level exception hierarchy (RepositoryFailure)
-- [x] Task 3.3: Update IsarNoteRepository to throw Domain exceptions
-- [x] Task 3.4: Update IsarCategoryRepository to throw Domain exceptions
-- [x] Task 3.5: Create ErrorHandler utility class with CreativeToast integration
-- [ ] Task 3.6: Update Service methods to return Result type (可选 - 需要大量重构)
-- [ ] Task 3.7: Refactor UI error handling to use ErrorHandler (可选 - 渐进式迁移)
-
-#### Phase 4: Testing (Low Priority)
-- [ ] Task 4.1: Add unit tests for NoteRepository
-- [ ] Task 4.2: Add unit tests for CategoryRepository
-- [ ] Task 4.3: Add unit tests for NoteService
-- [ ] Task 4.4: Add unit tests for CategoryService
-
-### Completed Tasks
-
-#### 2025-12-20
-- ✅ Task 1.1: Add Freezed dependencies to pubspec.yaml
-  - Added `freezed_annotation ^3.1.0` to dependencies
-  - Added `freezed ^3.0.0-0.0.dev` to dev_dependencies
-  - Added `json_serializable ^6.8.0` for JSON support
-  - Commit: `8fb119f` and `aa23490`
-
-- ✅ Task 1.1b: Fix build.yaml to include lan_sync/model for Isar generation
-  - Updated `build.yaml` to include `lib/lan_sync/model/**` path
-  - Fixed SyncLog schema generation issue
-  - All SyncLog-related errors resolved
-  - Commit: `aa23490`
-
-- ✅ Task 3.1: Create unified constants file (lib/core/constants.dart)
-  - Created centralized constants file to eliminate magic numbers
-  - Replaced hardcoded values throughout codebase:
-    - `1` → `AppConstants.homeCategoryId`
-    - `'home'` → `AppConstants.homeCategoryName`
-    - `'pocket_images/'` → `AppConstants.localImagePathPrefix`
-  - Updated 5 files with proper constant imports
-  - All code still compiles without errors
-  - Commit: `22b074d`
-
-- ✅ Phase 1: Freezed 迁移完成 (Task 1.2-1.5)
-  - 迁移 NoteEntity 到 Freezed 3.0（使用 abstract class）
-  - 迁移 CategoryEntity 到 Freezed 3.0（使用 abstract class）
-  - 迁移 AppConfigState 到 Freezed 3.0（保留自定义 getter）
-  - 迁移 LanSyncState 到 Freezed 3.0（保留自定义 getter 和 factory 构造函数）
-  - 创建 check-package-docs skill 用于查询第三方包文档
-  - 所有代码通过 flutter analyze 验证
-  - Commit: `53a3688`
-
-- ✅ Lint 优化和 Mapper 层移除
-  - 修复 5 个 info 级别警告（HTML 注释、library doc comment、PMlog 命名）
-  - 优化 analysis_options.yaml 配置（添加额外的 lint 规则）
-  - 移除 Mapper 层，简化架构
-  - 将转换逻辑内联到 Repository 的私有方法中（`_toModel()`, `_toDomain()`, `_toDomainList()`）
-  - 更新 IsarNoteRepository 和 IsarCategoryRepository
-  - 所有代码通过 flutter analyze 验证（0 issues）
-  - Commit: 合并到优化提交中
-
-- ✅ Phase 2: 代码组织优化
-  - Task 2.1: 创建统一常量文件 (lib/core/constants.dart) ✅
-  - Task 2.2: 标准化 provider 文件命名 - 跳过（当前命名约定合理：复数形式用于多个 providers，单数形式用于单一职责）
-  - Task 2.3: 重构 LanSyncNotifier - 跳过（等同步功能稳定后再重构，当前代码虽长但逻辑清晰）
-
-- ✅ Phase 3: 错误处理改进
-  - Task 3.1: 创建 Result 类型用于函数式错误处理
-    - 创建 `lib/core/result.dart` 使用 Freezed
-    - 支持 `Success<T>` 和 `Failure` 两种状态
-    - 提供丰富的辅助方法：`map`, `flatMap`, `getOrElse`, `getOrThrow` 等
-    - 提供 `runCatching` 和 `runCatchingSync` 便捷函数
-    - 为后续 Repository 和 Service 层的错误处理重构做准备
-    - Commit: `3691d28`
-  - Task 3.2-3.5: 创建 Domain 层异常体系并集成到 Repository 层
-    - 创建 `lib/domain/failures/repository_failure.dart` ✅
-    - 定义完整的异常层次结构（SaveNoteFailure、DeleteNoteFailure、QueryNoteFailure 等）
-    - 更新 IsarNoteRepository 和 IsarCategoryRepository 异常处理 ✅
-    - 创建 `lib/util/error_handler.dart` 集成 CreativeToast ✅
-    - 使用 Object? 类型兼容 IsarError（非 Exception 类型）
-    - 修复 BuildContext 跨 async 边界警告
-    - flutter analyze: **0 issues found** ✅
-
-### Notes
-
-- Each task should be tested with `flutter analyze` and `flutter run` before committing
-- Commit format: `fix: <task description>`
-- Run `dart run build_runner build --delete-conflicting-outputs` after adding Freezed annotations
-
-### Known Issues
-
-#### ~~Freezed 3.0 Compatibility Issue~~ (已解决)
-- **解决方案**: Freezed 3.0 要求使用 `abstract` 或 `sealed` 关键字
-- **实施**: 所有 Freezed 类已更新为 `abstract class`
-- **状态**: ✅ 已完成迁移，所有代码正常编译
-
-## New Development Rules (2025-12-24)
-- **Backend ORM**: Use MyBatis-Plus.
-- **Backend Architecture**: Follow MVC (Controller -> Service -> Repository). Keep Controllers clean.
-- **Observability**: Add detailed logs for debugging.
-- **Comments**: Must be in Chinese.
-- **Dependency Check**: Use `context7 mcp` to check versions before adding.
+## 🧪 Testing Strategy
+- **Unit Tests**: Mock Repositories to test Services.
+- **Widget Tests**: Test UI components.
+- **Integration Tests**: Test full flows.
