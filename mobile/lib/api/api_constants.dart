@@ -28,4 +28,24 @@ class ApiConstants {
   /// 会话消息列表 / 发送消息（GET / POST）
   static String chatMessages(String sessionUuid) =>
       '/api/ai/sessions/$sessionUuid/messages';
+
+  /// 单条消息操作（PATCH 编辑）
+  static String chatMessage(String sessionUuid, String messageUuid) =>
+      '/api/ai/sessions/$sessionUuid/messages/$messageUuid';
+
+  /// 重新生成 AI 回复（POST SSE）。支持传入 ASSISTANT UUID（重新生成）或 USER UUID（editAndResend 继续生成）。
+  static String chatMessageRegenerate(String sessionUuid, String messageUuid) =>
+      '/api/ai/sessions/$sessionUuid/messages/$messageUuid/regenerate';
+
+  /// 评分（POST）
+  static String chatMessageRating(String sessionUuid, String messageUuid) =>
+      '/api/ai/sessions/$sessionUuid/messages/$messageUuid/rating';
+
+  /// 分支列表（GET）
+  static String chatBranches(String sessionUuid) =>
+      '/api/ai/sessions/$sessionUuid/branches';
+
+  /// 更新分支别名（PATCH）
+  static String chatMessageAlias(String sessionUuid, String messageUuid) =>
+      '/api/ai/sessions/$sessionUuid/messages/$messageUuid/alias';
 }

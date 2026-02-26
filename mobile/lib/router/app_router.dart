@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocketmind/model/note.dart';
+import 'package:pocketmind/page/chat/branch_list_page.dart';
 import 'package:pocketmind/page/chat/chat_page.dart';
 import 'package:pocketmind/page/home/home_screen.dart';
 import 'package:pocketmind/page/home/desktop/desktop_home_screen.dart';
@@ -86,6 +87,16 @@ final appRouter = GoRouter(
         final sessionUuid = state.pathParameters['sessionUuid']!;
         return ChatPage(sessionUuid: sessionUuid);
       },
+      routes: [
+        // 分支列表页
+        GoRoute(
+          path: 'branches',
+          builder: (context, state) {
+            final sessionUuid = state.pathParameters['sessionUuid']!;
+            return BranchListPage(sessionUuid: sessionUuid);
+          },
+        ),
+      ],
     ),
   ],
 

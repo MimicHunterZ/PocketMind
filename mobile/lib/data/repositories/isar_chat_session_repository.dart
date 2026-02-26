@@ -13,9 +13,7 @@ class IsarChatSessionRepository {
 
   IsarChatSessionRepository(this._isar);
 
-
   // 查询 / 监听
-
 
   /// 实时监听会话列表，按 [ChatSession.updatedAt] 倒序排列。
   ///
@@ -53,9 +51,7 @@ class IsarChatSessionRepository {
         .findAll();
   }
 
-
   // 写入
-
 
   /// 将服务端返回的会话列表全量 upsert（有则更新，无则插入）。
   Future<void> upsertFromModels(List<ChatSessionModel> models) async {
@@ -87,9 +83,31 @@ class IsarChatSessionRepository {
     });
   }
 
+  /// 实时监听单个会话（用于 BranchBanner 订阅 activeLeafUuid 变化）。
+  Stream<ChatSession?> watchByUuid(String uuid) {
+    return _isar.chatSessions
+        .filter()
+        .uuidEqualTo(uuid)
+        .watch(fireImmediately: true)
+        .map((list) => list.isEmpty ? null : list.first);
+  }
+
+  /// 本地更新会话的激活叶子节点，null = 回到主线。
+  Future<void> updateActiveLeaf(String sessionUuid, String? leafUuid) async {
+    await _isar.writeTxn(() async {
+      final s = await _isar.chatSessions
+          .filter()
+          .uuidEqualTo(sessionUuid)
+          .findFirst();
+      if (s != null) {
+        s.activeLeafUuid = leafUuid;
+        await _isar.chatSessions.put(s);
+        PMlog.d(_tag, '更新激活叶子节点: $sessionUuid -> $leafUuid');
+      }
+    });
+  }
 
   // 私有工具
-
 
   static ChatSession _fromModel(ChatSessionModel m) {
     return ChatSession()

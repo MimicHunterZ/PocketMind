@@ -101,11 +101,18 @@ class ChatApiService {
   // 消息管理
   // -------------------------------------------------------------------------
 
-  /// 获取会话下的所有消息（按时间正序）。
-  Future<List<ChatMessageModel>> listMessages(String sessionUuid) async {
-    PMlog.d(_tag, '拉取消息列表: sessionUuid=$sessionUuid');
+  /// 获取会话下的消息列表（按时间正序）。
+  ///
+  /// [leafUuid] 指定分支叶子节点时，仅返回该分支的消息链；
+  /// 为 null 时返回最新主线消息。
+  Future<List<ChatMessageModel>> listMessages(
+    String sessionUuid, {
+    String? leafUuid,
+  }) async {
+    PMlog.d(_tag, '拉取消息列表: sessionUuid=$sessionUuid, leaf=$leafUuid');
     final raw = await _http.get<List<dynamic>>(
       ApiConstants.chatMessages(sessionUuid),
+      queryParameters: {if (leafUuid != null) 'leafUuid': leafUuid},
     );
     return raw
         .map((e) => ChatMessageModel.fromJson(e as Map<String, dynamic>))
@@ -114,20 +121,18 @@ class ChatApiService {
 
   /// 发送用户消息并流式接收 AI 回复。
   ///
-  /// 返回 [Stream<ChatStreamEvent>]，包含三种事件：
-  /// - [ChatDeltaEvent]  ：AI 回复的增量文本片段
-  /// - [ChatDoneEvent]   ：回复完成，携带 ASSISTANT 消息 UUID
-  /// - [ChatErrorEvent]  ：AI 服务异常
-  ///
-  /// 注意：SSE 请求直接使用 Dio 原始实例，绕过 _ApiTransformInterceptor
-  /// 的 JSON 解包逻辑（SSE 响应体为 ResponseBody 流，不是 {code,message,data} 格式）。
+  /// [parentUuid] 不为 null 时，从该历史节点分叉创建新分支。
   Stream<ChatStreamEvent> streamMessage(
     String sessionUuid,
     String content, {
     List<String> attachmentUuids = const [],
+    String? parentUuid,
     CancelToken? cancelToken,
   }) async* {
-    PMlog.d(_tag, '发送消息(SSE): sessionUuid=$sessionUuid, len=${content.length}');
+    PMlog.d(
+      _tag,
+      '发送消息(SSE): sessionUuid=$sessionUuid, len=${content.length}, parent=$parentUuid',
+    );
 
     late final Response<ResponseBody> response;
     try {
@@ -136,6 +141,7 @@ class ChatApiService {
         data: jsonEncode({
           'content': content,
           'attachmentUuids': attachmentUuids,
+          if (parentUuid != null) 'parentUuid': parentUuid,
         }),
         cancelToken: cancelToken,
         options: Options(
@@ -153,8 +159,101 @@ class ChatApiService {
       return;
     }
 
-    final rawStream = response.data!.stream;
+    yield* _parseSseStream(response.data!.stream, cancelToken);
+  }
 
+  /// 编辑 USER 消息内容（覆盖原内容，后端同时删除紧随的 ASSISTANT 消息）。
+  Future<void> editMessage(
+    String sessionUuid,
+    String messageUuid,
+    String content,
+  ) async {
+    PMlog.d(_tag, '编辑消息: $messageUuid');
+    await _http.patch<void>(
+      ApiConstants.chatMessage(sessionUuid, messageUuid),
+      data: {'content': content},
+    );
+  }
+
+  /// 重新生成或继续生成指定消息，流式返回新回复。
+  ///
+  /// [messageUuid] 可为 ASSISTANT UUID（重新生成）或 USER UUID（editAndResend 后继续生成）。
+  Stream<ChatStreamEvent> streamRegenerate(
+    String sessionUuid,
+    String messageUuid, {
+    CancelToken? cancelToken,
+  }) async* {
+    PMlog.d(_tag, '重新生成(SSE): $messageUuid');
+
+    late final Response<ResponseBody> response;
+    try {
+      response = await _http.dio.post<ResponseBody>(
+        ApiConstants.chatMessageRegenerate(sessionUuid, messageUuid),
+        cancelToken: cancelToken,
+        options: Options(
+          responseType: ResponseType.stream,
+          receiveTimeout: const Duration(minutes: 5),
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream',
+          },
+        ),
+      );
+    } on DioException catch (e) {
+      PMlog.e(_tag, '重新生成 SSE 请求失败: $e');
+      yield ChatErrorEvent(e.message ?? '网络请求失败');
+      return;
+    }
+
+    yield* _parseSseStream(response.data!.stream, cancelToken);
+  }
+
+  /// 对消息评分（1=点赞, 0=取消, -1=点踩）。
+  Future<void> rateMessage(
+    String sessionUuid,
+    String messageUuid,
+    int rating,
+  ) async {
+    PMlog.d(_tag, '评分消息: $messageUuid -> $rating');
+    await _http.post<void>(
+      ApiConstants.chatMessageRating(sessionUuid, messageUuid),
+      data: {'rating': rating},
+    );
+  }
+
+  /// 获取会话的所有分支摘要列表。
+  Future<List<ChatBranchSummaryModel>> fetchBranches(String sessionUuid) async {
+    PMlog.d(_tag, '拉取分支列表: $sessionUuid');
+    final raw = await _http.get<List<dynamic>>(
+      ApiConstants.chatBranches(sessionUuid),
+    );
+    return raw
+        .map((e) => ChatBranchSummaryModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// 更新分支叶子节点的别名（最多 10 个字符）。
+  Future<void> updateBranchAlias(
+    String sessionUuid,
+    String messageUuid,
+    String alias,
+  ) async {
+    PMlog.d(_tag, '更新分支别名: $messageUuid -> $alias');
+    await _http.patch<void>(
+      ApiConstants.chatMessageAlias(sessionUuid, messageUuid),
+      data: {'alias': alias},
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // 私有工具
+  // -------------------------------------------------------------------------
+
+  /// 解析 SSE 响应流，将 raw bytes 转为 [ChatStreamEvent]。
+  Stream<ChatStreamEvent> _parseSseStream(
+    Stream<List<int>> rawStream,
+    CancelToken? cancelToken,
+  ) async* {
     // SSE 行缓冲区（用于处理跨 chunk 的不完整行）
     final buffer = StringBuffer();
     String? currentEvent;

@@ -52,6 +52,8 @@ ChatMessageModel _$ChatMessageModelFromJson(Map<String, dynamic> json) =>
       toolData: json['toolData'] == null
           ? null
           : ToolCallData.fromJson(json['toolData'] as Map<String, dynamic>),
+      rating: (json['rating'] as num?)?.toInt() ?? 0,
+      branchAlias: json['branchAlias'] as String?,
     );
 
 Map<String, dynamic> _$ChatMessageModelToJson(ChatMessageModel instance) =>
@@ -65,4 +67,26 @@ Map<String, dynamic> _$ChatMessageModelToJson(ChatMessageModel instance) =>
       'attachmentUuids': instance.attachmentUuids,
       'createdAt': instance.createdAt,
       'toolData': instance.toolData,
+      'rating': instance.rating,
+      'branchAlias': instance.branchAlias,
     };
+
+ChatBranchSummaryModel _$ChatBranchSummaryModelFromJson(
+  Map<String, dynamic> json,
+) => ChatBranchSummaryModel(
+  leafUuid: json['leafUuid'] as String,
+  branchAlias: json['branchAlias'] as String?,
+  lastUserContent: json['lastUserContent'] as String,
+  lastAssistantContent: json['lastAssistantContent'] as String,
+  updatedAt: (json['updatedAt'] as num).toInt(),
+);
+
+Map<String, dynamic> _$ChatBranchSummaryModelToJson(
+  ChatBranchSummaryModel instance,
+) => <String, dynamic>{
+  'leafUuid': instance.leafUuid,
+  'branchAlias': instance.branchAlias,
+  'lastUserContent': instance.lastUserContent,
+  'lastAssistantContent': instance.lastAssistantContent,
+  'updatedAt': instance.updatedAt,
+};

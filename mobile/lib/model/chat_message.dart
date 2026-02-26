@@ -32,4 +32,10 @@ class ChatMessage {
   int updatedAt = 0;
 
   bool isDeleted = false;
+
+  /// 评分：1=点赞, 0=未评, -1=点踩
+  int rating = 0;
+
+  /// 分支别名（AI 自动生成，4-8 汉字），仅叶子节点有值
+  String? branchAlias;
 }

@@ -23,4 +23,11 @@ class RoutePaths {
 
   /// 生成聊天页路径
   static String chatOf(String sessionUuid) => '/chat/$sessionUuid';
+
+  /// 分支列表页 - 参数 :sessionUuid
+  static const String branchList = '/chat/:sessionUuid/branches';
+
+  /// 生成分支列表页路径
+  static String branchListOf(String sessionUuid) =>
+      '/chat/$sessionUuid/branches';
 }

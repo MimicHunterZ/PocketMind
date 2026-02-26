@@ -161,29 +161,11 @@ final class ChatServiceProvider
 String _$chatServiceHash() => r'0342f93e65e86a99ccb720b3d8a4792dae9d0463';
 
 /// 聊天会话列表流。
-///
-/// [noteUuid] 为 null 时返回全部非删除会话（按 updatedAt 倒序）；
-/// 不为 null 时返回该笔记下的会话。
-///
-/// 用法示例：
-/// ```dart
-/// ref.watch(chatSessionsProvider(null))       // 全局会话列表
-/// ref.watch(chatSessionsProvider(noteUuid))   // 笔记下的会话列表
-/// ```
 
 @ProviderFor(chatSessions)
 const chatSessionsProvider = ChatSessionsFamily._();
 
 /// 聊天会话列表流。
-///
-/// [noteUuid] 为 null 时返回全部非删除会话（按 updatedAt 倒序）；
-/// 不为 null 时返回该笔记下的会话。
-///
-/// 用法示例：
-/// ```dart
-/// ref.watch(chatSessionsProvider(null))       // 全局会话列表
-/// ref.watch(chatSessionsProvider(noteUuid))   // 笔记下的会话列表
-/// ```
 
 final class ChatSessionsProvider
     extends
@@ -196,15 +178,6 @@ final class ChatSessionsProvider
         $FutureModifier<List<ChatSession>>,
         $StreamProvider<List<ChatSession>> {
   /// 聊天会话列表流。
-  ///
-  /// [noteUuid] 为 null 时返回全部非删除会话（按 updatedAt 倒序）；
-  /// 不为 null 时返回该笔记下的会话。
-  ///
-  /// 用法示例：
-  /// ```dart
-  /// ref.watch(chatSessionsProvider(null))       // 全局会话列表
-  /// ref.watch(chatSessionsProvider(noteUuid))   // 笔记下的会话列表
-  /// ```
   const ChatSessionsProvider._({
     required ChatSessionsFamily super.from,
     required String? super.argument,
@@ -252,15 +225,6 @@ final class ChatSessionsProvider
 String _$chatSessionsHash() => r'0e023cc4b6ed3fb128329e4af4309b9c1ee2fb47';
 
 /// 聊天会话列表流。
-///
-/// [noteUuid] 为 null 时返回全部非删除会话（按 updatedAt 倒序）；
-/// 不为 null 时返回该笔记下的会话。
-///
-/// 用法示例：
-/// ```dart
-/// ref.watch(chatSessionsProvider(null))       // 全局会话列表
-/// ref.watch(chatSessionsProvider(noteUuid))   // 笔记下的会话列表
-/// ```
 
 final class ChatSessionsFamily extends $Family
     with $FunctionalFamilyOverride<Stream<List<ChatSession>>, String?> {
@@ -274,15 +238,6 @@ final class ChatSessionsFamily extends $Family
       );
 
   /// 聊天会话列表流。
-  ///
-  /// [noteUuid] 为 null 时返回全部非删除会话（按 updatedAt 倒序）；
-  /// 不为 null 时返回该笔记下的会话。
-  ///
-  /// 用法示例：
-  /// ```dart
-  /// ref.watch(chatSessionsProvider(null))       // 全局会话列表
-  /// ref.watch(chatSessionsProvider(noteUuid))   // 笔记下的会话列表
-  /// ```
 
   ChatSessionsProvider call(String? noteUuid) =>
       ChatSessionsProvider._(argument: noteUuid, from: this);
@@ -291,18 +246,104 @@ final class ChatSessionsFamily extends $Family
   String toString() => r'chatSessionsProvider';
 }
 
+/// 实时监听单个会话（用于 [BranchBanner] 订阅 activeLeafUuid 变化）。
+
+@ProviderFor(chatSessionStream)
+const chatSessionStreamProvider = ChatSessionStreamFamily._();
+
+/// 实时监听单个会话（用于 [BranchBanner] 订阅 activeLeafUuid 变化）。
+
+final class ChatSessionStreamProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<ChatSession?>,
+          ChatSession?,
+          Stream<ChatSession?>
+        >
+    with $FutureModifier<ChatSession?>, $StreamProvider<ChatSession?> {
+  /// 实时监听单个会话（用于 [BranchBanner] 订阅 activeLeafUuid 变化）。
+  const ChatSessionStreamProvider._({
+    required ChatSessionStreamFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'chatSessionStreamProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatSessionStreamHash();
+
+  @override
+  String toString() {
+    return r'chatSessionStreamProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<ChatSession?> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<ChatSession?> create(Ref ref) {
+    final argument = this.argument as String;
+    return chatSessionStream(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ChatSessionStreamProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$chatSessionStreamHash() => r'7f4268ee34185d92a3f381163cd3ccb4243a1620';
+
+/// 实时监听单个会话（用于 [BranchBanner] 订阅 activeLeafUuid 变化）。
+
+final class ChatSessionStreamFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<ChatSession?>, String> {
+  const ChatSessionStreamFamily._()
+    : super(
+        retry: null,
+        name: r'chatSessionStreamProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// 实时监听单个会话（用于 [BranchBanner] 订阅 activeLeafUuid 变化）。
+
+  ChatSessionStreamProvider call(String sessionUuid) =>
+      ChatSessionStreamProvider._(argument: sessionUuid, from: this);
+
+  @override
+  String toString() => r'chatSessionStreamProvider';
+}
+
 /// 指定会话的消息列表流（按时间轴升序）。
 ///
-/// UI 订阅此 Provider，Isar 数据变更后自动推送最新列表。
-/// 完整历史在进入页面时由 [ChatSend.initSession] 触发同步。
+/// 自动感知会话的 [ChatSession.activeLeafUuid]：
+/// - null → 主线（watchBySessionUuid）
+/// - 非 null → 分支链路（watchByLeafUuid）
 
 @ProviderFor(chatMessages)
 const chatMessagesProvider = ChatMessagesFamily._();
 
 /// 指定会话的消息列表流（按时间轴升序）。
 ///
-/// UI 订阅此 Provider，Isar 数据变更后自动推送最新列表。
-/// 完整历史在进入页面时由 [ChatSend.initSession] 触发同步。
+/// 自动感知会话的 [ChatSession.activeLeafUuid]：
+/// - null → 主线（watchBySessionUuid）
+/// - 非 null → 分支链路（watchByLeafUuid）
 
 final class ChatMessagesProvider
     extends
@@ -316,8 +357,9 @@ final class ChatMessagesProvider
         $StreamProvider<List<ChatMessage>> {
   /// 指定会话的消息列表流（按时间轴升序）。
   ///
-  /// UI 订阅此 Provider，Isar 数据变更后自动推送最新列表。
-  /// 完整历史在进入页面时由 [ChatSend.initSession] 触发同步。
+  /// 自动感知会话的 [ChatSession.activeLeafUuid]：
+  /// - null → 主线（watchBySessionUuid）
+  /// - 非 null → 分支链路（watchByLeafUuid）
   const ChatMessagesProvider._({
     required ChatMessagesFamily super.from,
     required String super.argument,
@@ -362,12 +404,13 @@ final class ChatMessagesProvider
   }
 }
 
-String _$chatMessagesHash() => r'ced28c8392b29c50871a7be5e2e3b402798f3186';
+String _$chatMessagesHash() => r'378fbacaeba071123600b0f168c4d9c33146d133';
 
 /// 指定会话的消息列表流（按时间轴升序）。
 ///
-/// UI 订阅此 Provider，Isar 数据变更后自动推送最新列表。
-/// 完整历史在进入页面时由 [ChatSend.initSession] 触发同步。
+/// 自动感知会话的 [ChatSession.activeLeafUuid]：
+/// - null → 主线（watchBySessionUuid）
+/// - 非 null → 分支链路（watchByLeafUuid）
 
 final class ChatMessagesFamily extends $Family
     with $FunctionalFamilyOverride<Stream<List<ChatMessage>>, String> {
@@ -382,8 +425,9 @@ final class ChatMessagesFamily extends $Family
 
   /// 指定会话的消息列表流（按时间轴升序）。
   ///
-  /// UI 订阅此 Provider，Isar 数据变更后自动推送最新列表。
-  /// 完整历史在进入页面时由 [ChatSend.initSession] 触发同步。
+  /// 自动感知会话的 [ChatSession.activeLeafUuid]：
+  /// - null → 主线（watchBySessionUuid）
+  /// - 非 null → 分支链路（watchByLeafUuid）
 
   ChatMessagesProvider call(String sessionUuid) =>
       ChatMessagesProvider._(argument: sessionUuid, from: this);
@@ -476,48 +520,189 @@ final class ChatSessionByUuidFamily extends $Family
   String toString() => r'chatSessionByUuidProvider';
 }
 
+/// 获取会话所有分支摘要列表（按需拉取，BranchListPage 使用）。
+
+@ProviderFor(chatBranches)
+const chatBranchesProvider = ChatBranchesFamily._();
+
+/// 获取会话所有分支摘要列表（按需拉取，BranchListPage 使用）。
+
+final class ChatBranchesProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<ChatBranchSummaryModel>>,
+          List<ChatBranchSummaryModel>,
+          FutureOr<List<ChatBranchSummaryModel>>
+        >
+    with
+        $FutureModifier<List<ChatBranchSummaryModel>>,
+        $FutureProvider<List<ChatBranchSummaryModel>> {
+  /// 获取会话所有分支摘要列表（按需拉取，BranchListPage 使用）。
+  const ChatBranchesProvider._({
+    required ChatBranchesFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'chatBranchesProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatBranchesHash();
+
+  @override
+  String toString() {
+    return r'chatBranchesProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $FutureProviderElement<List<ChatBranchSummaryModel>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<ChatBranchSummaryModel>> create(Ref ref) {
+    final argument = this.argument as String;
+    return chatBranches(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ChatBranchesProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$chatBranchesHash() => r'ccfe5ea44a1e60d9da6d7e446ad4018782fb395a';
+
+/// 获取会话所有分支摘要列表（按需拉取，BranchListPage 使用）。
+
+final class ChatBranchesFamily extends $Family
+    with
+        $FunctionalFamilyOverride<
+          FutureOr<List<ChatBranchSummaryModel>>,
+          String
+        > {
+  const ChatBranchesFamily._()
+    : super(
+        retry: null,
+        name: r'chatBranchesProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// 获取会话所有分支摘要列表（按需拉取，BranchListPage 使用）。
+
+  ChatBranchesProvider call(String sessionUuid) =>
+      ChatBranchesProvider._(argument: sessionUuid, from: this);
+
+  @override
+  String toString() => r'chatBranchesProvider';
+}
+
+/// 实时监听单条消息（用于分支芯片显示 AI 生成的别名）。
+
+@ProviderFor(chatMessageByUuid)
+const chatMessageByUuidProvider = ChatMessageByUuidFamily._();
+
+/// 实时监听单条消息（用于分支芯片显示 AI 生成的别名）。
+
+final class ChatMessageByUuidProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<ChatMessage?>,
+          ChatMessage?,
+          Stream<ChatMessage?>
+        >
+    with $FutureModifier<ChatMessage?>, $StreamProvider<ChatMessage?> {
+  /// 实时监听单条消息（用于分支芯片显示 AI 生成的别名）。
+  const ChatMessageByUuidProvider._({
+    required ChatMessageByUuidFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'chatMessageByUuidProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatMessageByUuidHash();
+
+  @override
+  String toString() {
+    return r'chatMessageByUuidProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<ChatMessage?> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<ChatMessage?> create(Ref ref) {
+    final argument = this.argument as String;
+    return chatMessageByUuid(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ChatMessageByUuidProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$chatMessageByUuidHash() => r'e5677e3a6e7cd6d633e713298061270c9d2f349e';
+
+/// 实时监听单条消息（用于分支芯片显示 AI 生成的别名）。
+
+final class ChatMessageByUuidFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<ChatMessage?>, String> {
+  const ChatMessageByUuidFamily._()
+    : super(
+        retry: null,
+        name: r'chatMessageByUuidProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// 实时监听单条消息（用于分支芯片显示 AI 生成的别名）。
+
+  ChatMessageByUuidProvider call(String uuid) =>
+      ChatMessageByUuidProvider._(argument: uuid, from: this);
+
+  @override
+  String toString() => r'chatMessageByUuidProvider';
+}
+
 /// 消息发送 Notifier，按 [sessionUuid] 分组（family）。
-///
-/// 职责：
-/// 1. 调用 [ChatService.streamMessage] 获取 SSE 流；
-/// 2. 监听 [ChatDeltaEvent] 累积流式文本，更新 [ChatSendState.streaming]；
-/// 3. 收到 [ChatDoneEvent] 后触发 [ChatService.syncMessages] 落库，并复位状态；
-/// 4. 遇到 [ChatErrorEvent] 或异常，更新 [ChatSendState.error]。
-///
-/// UI 显示逻辑：
-/// - 消息列表来自 [chatMessagesProvider]（Isar stream，持久化驱动）；
-/// - 流式文本通过 `(state as ChatSendStreaming).content` 额外渲染 AI 正在输入的气泡；
-/// - 收到 `idle` 时隐藏该气泡（最终消息已落库，Isar stream 自动刷新）。
 
 @ProviderFor(ChatSend)
 const chatSendProvider = ChatSendFamily._();
 
 /// 消息发送 Notifier，按 [sessionUuid] 分组（family）。
-///
-/// 职责：
-/// 1. 调用 [ChatService.streamMessage] 获取 SSE 流；
-/// 2. 监听 [ChatDeltaEvent] 累积流式文本，更新 [ChatSendState.streaming]；
-/// 3. 收到 [ChatDoneEvent] 后触发 [ChatService.syncMessages] 落库，并复位状态；
-/// 4. 遇到 [ChatErrorEvent] 或异常，更新 [ChatSendState.error]。
-///
-/// UI 显示逻辑：
-/// - 消息列表来自 [chatMessagesProvider]（Isar stream，持久化驱动）；
-/// - 流式文本通过 `(state as ChatSendStreaming).content` 额外渲染 AI 正在输入的气泡；
-/// - 收到 `idle` 时隐藏该气泡（最终消息已落库，Isar stream 自动刷新）。
 final class ChatSendProvider
     extends $NotifierProvider<ChatSend, ChatSendState> {
   /// 消息发送 Notifier，按 [sessionUuid] 分组（family）。
-  ///
-  /// 职责：
-  /// 1. 调用 [ChatService.streamMessage] 获取 SSE 流；
-  /// 2. 监听 [ChatDeltaEvent] 累积流式文本，更新 [ChatSendState.streaming]；
-  /// 3. 收到 [ChatDoneEvent] 后触发 [ChatService.syncMessages] 落库，并复位状态；
-  /// 4. 遇到 [ChatErrorEvent] 或异常，更新 [ChatSendState.error]。
-  ///
-  /// UI 显示逻辑：
-  /// - 消息列表来自 [chatMessagesProvider]（Isar stream，持久化驱动）；
-  /// - 流式文本通过 `(state as ChatSendStreaming).content` 额外渲染 AI 正在输入的气泡；
-  /// - 收到 `idle` 时隐藏该气泡（最终消息已落库，Isar stream 自动刷新）。
   const ChatSendProvider._({
     required ChatSendFamily super.from,
     required String super.argument,
@@ -562,20 +747,9 @@ final class ChatSendProvider
   }
 }
 
-String _$chatSendHash() => r'd1370ae5b22fb2c95c0f17d7cc9d1fe4be154bd0';
+String _$chatSendHash() => r'34c2490df7cf8396acb6972b8798da7025c90c2b';
 
 /// 消息发送 Notifier，按 [sessionUuid] 分组（family）。
-///
-/// 职责：
-/// 1. 调用 [ChatService.streamMessage] 获取 SSE 流；
-/// 2. 监听 [ChatDeltaEvent] 累积流式文本，更新 [ChatSendState.streaming]；
-/// 3. 收到 [ChatDoneEvent] 后触发 [ChatService.syncMessages] 落库，并复位状态；
-/// 4. 遇到 [ChatErrorEvent] 或异常，更新 [ChatSendState.error]。
-///
-/// UI 显示逻辑：
-/// - 消息列表来自 [chatMessagesProvider]（Isar stream，持久化驱动）；
-/// - 流式文本通过 `(state as ChatSendStreaming).content` 额外渲染 AI 正在输入的气泡；
-/// - 收到 `idle` 时隐藏该气泡（最终消息已落库，Isar stream 自动刷新）。
 
 final class ChatSendFamily extends $Family
     with
@@ -596,17 +770,6 @@ final class ChatSendFamily extends $Family
       );
 
   /// 消息发送 Notifier，按 [sessionUuid] 分组（family）。
-  ///
-  /// 职责：
-  /// 1. 调用 [ChatService.streamMessage] 获取 SSE 流；
-  /// 2. 监听 [ChatDeltaEvent] 累积流式文本，更新 [ChatSendState.streaming]；
-  /// 3. 收到 [ChatDoneEvent] 后触发 [ChatService.syncMessages] 落库，并复位状态；
-  /// 4. 遇到 [ChatErrorEvent] 或异常，更新 [ChatSendState.error]。
-  ///
-  /// UI 显示逻辑：
-  /// - 消息列表来自 [chatMessagesProvider]（Isar stream，持久化驱动）；
-  /// - 流式文本通过 `(state as ChatSendStreaming).content` 额外渲染 AI 正在输入的气泡；
-  /// - 收到 `idle` 时隐藏该气泡（最终消息已落库，Isar stream 自动刷新）。
 
   ChatSendProvider call(String sessionUuid) =>
       ChatSendProvider._(argument: sessionUuid, from: this);
@@ -616,17 +779,6 @@ final class ChatSendFamily extends $Family
 }
 
 /// 消息发送 Notifier，按 [sessionUuid] 分组（family）。
-///
-/// 职责：
-/// 1. 调用 [ChatService.streamMessage] 获取 SSE 流；
-/// 2. 监听 [ChatDeltaEvent] 累积流式文本，更新 [ChatSendState.streaming]；
-/// 3. 收到 [ChatDoneEvent] 后触发 [ChatService.syncMessages] 落库，并复位状态；
-/// 4. 遇到 [ChatErrorEvent] 或异常，更新 [ChatSendState.error]。
-///
-/// UI 显示逻辑：
-/// - 消息列表来自 [chatMessagesProvider]（Isar stream，持久化驱动）；
-/// - 流式文本通过 `(state as ChatSendStreaming).content` 额外渲染 AI 正在输入的气泡；
-/// - 收到 `idle` 时隐藏该气泡（最终消息已落库，Isar stream 自动刷新）。
 
 abstract class _$ChatSend extends $Notifier<ChatSendState> {
   late final _$args = ref.$arg as String;

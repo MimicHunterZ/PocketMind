@@ -22,34 +22,40 @@ const ChatMessageSchema = CollectionSchema(
       name: r'attachmentUuids',
       type: IsarType.stringList,
     ),
-    r'content': PropertySchema(id: 1, name: r'content', type: IsarType.string),
+    r'branchAlias': PropertySchema(
+      id: 1,
+      name: r'branchAlias',
+      type: IsarType.string,
+    ),
+    r'content': PropertySchema(id: 2, name: r'content', type: IsarType.string),
     r'isDeleted': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'isDeleted',
       type: IsarType.bool,
     ),
     r'messageType': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'messageType',
       type: IsarType.string,
     ),
     r'parentUuid': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'parentUuid',
       type: IsarType.string,
     ),
-    r'role': PropertySchema(id: 5, name: r'role', type: IsarType.string),
+    r'rating': PropertySchema(id: 6, name: r'rating', type: IsarType.long),
+    r'role': PropertySchema(id: 7, name: r'role', type: IsarType.string),
     r'sessionUuid': PropertySchema(
-      id: 6,
+      id: 8,
       name: r'sessionUuid',
       type: IsarType.string,
     ),
     r'updatedAt': PropertySchema(
-      id: 7,
+      id: 9,
       name: r'updatedAt',
       type: IsarType.long,
     ),
-    r'uuid': PropertySchema(id: 8, name: r'uuid', type: IsarType.string),
+    r'uuid': PropertySchema(id: 10, name: r'uuid', type: IsarType.string),
   },
 
   estimateSize: _chatMessageEstimateSize,
@@ -107,6 +113,12 @@ int _chatMessageEstimateSize(
       bytesCount += value.length * 3;
     }
   }
+  {
+    final value = object.branchAlias;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.content.length * 3;
   bytesCount += 3 + object.messageType.length * 3;
   {
@@ -128,14 +140,16 @@ void _chatMessageSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeStringList(offsets[0], object.attachmentUuids);
-  writer.writeString(offsets[1], object.content);
-  writer.writeBool(offsets[2], object.isDeleted);
-  writer.writeString(offsets[3], object.messageType);
-  writer.writeString(offsets[4], object.parentUuid);
-  writer.writeString(offsets[5], object.role);
-  writer.writeString(offsets[6], object.sessionUuid);
-  writer.writeLong(offsets[7], object.updatedAt);
-  writer.writeString(offsets[8], object.uuid);
+  writer.writeString(offsets[1], object.branchAlias);
+  writer.writeString(offsets[2], object.content);
+  writer.writeBool(offsets[3], object.isDeleted);
+  writer.writeString(offsets[4], object.messageType);
+  writer.writeString(offsets[5], object.parentUuid);
+  writer.writeLong(offsets[6], object.rating);
+  writer.writeString(offsets[7], object.role);
+  writer.writeString(offsets[8], object.sessionUuid);
+  writer.writeLong(offsets[9], object.updatedAt);
+  writer.writeString(offsets[10], object.uuid);
 }
 
 ChatMessage _chatMessageDeserialize(
@@ -146,15 +160,17 @@ ChatMessage _chatMessageDeserialize(
 ) {
   final object = ChatMessage();
   object.attachmentUuids = reader.readStringList(offsets[0]) ?? [];
-  object.content = reader.readString(offsets[1]);
+  object.branchAlias = reader.readStringOrNull(offsets[1]);
+  object.content = reader.readString(offsets[2]);
   object.id = id;
-  object.isDeleted = reader.readBool(offsets[2]);
-  object.messageType = reader.readString(offsets[3]);
-  object.parentUuid = reader.readStringOrNull(offsets[4]);
-  object.role = reader.readString(offsets[5]);
-  object.sessionUuid = reader.readString(offsets[6]);
-  object.updatedAt = reader.readLong(offsets[7]);
-  object.uuid = reader.readString(offsets[8]);
+  object.isDeleted = reader.readBool(offsets[3]);
+  object.messageType = reader.readString(offsets[4]);
+  object.parentUuid = reader.readStringOrNull(offsets[5]);
+  object.rating = reader.readLong(offsets[6]);
+  object.role = reader.readString(offsets[7]);
+  object.sessionUuid = reader.readString(offsets[8]);
+  object.updatedAt = reader.readLong(offsets[9]);
+  object.uuid = reader.readString(offsets[10]);
   return object;
 }
 
@@ -168,20 +184,24 @@ P _chatMessageDeserializeProp<P>(
     case 0:
       return (reader.readStringList(offset) ?? []) as P;
     case 1:
-      return (reader.readString(offset)) as P;
-    case 2:
-      return (reader.readBool(offset)) as P;
-    case 3:
-      return (reader.readString(offset)) as P;
-    case 4:
       return (reader.readStringOrNull(offset)) as P;
+    case 2:
+      return (reader.readString(offset)) as P;
+    case 3:
+      return (reader.readBool(offset)) as P;
+    case 4:
+      return (reader.readString(offset)) as P;
     case 5:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 6:
-      return (reader.readString(offset)) as P;
-    case 7:
       return (reader.readLong(offset)) as P;
+    case 7:
+      return (reader.readString(offset)) as P;
     case 8:
+      return (reader.readString(offset)) as P;
+    case 9:
+      return (reader.readLong(offset)) as P;
+    case 10:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -651,6 +671,165 @@ extension ChatMessageQueryFilter
         includeLower,
         upper,
         includeUpper,
+      );
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition>
+  branchAliasIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'branchAlias'),
+      );
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition>
+  branchAliasIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'branchAlias'),
+      );
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition>
+  branchAliasEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'branchAlias',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition>
+  branchAliasGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'branchAlias',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition>
+  branchAliasLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'branchAlias',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition>
+  branchAliasBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'branchAlias',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition>
+  branchAliasStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'branchAlias',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition>
+  branchAliasEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'branchAlias',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition>
+  branchAliasContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'branchAlias',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition>
+  branchAliasMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'branchAlias',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition>
+  branchAliasIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'branchAlias', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition>
+  branchAliasIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'branchAlias', value: ''),
       );
     });
   }
@@ -1170,6 +1349,63 @@ extension ChatMessageQueryFilter
     });
   }
 
+  QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition> ratingEqualTo(
+    int value,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'rating', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition>
+  ratingGreaterThan(int value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'rating',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition> ratingLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'rating',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition> ratingBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'rating',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
   QueryBuilder<ChatMessage, ChatMessage, QAfterFilterCondition> roleEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -1669,6 +1905,18 @@ extension ChatMessageQueryLinks
 
 extension ChatMessageQuerySortBy
     on QueryBuilder<ChatMessage, ChatMessage, QSortBy> {
+  QueryBuilder<ChatMessage, ChatMessage, QAfterSortBy> sortByBranchAlias() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'branchAlias', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterSortBy> sortByBranchAliasDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'branchAlias', Sort.desc);
+    });
+  }
+
   QueryBuilder<ChatMessage, ChatMessage, QAfterSortBy> sortByContent() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'content', Sort.asc);
@@ -1714,6 +1962,18 @@ extension ChatMessageQuerySortBy
   QueryBuilder<ChatMessage, ChatMessage, QAfterSortBy> sortByParentUuidDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'parentUuid', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterSortBy> sortByRating() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'rating', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterSortBy> sortByRatingDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'rating', Sort.desc);
     });
   }
 
@@ -1768,6 +2028,18 @@ extension ChatMessageQuerySortBy
 
 extension ChatMessageQuerySortThenBy
     on QueryBuilder<ChatMessage, ChatMessage, QSortThenBy> {
+  QueryBuilder<ChatMessage, ChatMessage, QAfterSortBy> thenByBranchAlias() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'branchAlias', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterSortBy> thenByBranchAliasDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'branchAlias', Sort.desc);
+    });
+  }
+
   QueryBuilder<ChatMessage, ChatMessage, QAfterSortBy> thenByContent() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'content', Sort.asc);
@@ -1825,6 +2097,18 @@ extension ChatMessageQuerySortThenBy
   QueryBuilder<ChatMessage, ChatMessage, QAfterSortBy> thenByParentUuidDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'parentUuid', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterSortBy> thenByRating() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'rating', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QAfterSortBy> thenByRatingDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'rating', Sort.desc);
     });
   }
 
@@ -1886,6 +2170,14 @@ extension ChatMessageQueryWhereDistinct
     });
   }
 
+  QueryBuilder<ChatMessage, ChatMessage, QDistinct> distinctByBranchAlias({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'branchAlias', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<ChatMessage, ChatMessage, QDistinct> distinctByContent({
     bool caseSensitive = true,
   }) {
@@ -1913,6 +2205,12 @@ extension ChatMessageQueryWhereDistinct
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'parentUuid', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<ChatMessage, ChatMessage, QDistinct> distinctByRating() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'rating');
     });
   }
 
@@ -1962,6 +2260,12 @@ extension ChatMessageQueryProperty
     });
   }
 
+  QueryBuilder<ChatMessage, String?, QQueryOperations> branchAliasProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'branchAlias');
+    });
+  }
+
   QueryBuilder<ChatMessage, String, QQueryOperations> contentProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'content');
@@ -1983,6 +2287,12 @@ extension ChatMessageQueryProperty
   QueryBuilder<ChatMessage, String?, QQueryOperations> parentUuidProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'parentUuid');
+    });
+  }
+
+  QueryBuilder<ChatMessage, int, QQueryOperations> ratingProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'rating');
     });
   }
 

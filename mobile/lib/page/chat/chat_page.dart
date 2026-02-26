@@ -1,14 +1,17 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:pocketmind/model/chat_message.dart';
+import 'package:pocketmind/page/widget/creative_toast.dart';
 import 'package:pocketmind/page/widget/markdown_text.dart';
 import 'package:pocketmind/page/widget/pm_app_bar.dart';
 import 'package:pocketmind/providers/chat_providers.dart';
+import 'package:pocketmind/router/route_paths.dart';
 import 'package:pocketmind/util/theme_data.dart';
 
 /// 聊天页面。
@@ -33,6 +36,15 @@ class _ChatPageState extends ConsumerState<ChatPage>
   bool _isVoiceMode = false;
   bool _hasText = false;
 
+  /// 正在编辑的消息 UUID（非 null 表示编辑模式）
+  String? _editingMessageUuid;
+
+  /// 编辑前的原始内容，用于判断是否有修改
+  String _editingOriginalContent = '';
+
+  /// 用户在流式接收期间主动上滑时设为 true，暂停自动滚底。
+  bool _userScrolledUp = false;
+
   // AppBar 标题底部弹出菜单
   void _showSessionMenu(BuildContext context) {
     showModalBottomSheet<void>(
@@ -50,16 +62,24 @@ class _ChatPageState extends ConsumerState<ChatPage>
             _SheetTile(
               icon: Icons.edit_outlined,
               label: '重命名会话',
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(ctx);
                 _showRenameDialog(context);
+              },
+            ),
+            _SheetTile(
+              icon: Icons.account_tree_outlined,
+              label: '查看分支',
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push(RoutePaths.branchListOf(widget.sessionUuid));
               },
             ),
             _SheetTile(
               icon: Icons.delete_outline,
               label: '删除会话',
               color: Theme.of(context).colorScheme.error,
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(ctx);
                 _confirmDelete(context);
               },
@@ -71,71 +91,31 @@ class _ChatPageState extends ConsumerState<ChatPage>
     );
   }
 
-  void _showRenameDialog(BuildContext outerContext) {
-    final controller = TextEditingController();
-    showDialog<void>(
-      context: outerContext,
-      builder: (ctx) => AlertDialog(
-        title: const Text('重命名会话'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: '输入新标题'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              final t = controller.text.trim();
-              if (t.isNotEmpty) {
-                ref
-                    .read(chatServiceProvider)
-                    .renameSession(widget.sessionUuid, t);
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('确认'),
-          ),
-        ],
-      ),
+  void _showRenameDialog(BuildContext outerContext) async {
+    String? t = await showInputDialog(
+      outerContext,
+      title: '重命名会话',
+      hintText: '输入新标题',
     );
+    if (t != null) {
+      ref.read(chatServiceProvider).renameSession(widget.sessionUuid, t);
+    }
   }
 
-  void _confirmDelete(BuildContext outerContext) {
-    showDialog<void>(
-      context: outerContext,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除会话'),
-        content: const Text('删除后无法恢复，确认删除？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () async {
-              await ref
-                  .read(chatServiceProvider)
-                  .deleteSession(widget.sessionUuid);
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (outerContext.mounted) outerContext.pop();
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+  void _confirmDelete(BuildContext outerContext) async {
+    bool? res = await showConfirmDialog(
+      outerContext,
+      title: '删除会话',
+      message: '删除后无法恢复，确认删除？',
     );
+    if (res == true) {
+      await ref.read(chatServiceProvider).deleteSession(widget.sessionUuid);
+    }
+    if (!outerContext.mounted) return;
+    outerContext.pop();
   }
 
-  
   // 生命周期
-  
 
   @override
   void initState() {
@@ -144,6 +124,8 @@ class _ChatPageState extends ConsumerState<ChatPage>
       final hasText = _textController.text.trim().isNotEmpty;
       if (hasText != _hasText) setState(() => _hasText = hasText);
     });
+    // 监听用户滚动：上滑时暂停自动滚底
+    _scrollController.addListener(_onScroll);
     // 进入页面时从服务端同步历史
     Future.microtask(() {
       if (!mounted) return;
@@ -159,11 +141,20 @@ class _ChatPageState extends ConsumerState<ChatPage>
     super.dispose();
   }
 
-  
   // 滚动 & 发送
-  
+
+  /// 检测用户上滑行为，在流式接收期间暂停自动滚底。
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    final isAtBottom = pos.pixels >= pos.maxScrollExtent - 60;
+    if (!isAtBottom && !_userScrolledUp) {
+      setState(() => _userScrolledUp = true);
+    }
+  }
 
   void _scrollToBottom({bool immediate = false}) {
+    if (_userScrolledUp) return; // 用户上滑期间不强制滚底
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
       if (immediate) {
@@ -181,15 +172,59 @@ class _ChatPageState extends ConsumerState<ChatPage>
   void _sendMessage() {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
+
+    // 编辑模式：内容未变则不允许发送
+    if (_editingMessageUuid != null) {
+      if (text == _editingOriginalContent) {
+        CreativeToast.info(
+          context,
+          title: '内容未修改',
+          message: '请修改内容后再发送',
+          direction: ToastDirection.bottom,
+        );
+        return;
+      }
+      final editingUuid = _editingMessageUuid!;
+      _cancelEdit();
+      setState(() => _userScrolledUp = false);
+      ref
+          .read(chatSendProvider(widget.sessionUuid).notifier)
+          .editAndResend(editingUuid, text);
+      _scrollToBottom();
+      return;
+    }
+
     _textController.clear();
     _focusNode.requestFocus();
+    // 新消息发送时重置上滑标记，立即滚底
+    setState(() => _userScrolledUp = false);
     ref.read(chatSendProvider(widget.sessionUuid).notifier).send(text);
     _scrollToBottom();
   }
 
-  
+  /// 进入编辑模式：将消息内容写入底部输入框并记录原始内容。
+  void _startEdit(String messageUuid, String content) {
+    setState(() {
+      _editingMessageUuid = messageUuid;
+      _editingOriginalContent = content;
+    });
+    _textController.text = content;
+    _textController.selection = TextSelection.collapsed(
+      offset: _textController.text.length,
+    );
+    _focusNode.requestFocus();
+  }
+
+  /// 取消编辑模式，清空输入框。
+  void _cancelEdit() {
+    setState(() {
+      _editingMessageUuid = null;
+      _editingOriginalContent = '';
+    });
+    _textController.clear();
+  }
+
   // Build
-  
 
   @override
   Widget build(BuildContext context) {
@@ -197,7 +232,11 @@ class _ChatPageState extends ConsumerState<ChatPage>
     ref.listen(chatMessagesProvider(widget.sessionUuid), (_, _) {
       _scrollToBottom();
     });
-    ref.listen(chatSendProvider(widget.sessionUuid), (_, next) {
+    ref.listen(chatSendProvider(widget.sessionUuid), (prev, next) {
+      // 新一轮 AI 回复开始（包括 regenerate），重置上滑标记
+      if (prev is! ChatSendStreaming && next is ChatSendStreaming) {
+        if (mounted) setState(() => _userScrolledUp = false);
+      }
       if (next is ChatSendStreaming) _scrollToBottom();
     });
 
@@ -217,15 +256,24 @@ class _ChatPageState extends ConsumerState<ChatPage>
         title: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              session?.title ?? 'AI 对话',
-              style: TextStyle(
-                fontSize: 16.sp,
-                fontWeight: FontWeight.w600,
-                color: cs.onSurface,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    session?.title ?? 'AI 对话',
+                    style: TextStyle(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                _BranchChip(sessionUuid: widget.sessionUuid),
+              ],
             ),
             if (sendState is ChatSendStreaming)
               Text(
@@ -249,6 +297,9 @@ class _ChatPageState extends ConsumerState<ChatPage>
           Expanded(
             child: _buildMessageList(context, messagesAsync, sendState, colors),
           ),
+          // 编辑模式提示条
+          if (_editingMessageUuid != null)
+            _EditModeBanner(colors: colors, onCancel: _cancelEdit),
           // 底部输入栏
           _ChatInputBar(
             textController: _textController,
@@ -256,6 +307,7 @@ class _ChatPageState extends ConsumerState<ChatPage>
             isVoiceMode: _isVoiceMode,
             hasText: _hasText,
             isSending: sendState is ChatSendStreaming,
+            isEditMode: _editingMessageUuid != null,
             onToggleVoice: () => setState(() => _isVoiceMode = !_isVoiceMode),
             onSend: _sendMessage,
             onCamera: () {
@@ -268,9 +320,7 @@ class _ChatPageState extends ConsumerState<ChatPage>
     );
   }
 
-  
   // 消息列表
-  
 
   Widget _buildMessageList(
     BuildContext context,
@@ -315,13 +365,36 @@ class _ChatPageState extends ConsumerState<ChatPage>
     final widgets = <Widget>[];
     DateTime? lastTime;
 
+    // 计算哪些消息有子消息（非叶节点）
+    final parentUuidSet = messages
+        .map((m) => m.parentUuid)
+        .whereType<String>()
+        .toSet();
+
+    // 仅允许编辑当前分支末尾的 USER 消息（防止孤立下游对话链）
+    String? lastUserMsgUuid;
+    for (final m in messages) {
+      if (m.role == 'USER') lastUserMsgUuid = m.uuid;
+    }
+
     for (final msg in messages) {
       final ts = DateTime.fromMillisecondsSinceEpoch(msg.updatedAt);
       if (lastTime == null || ts.difference(lastTime).abs().inMinutes >= 5) {
         widgets.add(_TimeDivider(time: ts, colors: colors));
       }
       lastTime = ts;
-      widgets.add(_ChatBubble(message: msg, colors: colors));
+      final isLeaf = !parentUuidSet.contains(msg.uuid);
+      widgets.add(
+        _ChatBubble(
+          message: msg,
+          colors: colors,
+          sessionUuid: widget.sessionUuid,
+          isLeaf: isLeaf,
+          isLastUserMsg: msg.uuid == lastUserMsgUuid,
+          // 仅末尾 USER 消息可编辑
+          onEditTap: msg.uuid == lastUserMsgUuid ? _startEdit : null,
+        ),
+      );
     }
 
     // 流式预览气泡
@@ -330,13 +403,15 @@ class _ChatPageState extends ConsumerState<ChatPage>
       if (lastTime == null || now.difference(lastTime).abs().inMinutes >= 5) {
         widgets.add(_TimeDivider(time: now, colors: colors));
       }
-      // 乐观展示用户消息（落库前即刻呈现）
-      widgets.add(
-        _PendingUserBubble(
-          content: sendState.pendingUserMessage,
-          colors: colors,
-        ),
-      );
+      // 仅在有待发送内容时展示用户气泡（重新生成时无需显示）
+      if (sendState.pendingUserMessage.isNotEmpty) {
+        widgets.add(
+          _PendingUserBubble(
+            content: sendState.pendingUserMessage,
+            colors: colors,
+          ),
+        );
+      }
       widgets.add(_StreamingBubble(content: sendState.content, colors: colors));
     }
 
@@ -376,23 +451,39 @@ class _ChatPageState extends ConsumerState<ChatPage>
   }
 }
 
-
 // 消息气泡
 
-
-class _ChatBubble extends StatelessWidget {
+class _ChatBubble extends ConsumerStatefulWidget {
   final ChatMessage message;
   final ChatBubbleColors colors;
+  final String sessionUuid;
+  final bool isLeaf;
+  final bool isLastUserMsg;
 
-  const _ChatBubble({required this.message, required this.colors});
+  /// 点击编辑按钮时的回调（uuid, 当前内容）
+  final void Function(String uuid, String content)? onEditTap;
+
+  const _ChatBubble({
+    required this.message,
+    required this.colors,
+    required this.sessionUuid,
+    required this.isLeaf,
+    required this.isLastUserMsg,
+    this.onEditTap,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    final isUser = message.role == 'USER';
+  ConsumerState<_ChatBubble> createState() => _ChatBubbleState();
+}
 
-    if (message.messageType == 'TOOL_CALL' ||
-        message.messageType == 'TOOL_RESULT') {
-      return _ToolCallCard(message: message);
+class _ChatBubbleState extends ConsumerState<_ChatBubble> {
+  @override
+  Widget build(BuildContext context) {
+    final isUser = widget.message.role == 'USER';
+
+    if (widget.message.messageType == 'TOOL_CALL' ||
+        widget.message.messageType == 'TOOL_RESULT') {
+      return _ToolCallCard(message: widget.message);
     }
 
     return Padding(
@@ -404,22 +495,46 @@ class _ChatBubble extends StatelessWidget {
             : MainAxisAlignment.start,
         children: [
           Flexible(
-            child: _BubbleShape(
-              isUser: isUser,
-              colors: colors,
-              child: isUser
-                  ? SelectableText(
-                      message.content,
-                      style: TextStyle(
-                        fontSize: 15.sp,
-                        height: 1.55,
-                        color: colors.userBubbleText,
-                      ),
-                    )
-                  : MarkdownText(
-                      data: message.content,
-                      baseStyle: TextStyle(color: colors.assistantBubbleText),
-                    ),
+            child: Column(
+              crossAxisAlignment: isUser
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _BubbleShape(
+                  isUser: isUser,
+                  colors: widget.colors,
+                  child: isUser
+                      ? SelectableText(
+                          widget.message.content,
+                          style: TextStyle(
+                            fontSize: 15.sp,
+                            height: 1.55,
+                            color: widget.colors.userBubbleText,
+                          ),
+                        )
+                      : MarkdownText(
+                          data: widget.message.content,
+                          baseStyle: TextStyle(
+                            color: widget.colors.assistantBubbleText,
+                          ),
+                        ),
+                ),
+                SizedBox(height: 4.h),
+                _MessageActionBar(
+                  message: widget.message,
+                  sessionUuid: widget.sessionUuid,
+                  isUser: isUser,
+                  isLeaf: widget.isLeaf,
+                  isLastUserMsg: widget.isLastUserMsg,
+                  onEditStart: isUser && widget.onEditTap != null
+                      ? () => widget.onEditTap!(
+                          widget.message.uuid,
+                          widget.message.content,
+                        )
+                      : null,
+                ),
+              ],
             ),
           ),
           if (isUser) SizedBox(width: 4.w),
@@ -475,9 +590,312 @@ class _BubbleShape extends StatelessWidget {
   }
 }
 
+// 气泡底部操作栏（复制/编辑/删除/点赞/点踩/重生成/分支）
+
+class _MessageActionBar extends ConsumerWidget {
+  final ChatMessage message;
+  final String sessionUuid;
+  final bool isUser;
+  final bool isLeaf;
+  final bool isLastUserMsg;
+  final VoidCallback? onEditStart;
+
+  const _MessageActionBar({
+    required this.message,
+    required this.sessionUuid,
+    required this.isUser,
+    required this.isLeaf,
+    required this.isLastUserMsg,
+    this.onEditStart,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final notifier = ref.read(chatSendProvider(sessionUuid).notifier);
+    final isSending =
+        ref.watch(chatSendProvider(sessionUuid)) is ChatSendStreaming;
+
+    void copyContent() {
+      Clipboard.setData(ClipboardData(text: message.content));
+      CreativeToast.success(
+        context,
+        title: '已复制',
+        message: '内容已复制到剪贴板',
+        direction: ToastDirection.bottom,
+      );
+    }
+
+    void rateMessage(int rating) {
+      // 与当前 rating 相同时取消（切换为 0），实现互斥
+      final newRating = message.rating == rating ? 0 : rating;
+      notifier.rateMessage(message.uuid, newRating);
+    }
+
+    Future<void> openBranchSheet() async {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Theme.of(context).cardColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+        ),
+        builder: (ctx) =>
+            _NewBranchSheet(sessionUuid: sessionUuid, parentUuid: message.uuid),
+      );
+    }
+
+    final iconColor = cs.onSurfaceVariant.withValues(alpha: 0.7);
+    final iconSize = 18.sp;
+
+    if (isUser) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ActionIconBtn(
+            icon: Icons.copy_outlined,
+            size: iconSize,
+            color: iconColor,
+            tooltip: '复制',
+            onTap: isSending ? null : copyContent,
+          ),
+          if (isLastUserMsg)
+            _ActionIconBtn(
+              icon: Icons.edit_outlined,
+              size: iconSize,
+              color: iconColor,
+              tooltip: '编辑',
+              onTap: (isSending || onEditStart == null) ? null : onEditStart,
+            ),
+        ],
+      );
+    }
+
+    // AI 消息
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _ActionIconBtn(
+          icon: Icons.copy_outlined,
+          size: iconSize,
+          color: iconColor,
+          tooltip: '复制',
+          onTap: isSending ? null : copyContent,
+        ),
+        _ActionIconBtn(
+          // 点赞激活时使用填充图标
+          icon: message.rating == 1
+              ? Icons.thumb_up_alt
+              : Icons.thumb_up_alt_outlined,
+          size: iconSize,
+          color: message.rating == 1 ? cs.primary : iconColor,
+          tooltip: '点赞',
+          onTap: isSending ? null : () => rateMessage(1),
+        ),
+        _ActionIconBtn(
+          // 点踩激活时使用填充图标
+          icon: message.rating == -1
+              ? Icons.thumb_down_alt
+              : Icons.thumb_down_alt_outlined,
+          size: iconSize,
+          color: message.rating == -1 ? cs.error : iconColor,
+          tooltip: '点踩',
+          onTap: isSending ? null : () => rateMessage(-1),
+        ),
+        // 仅最新叶节点允许重新生成
+        if (isLeaf)
+          _ActionIconBtn(
+            icon: Icons.refresh_rounded,
+            size: iconSize,
+            color: iconColor,
+            tooltip: '重新生成',
+            onTap: isSending ? null : () => notifier.regenerate(message.uuid),
+          ),
+        _ActionIconBtn(
+          icon: Icons.account_tree_outlined,
+          size: iconSize,
+          color: iconColor,
+          tooltip: '开启分支',
+          onTap: isSending ? null : openBranchSheet,
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionIconBtn extends StatelessWidget {
+  final IconData icon;
+  final double size;
+  final Color color;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  const _ActionIconBtn({
+    required this.icon,
+    required this.size,
+    required this.color,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6.r),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 3.h),
+          child: Icon(icon, size: size, color: color),
+        ),
+      ),
+    );
+  }
+}
+
+// 新分支底部弹窗（从某条 AI 消息节点开始新对话）
+
+class _NewBranchSheet extends ConsumerStatefulWidget {
+  final String sessionUuid;
+  final String parentUuid;
+
+  const _NewBranchSheet({required this.sessionUuid, required this.parentUuid});
+
+  @override
+  ConsumerState<_NewBranchSheet> createState() => _NewBranchSheetState();
+}
+
+class _NewBranchSheetState extends ConsumerState<_NewBranchSheet> {
+  final _ctrl = TextEditingController();
+  bool _isSending = false;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final text = _ctrl.text.trim();
+    if (text.isEmpty || _isSending) return;
+    setState(() => _isSending = true);
+    Navigator.pop(context);
+    await ref
+        .read(chatSendProvider(widget.sessionUuid).notifier)
+        .send(text, parentUuid: widget.parentUuid);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _BottomSheetHandle(),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
+            child: Text(
+              '从此处开启新分支',
+              style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: 16.w,
+            ).copyWith(bottom: 8.h),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    constraints: BoxConstraints(maxHeight: 120.h),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(16.r),
+                    ),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 14.w,
+                      vertical: 4.h,
+                    ),
+                    child: TextField(
+                      controller: _ctrl,
+                      autofocus: true,
+                      maxLines: null,
+                      decoration: InputDecoration(
+                        hintText: '输入分支第一条消息…',
+                        border: InputBorder.none,
+                        hintStyle: TextStyle(
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8.w),
+                IconButton.filled(
+                  icon: const Icon(Icons.send_rounded),
+                  onPressed: _isSending ? null : _send,
+                  style: IconButton.styleFrom(
+                    backgroundColor: cs.tertiary,
+                    foregroundColor: cs.onTertiary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 8.h),
+        ],
+      ),
+    );
+  }
+}
+
+// 分支标签（显示在 AppBar 标题旁，指示当前所在分支）
+
+class _BranchChip extends ConsumerWidget {
+  final String sessionUuid;
+
+  const _BranchChip({required this.sessionUuid});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref
+        .watch(chatSessionStreamProvider(sessionUuid))
+        .asData
+        ?.value;
+    final cs = Theme.of(context).colorScheme;
+    final leafUuid = session?.activeLeafUuid;
+
+    // 读取叶子消息以获取 AI 生成的分支别名
+    final leafMessage = leafUuid != null
+        ? ref.watch(chatMessageByUuidProvider(leafUuid)).asData?.value
+        : null;
+    final label = leafUuid == null ? '主线' : (leafMessage?.branchAlias ?? '分支');
+
+    return Container(
+      margin: EdgeInsets.only(left: 6.w),
+      padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 2.h),
+      decoration: BoxDecoration(
+        color: cs.tertiaryContainer,
+        borderRadius: BorderRadius.circular(6.r),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10.sp,
+          color: cs.onTertiaryContainer,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
 
 // 用户消息乐观展示气泡（等待 Isar 落库期间的占位）
-
 
 class _PendingUserBubble extends StatelessWidget {
   final String content;
@@ -513,9 +931,7 @@ class _PendingUserBubble extends StatelessWidget {
   }
 }
 
-
 // 流式打字气泡
-
 
 class _StreamingBubble extends StatefulWidget {
   final String content;
@@ -625,9 +1041,7 @@ class _DotsIndicator extends StatelessWidget {
   }
 }
 
-
 // 工具调用消息卡片
-
 
 class _ToolCallCard extends StatelessWidget {
   final ChatMessage message;
@@ -676,9 +1090,7 @@ class _ToolCallCard extends StatelessWidget {
   }
 }
 
-
 // 时间分割线
-
 
 class _TimeDivider extends StatelessWidget {
   final DateTime time;
@@ -722,9 +1134,7 @@ class _TimeDivider extends StatelessWidget {
   }
 }
 
-
 // 空状态提示
-
 
 class _EmptyHint extends StatelessWidget {
   const _EmptyHint();
@@ -752,9 +1162,7 @@ class _EmptyHint extends StatelessWidget {
   }
 }
 
-
 // 底部菜单辅助组件
-
 
 class _BottomSheetHandle extends StatelessWidget {
   const _BottomSheetHandle();
@@ -805,9 +1213,49 @@ class _SheetTile extends StatelessWidget {
   }
 }
 
+// 编辑模式提示条
+
+class _EditModeBanner extends StatelessWidget {
+  final ChatBubbleColors colors;
+  final VoidCallback onCancel;
+
+  const _EditModeBanner({required this.colors, required this.onCancel});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
+      color: cs.secondaryContainer.withValues(alpha: 0.6),
+      child: Row(
+        children: [
+          Icon(
+            Icons.edit_outlined,
+            size: 14.sp,
+            color: cs.onSecondaryContainer,
+          ),
+          SizedBox(width: 6.w),
+          Text(
+            '编辑模式 — 修改内容后发送',
+            style: TextStyle(fontSize: 12.sp, color: cs.onSecondaryContainer),
+          ),
+          const Spacer(),
+          GestureDetector(
+            onTap: onCancel,
+            child: Icon(
+              Icons.close_rounded,
+              size: 16.sp,
+              color: cs.onSecondaryContainer,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 // 底部输入栏
-
 
 class _ChatInputBar extends StatelessWidget {
   final TextEditingController textController;
@@ -815,6 +1263,7 @@ class _ChatInputBar extends StatelessWidget {
   final bool isVoiceMode;
   final bool hasText;
   final bool isSending;
+  final bool isEditMode;
   final VoidCallback onToggleVoice;
   final VoidCallback onSend;
   final VoidCallback onCamera;
@@ -826,6 +1275,7 @@ class _ChatInputBar extends StatelessWidget {
     required this.isVoiceMode,
     required this.hasText,
     required this.isSending,
+    required this.isEditMode,
     required this.onToggleVoice,
     required this.onSend,
     required this.onCamera,
@@ -868,6 +1318,11 @@ class _ChatInputBar extends StatelessWidget {
                         controller: textController,
                         focusNode: focusNode,
                         enabled: !isSending,
+                        hintText: isSending
+                            ? '正在回复中…'
+                            : isEditMode
+                            ? '修改内容后点发送…'
+                            : '发消息…',
                         onSubmit: onSend,
                         cs: cs,
                       ),
@@ -906,6 +1361,7 @@ class _TextInput extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool enabled;
+  final String hintText;
   final VoidCallback onSubmit;
   final ColorScheme cs;
 
@@ -913,6 +1369,7 @@ class _TextInput extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.enabled,
+    required this.hintText,
     required this.onSubmit,
     required this.cs,
   });
@@ -934,7 +1391,7 @@ class _TextInput extends StatelessWidget {
         textInputAction: TextInputAction.newline,
         style: TextStyle(fontSize: 15.sp, color: cs.onSurface),
         decoration: InputDecoration(
-          hintText: enabled ? '发消息…' : '正在回复中…',
+          hintText: hintText,
           hintStyle: TextStyle(
             fontSize: 15.sp,
             color: cs.onSurfaceVariant.withValues(alpha: 0.6),

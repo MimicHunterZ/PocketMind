@@ -89,6 +89,12 @@ class ChatMessageModel {
   /// 工具调用元数据（仅工具类消息时非 null）
   final ToolCallData? toolData;
 
+  /// 评分：1=点赞, 0=未评, -1=点踩
+  final int rating;
+
+  /// 分支别名（AI 自动生成 4-8 汉字，仅叶子节点）
+  final String? branchAlias;
+
   const ChatMessageModel({
     required this.uuid,
     required this.sessionUuid,
@@ -99,6 +105,8 @@ class ChatMessageModel {
     required this.attachmentUuids,
     required this.createdAt,
     this.toolData,
+    this.rating = 0,
+    this.branchAlias,
   });
 
   factory ChatMessageModel.fromJson(Map<String, dynamic> json) =>
@@ -111,6 +119,42 @@ class ChatMessageModel {
   bool get isToolCallMessage => messageType == 'TOOL_CALL';
   bool get isToolResultMessage => messageType == 'TOOL_RESULT';
   bool get isTextMessage => messageType == 'TEXT';
+}
+
+// ============================================================
+// 分支摘要
+// ============================================================
+
+/// 分支摘要（对应后端 ChatBranchSummaryResponse）
+@JsonSerializable()
+class ChatBranchSummaryModel {
+  /// 该分支末端消息（叶子节点）的 UUID
+  final String leafUuid;
+
+  /// AI 自动生成的 4-8 汉字分支标签；null = 主线
+  final String? branchAlias;
+
+  /// 分支内最后一条 USER 消息（最多 200 字符，UI 用 maxLines:2 截断）
+  final String lastUserContent;
+
+  /// 分支内最后一条 ASSISTANT 消息（最多 200 字符，UI 用 maxLines:2 截断）
+  final String lastAssistantContent;
+
+  /// 最后更新时间（毫秒时间戳）
+  final int updatedAt;
+
+  const ChatBranchSummaryModel({
+    required this.leafUuid,
+    this.branchAlias,
+    required this.lastUserContent,
+    required this.lastAssistantContent,
+    required this.updatedAt,
+  });
+
+  factory ChatBranchSummaryModel.fromJson(Map<String, dynamic> json) =>
+      _$ChatBranchSummaryModelFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ChatBranchSummaryModelToJson(this);
 }
 
 // ============================================================

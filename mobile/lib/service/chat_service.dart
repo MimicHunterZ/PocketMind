@@ -28,13 +28,9 @@ class ChatService {
        _messageRepo = messageRepo,
        _apiService = apiService;
 
-  
   // 会话管理
-  
 
   /// 从服务端拉取会话列表并同步到本地 Isar。
-  ///
-  /// [noteUuid] 不为 null 时只拉取该笔记下的会话。
   Future<void> syncSessions({String? noteUuid}) async {
     try {
       final models = await _apiService.listSessions(noteUuid: noteUuid);
@@ -60,7 +56,6 @@ class ChatService {
   /// 重命名会话（更新服务端，再重新同步本地）。
   Future<void> renameSession(String uuid, String title) async {
     await _apiService.renameSession(uuid, title);
-    // 重新拉取以保证本地数据与服务端一致
     await syncSessions();
   }
 
@@ -70,18 +65,23 @@ class ChatService {
     await _sessionRepo.softDelete(uuid);
   }
 
-  
-  // 消息管理
-  
+  /// 本地更新会话激活的叶子节点（分支模式）。null = 回到主线。
+  Future<void> updateActiveLeaf(String sessionUuid, String? leafUuid) async {
+    await _sessionRepo.updateActiveLeaf(sessionUuid, leafUuid);
+  }
 
-  /// 从服务端拉取指定会话的全部历史消息并同步到本地 Isar。
+  // 消息管理
+
+  /// 从服务端拉取指定会话的历史消息并同步到本地 Isar。
   ///
-  /// 通常在以下时机调用：
-  /// 1. 进入聊天页面时（初始化加载）
-  /// 2. 收到 [ChatDoneEvent] 后（将本轮对话落库）
-  Future<void> syncMessages(String sessionUuid) async {
+  /// [leafUuid] 不为 null 时，拉取该分支叶子节点所在的消息链；
+  /// 默认（null）拉取主线最新消息。
+  Future<void> syncMessages(String sessionUuid, {String? leafUuid}) async {
     try {
-      final models = await _apiService.listMessages(sessionUuid);
+      final models = await _apiService.listMessages(
+        sessionUuid,
+        leafUuid: leafUuid,
+      );
       await _messageRepo.upsertFromModels(models);
       PMlog.d(_tag, '同步消息完成: sessionUuid=$sessionUuid, count=${models.length}');
     } catch (e) {
@@ -90,16 +90,14 @@ class ChatService {
     }
   }
 
-  /// 向指定会话发送消息，返回服务端 SSE 事件流。
+  /// 发送消息，返回 SSE 事件流。
   ///
-  /// 调用方（[ChatSend] Notifier）负责：
-  /// - 监听 [ChatDeltaEvent] 更新流式预览文本；
-  /// - 收到 [ChatDoneEvent] 后调用 [syncMessages] 将消息落库；
-  /// - 捕获 [ChatErrorEvent] 更新错误状态。
+  /// [parentUuid] 不为 null 时，从该节点分叉（创建新分支）。
   Stream<ChatStreamEvent> streamMessage(
     String sessionUuid,
     String content, {
     List<String> attachmentUuids = const [],
+    String? parentUuid,
     CancelToken? cancelToken,
   }) {
     PMlog.d(_tag, '发送消息: sessionUuid=$sessionUuid');
@@ -107,7 +105,67 @@ class ChatService {
       sessionUuid,
       content,
       attachmentUuids: attachmentUuids,
+      parentUuid: parentUuid,
       cancelToken: cancelToken,
     );
+  }
+
+  /// 编辑 USER 消息内容（服务端覆盖原内容并删除 ASSISTANT 回复）。
+  ///
+  /// 本地同步：更新消息内容，并立即软删除紧随的 ASSISTANT 消息，使 UI 即时响应。
+  /// 调用方应随后发起 [streamMessage] 以重新生成 AI 回复。
+  Future<void> editMessage(
+    String sessionUuid,
+    String messageUuid,
+    String newContent,
+  ) async {
+    await _apiService.editMessage(sessionUuid, messageUuid, newContent);
+    // 本地同步：更新内容 + 立即软删除旧 AI 回复（避免旧回复在新流式响应期间继续显示）
+    await _messageRepo.updateContent(messageUuid, newContent);
+    await _messageRepo.softDeleteAssistantChildrenOf(messageUuid);
+    PMlog.d(_tag, '已编辑消息 $messageUuid，并清理旧 AI 回复');
+  }
+
+  /// 重新生成或继续生成 ASSISTANT 回复，返回 SSE 事件流。
+  ///
+  /// [messageUuid] 可为 ASSISTANT UUID（重新生成）或 USER UUID（editAndResend 后继续生成）。
+  Stream<ChatStreamEvent> streamRegenerate(
+    String sessionUuid,
+    String messageUuid, {
+    CancelToken? cancelToken,
+  }) {
+    PMlog.d(_tag, '重新生成: sessionUuid=$sessionUuid, messageUuid=$messageUuid');
+    return _apiService.streamRegenerate(
+      sessionUuid,
+      messageUuid,
+      cancelToken: cancelToken,
+    );
+  }
+
+  /// 对消息评分（1=点赞, 0=取消, -1=点踩），同步到服务端并更新本地缓存。
+  Future<void> rateMessage(
+    String sessionUuid,
+    String messageUuid,
+    int rating,
+  ) async {
+    await _apiService.rateMessage(sessionUuid, messageUuid, rating);
+    await _messageRepo.upsertRating(messageUuid, rating);
+    PMlog.d(_tag, '评分 $messageUuid -> $rating');
+  }
+
+  /// 获取会话所有分支摘要（不落本地缓存，页面按需拉取）。
+  Future<List<ChatBranchSummaryModel>> fetchBranches(String sessionUuid) {
+    return _apiService.fetchBranches(sessionUuid);
+  }
+
+  /// 更新分支叶子节点的别名（同步服务端 + 本地缓存）。
+  Future<void> updateBranchAlias(
+    String sessionUuid,
+    String messageUuid,
+    String alias,
+  ) async {
+    await _apiService.updateBranchAlias(sessionUuid, messageUuid, alias);
+    await _messageRepo.updateBranchAlias(messageUuid, alias);
+    PMlog.d(_tag, '已更新分支别名: $messageUuid -> $alias');
   }
 }

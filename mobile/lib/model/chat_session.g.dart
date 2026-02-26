@@ -17,23 +17,28 @@ const ChatSessionSchema = CollectionSchema(
   name: r'ChatSession',
   id: 1625796556473863540,
   properties: {
-    r'isDeleted': PropertySchema(
+    r'activeLeafUuid': PropertySchema(
       id: 0,
+      name: r'activeLeafUuid',
+      type: IsarType.string,
+    ),
+    r'isDeleted': PropertySchema(
+      id: 1,
       name: r'isDeleted',
       type: IsarType.bool,
     ),
     r'scopeNoteUuid': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'scopeNoteUuid',
       type: IsarType.string,
     ),
-    r'title': PropertySchema(id: 2, name: r'title', type: IsarType.string),
+    r'title': PropertySchema(id: 3, name: r'title', type: IsarType.string),
     r'updatedAt': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'updatedAt',
       type: IsarType.long,
     ),
-    r'uuid': PropertySchema(id: 4, name: r'uuid', type: IsarType.string),
+    r'uuid': PropertySchema(id: 5, name: r'uuid', type: IsarType.string),
   },
 
   estimateSize: _chatSessionEstimateSize,
@@ -98,6 +103,12 @@ int _chatSessionEstimateSize(
 ) {
   var bytesCount = offsets.last;
   {
+    final value = object.activeLeafUuid;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.scopeNoteUuid;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -119,11 +130,12 @@ void _chatSessionSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeBool(offsets[0], object.isDeleted);
-  writer.writeString(offsets[1], object.scopeNoteUuid);
-  writer.writeString(offsets[2], object.title);
-  writer.writeLong(offsets[3], object.updatedAt);
-  writer.writeString(offsets[4], object.uuid);
+  writer.writeString(offsets[0], object.activeLeafUuid);
+  writer.writeBool(offsets[1], object.isDeleted);
+  writer.writeString(offsets[2], object.scopeNoteUuid);
+  writer.writeString(offsets[3], object.title);
+  writer.writeLong(offsets[4], object.updatedAt);
+  writer.writeString(offsets[5], object.uuid);
 }
 
 ChatSession _chatSessionDeserialize(
@@ -133,12 +145,13 @@ ChatSession _chatSessionDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = ChatSession();
+  object.activeLeafUuid = reader.readStringOrNull(offsets[0]);
   object.id = id;
-  object.isDeleted = reader.readBool(offsets[0]);
-  object.scopeNoteUuid = reader.readStringOrNull(offsets[1]);
-  object.title = reader.readStringOrNull(offsets[2]);
-  object.updatedAt = reader.readLong(offsets[3]);
-  object.uuid = reader.readString(offsets[4]);
+  object.isDeleted = reader.readBool(offsets[1]);
+  object.scopeNoteUuid = reader.readStringOrNull(offsets[2]);
+  object.title = reader.readStringOrNull(offsets[3]);
+  object.updatedAt = reader.readLong(offsets[4]);
+  object.uuid = reader.readString(offsets[5]);
   return object;
 }
 
@@ -150,14 +163,16 @@ P _chatSessionDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readBool(offset)) as P;
-    case 1:
       return (reader.readStringOrNull(offset)) as P;
+    case 1:
+      return (reader.readBool(offset)) as P;
     case 2:
       return (reader.readStringOrNull(offset)) as P;
     case 3:
-      return (reader.readLong(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 4:
+      return (reader.readLong(offset)) as P;
+    case 5:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -564,6 +579,165 @@ extension ChatSessionQueryWhere
 
 extension ChatSessionQueryFilter
     on QueryBuilder<ChatSession, ChatSession, QFilterCondition> {
+  QueryBuilder<ChatSession, ChatSession, QAfterFilterCondition>
+  activeLeafUuidIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'activeLeafUuid'),
+      );
+    });
+  }
+
+  QueryBuilder<ChatSession, ChatSession, QAfterFilterCondition>
+  activeLeafUuidIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'activeLeafUuid'),
+      );
+    });
+  }
+
+  QueryBuilder<ChatSession, ChatSession, QAfterFilterCondition>
+  activeLeafUuidEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'activeLeafUuid',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatSession, ChatSession, QAfterFilterCondition>
+  activeLeafUuidGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'activeLeafUuid',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatSession, ChatSession, QAfterFilterCondition>
+  activeLeafUuidLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'activeLeafUuid',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatSession, ChatSession, QAfterFilterCondition>
+  activeLeafUuidBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'activeLeafUuid',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatSession, ChatSession, QAfterFilterCondition>
+  activeLeafUuidStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'activeLeafUuid',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatSession, ChatSession, QAfterFilterCondition>
+  activeLeafUuidEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'activeLeafUuid',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatSession, ChatSession, QAfterFilterCondition>
+  activeLeafUuidContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'activeLeafUuid',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatSession, ChatSession, QAfterFilterCondition>
+  activeLeafUuidMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'activeLeafUuid',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<ChatSession, ChatSession, QAfterFilterCondition>
+  activeLeafUuidIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'activeLeafUuid', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<ChatSession, ChatSession, QAfterFilterCondition>
+  activeLeafUuidIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'activeLeafUuid', value: ''),
+      );
+    });
+  }
+
   QueryBuilder<ChatSession, ChatSession, QAfterFilterCondition> idEqualTo(
     Id value,
   ) {
@@ -1167,6 +1341,19 @@ extension ChatSessionQueryLinks
 
 extension ChatSessionQuerySortBy
     on QueryBuilder<ChatSession, ChatSession, QSortBy> {
+  QueryBuilder<ChatSession, ChatSession, QAfterSortBy> sortByActiveLeafUuid() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'activeLeafUuid', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ChatSession, ChatSession, QAfterSortBy>
+  sortByActiveLeafUuidDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'activeLeafUuid', Sort.desc);
+    });
+  }
+
   QueryBuilder<ChatSession, ChatSession, QAfterSortBy> sortByIsDeleted() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isDeleted', Sort.asc);
@@ -1231,6 +1418,19 @@ extension ChatSessionQuerySortBy
 
 extension ChatSessionQuerySortThenBy
     on QueryBuilder<ChatSession, ChatSession, QSortThenBy> {
+  QueryBuilder<ChatSession, ChatSession, QAfterSortBy> thenByActiveLeafUuid() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'activeLeafUuid', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ChatSession, ChatSession, QAfterSortBy>
+  thenByActiveLeafUuidDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'activeLeafUuid', Sort.desc);
+    });
+  }
+
   QueryBuilder<ChatSession, ChatSession, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -1307,6 +1507,17 @@ extension ChatSessionQuerySortThenBy
 
 extension ChatSessionQueryWhereDistinct
     on QueryBuilder<ChatSession, ChatSession, QDistinct> {
+  QueryBuilder<ChatSession, ChatSession, QDistinct> distinctByActiveLeafUuid({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'activeLeafUuid',
+        caseSensitive: caseSensitive,
+      );
+    });
+  }
+
   QueryBuilder<ChatSession, ChatSession, QDistinct> distinctByIsDeleted() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'isDeleted');
@@ -1352,6 +1563,13 @@ extension ChatSessionQueryProperty
   QueryBuilder<ChatSession, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<ChatSession, String?, QQueryOperations>
+  activeLeafUuidProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'activeLeafUuid');
     });
   }
 

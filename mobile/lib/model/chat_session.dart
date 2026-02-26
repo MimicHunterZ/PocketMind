@@ -21,4 +21,8 @@ class ChatSession {
   int updatedAt = 0;
 
   bool isDeleted = false;
+
+  /// 当前激活的叶子节点 UUID；null = 主线（最新一条消息）
+  /// 仅本地使用，不同步后端
+  String? activeLeafUuid;
 }
