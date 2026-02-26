@@ -1,16 +1,18 @@
 package com.doublez.pocketmindserver.ai.api;
 
+import com.doublez.pocketmindserver.ai.api.dto.chat.ChatBranchSummaryResponse;
 import com.doublez.pocketmindserver.ai.api.dto.chat.ChatMessageResponse;
 import com.doublez.pocketmindserver.ai.api.dto.chat.ChatMessageResponse.ToolCallData;
 import com.doublez.pocketmindserver.ai.api.dto.chat.ChatSessionResponse;
 import com.doublez.pocketmindserver.ai.api.dto.chat.CreateSessionRequest;
+import com.doublez.pocketmindserver.ai.api.dto.chat.EditMessageRequest;
+import com.doublez.pocketmindserver.ai.api.dto.chat.RateMessageRequest;
 import com.doublez.pocketmindserver.ai.api.dto.chat.SendMessageRequest;
+import com.doublez.pocketmindserver.ai.api.dto.chat.UpdateAliasRequest;
 import com.doublez.pocketmindserver.ai.api.dto.chat.UpdateSessionRequest;
 import com.doublez.pocketmindserver.ai.application.AiChatService;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
-import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
-import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
 import com.doublez.pocketmindserver.shared.domain.PageQuery;
 import com.doublez.pocketmindserver.shared.security.UserContext;
 import com.doublez.pocketmindserver.shared.web.ApiCode;
@@ -58,8 +60,6 @@ import java.util.UUID;
 @CrossOrigin(origins = "*")
 public class ChatController {
 
-    private final ChatSessionRepository chatSessionRepository;
-    private final ChatMessageRepository chatMessageRepository;
     private final AiChatService aiChatService;
     private final ObjectMapper objectMapper;
 
@@ -72,15 +72,8 @@ public class ChatController {
     public ResponseEntity<ChatSessionResponse> createSession(
             @RequestBody CreateSessionRequest request) {
         long userId = parseUserId();
-        UUID sessionUuid = UUID.randomUUID();
-        String title = request.title() != null ? request.title() : "";
-
-        ChatSessionEntity session = ChatSessionEntity.create(
-                sessionUuid, userId, request.noteUuid(), title);
-        chatSessionRepository.save(session);
-
-        log.info("创建会话: userId={}, sessionUuid={}, noteUuid={}",
-                userId, sessionUuid, request.noteUuid());
+        ChatSessionEntity session = aiChatService.createSession(
+                userId, request.noteUuid(), request.title());
         return ResponseEntity.status(HttpStatus.CREATED).body(toSessionResponse(session));
     }
 
@@ -97,12 +90,8 @@ public class ChatController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
         long userId = parseUserId();
-
-        List<ChatSessionEntity> sessions = noteUuid != null
-                ? chatSessionRepository.findByNoteUuid(userId, noteUuid)
-                : chatSessionRepository.findByUserId(userId, new PageQuery(size, page));
-
-        return sessions.stream().map(this::toSessionResponse).toList();
+        return aiChatService.listSessions(userId, noteUuid, new PageQuery(size, page))
+                .stream().map(this::toSessionResponse).toList();
     }
 
     /**
@@ -113,15 +102,7 @@ public class ChatController {
             @PathVariable UUID sessionUuid,
             @RequestBody UpdateSessionRequest request) {
         long userId = parseUserId();
-
-        ChatSessionEntity session = chatSessionRepository.findByUuidAndUserId(sessionUuid, userId)
-                .orElseThrow(() -> new BusinessException(
-                        ApiCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, "sessionUuid=" + sessionUuid));
-
-        session.updateTitle(request.title() != null ? request.title() : "");
-        chatSessionRepository.update(session);
-
-        log.info("重命名会话: userId={}, sessionUuid={}, title={}", userId, sessionUuid, request.title());
+        aiChatService.renameSession(userId, sessionUuid, request.title());
     }
 
     /**
@@ -130,35 +111,22 @@ public class ChatController {
     @DeleteMapping("/{sessionUuid}")
     public void deleteSession(@PathVariable UUID sessionUuid) {
         long userId = parseUserId();
-
-        // 校验归属权
-        chatSessionRepository.findByUuidAndUserId(sessionUuid, userId)
-                .orElseThrow(() -> new BusinessException(
-                        ApiCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, "sessionUuid=" + sessionUuid));
-
-        chatSessionRepository.deleteByUuidAndUserId(sessionUuid, userId);
-
-        log.info("删除会话: userId={}, sessionUuid={}", userId, sessionUuid);
+        aiChatService.deleteSession(userId, sessionUuid);
     }
 
     // 消息管理
 
     /**
      * 列出会话下的所有消息（按时间正序，最多 500 条）。
+     * 若传入 leafUuid，则返回从叶节点到链头的完整分支消息链（用于分支模式）。
      */
     @GetMapping("/{sessionUuid}/messages")
-    public List<ChatMessageResponse> listMessages(@PathVariable UUID sessionUuid) {
+    public List<ChatMessageResponse> listMessages(
+            @PathVariable UUID sessionUuid,
+            @RequestParam(required = false) UUID leafUuid) {
         long userId = parseUserId();
-
-        // 校验 session 归属
-        chatSessionRepository.findByUuidAndUserId(sessionUuid, userId)
-                .orElseThrow(() -> new BusinessException(
-                        ApiCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, "sessionUuid=" + sessionUuid));
-
-        return chatMessageRepository.findBySessionUuid(userId, sessionUuid, new PageQuery(500, 0))
-                .stream()
-                .map(this::toMessageResponse)
-                .toList();
+        return aiChatService.listMessages(userId, sessionUuid, leafUuid)
+                .stream().map(this::toMessageResponse).toList();
     }
 
     /**
@@ -192,7 +160,76 @@ public class ChatController {
                 userId,
                 sessionUuid,
                 request.content(),
-                request.safeAttachmentUuids());
+                request.safeAttachmentUuids(),
+                request.parentUuid());
+    }
+
+    /**
+     * 编辑 USER 消息内容（同时删除紧随其后的 ASSISTANT 消息，等待客户端触发重新生成）。
+     */
+    @PatchMapping("/{sessionUuid}/messages/{messageUuid}")
+    public void editMessage(
+            @PathVariable UUID sessionUuid,
+            @PathVariable UUID messageUuid,
+            @Valid @RequestBody EditMessageRequest request) {
+        long userId = parseUserId();
+        aiChatService.editUserMessage(userId, messageUuid, request.content());
+        log.info("编辑消息: userId={}, messageUuid={}", userId, messageUuid);
+    }
+
+    /**
+     * 重新生成指定消息的 AI 回复（SSE 流式）。
+     *
+     * <p>支持两种调用方式：
+     * <ul>
+     *   <li>ASSISTANT UUID：标准重新生成，软删除旧回复后重新调用 AI。</li>
+     *   <li>USER UUID：继续生成，适用于 editAndResend 场景（ASSISTANT 已被 editMessage 清除）。</li>
+     * </ul>
+     */
+    @PostMapping(
+            value = "/{sessionUuid}/messages/{messageUuid}/regenerate",
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE
+    )
+    public Flux<ServerSentEvent<String>> regenerateMessage(
+            @PathVariable UUID sessionUuid,
+            @PathVariable UUID messageUuid) {
+        long userId = parseUserId();
+        log.info("重新生成消息: userId={}, sessionUuid={}, messageUuid={}", userId, sessionUuid, messageUuid);
+        return aiChatService.regenerateReply(userId, sessionUuid, messageUuid);
+    }
+
+    /**
+     * 对消息评分（点赞/点踩/取消）。
+     */
+    @PostMapping("/{sessionUuid}/messages/{messageUuid}/rating")
+    public void rateMessage(
+            @PathVariable UUID sessionUuid,
+            @PathVariable UUID messageUuid,
+            @RequestBody RateMessageRequest request) {
+        long userId = parseUserId();
+        aiChatService.rateMessage(userId, messageUuid, request.rating());
+    }
+
+    /**
+     * 更新分支别名（用户手动编辑，最多 10 字符）。
+     */
+    @PatchMapping("/{sessionUuid}/messages/{messageUuid}/alias")
+    public void updateAlias(
+            @PathVariable UUID sessionUuid,
+            @PathVariable UUID messageUuid,
+            @Valid @RequestBody UpdateAliasRequest request) {
+        long userId = parseUserId();
+        aiChatService.updateBranchAlias(userId, messageUuid, request.alias());
+        log.info("更新分支别名: userId={}, messageUuid={}", userId, messageUuid);
+    }
+
+    /**
+     * 获取会话的所有分支摘要列表。
+     */
+    @GetMapping("/{sessionUuid}/branches")
+    public List<ChatBranchSummaryResponse> getBranches(@PathVariable UUID sessionUuid) {
+        long userId = parseUserId();
+        return aiChatService.getBranches(userId, sessionUuid);
     }
 
     // 私有转换 & 工具方法
@@ -215,7 +252,9 @@ public class ChatController {
                 m.getContent(),
                 m.getAttachmentUuids(),
                 m.getUpdatedAt(),
-                parseToolCallData(m));
+                parseToolCallData(m),
+                m.getRating(),
+                m.getBranchAlias());
     }
 
     /**

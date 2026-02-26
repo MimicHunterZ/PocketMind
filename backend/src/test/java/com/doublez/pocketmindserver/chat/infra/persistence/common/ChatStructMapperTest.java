@@ -105,7 +105,9 @@ class ChatStructMapperTest {
                 "消息内容",
                 List.of(attachUuid),
                 ts,
-                false
+                false,
+                0,              // rating
+                null            // branchAlias
         );
 
         ChatMessageModel model     = mapper.toMessageModel(original);

@@ -250,7 +250,11 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at       BIGINT      NOT NULL DEFAULT 0,
-    is_deleted       BOOLEAN     NOT NULL DEFAULT FALSE
+    is_deleted       BOOLEAN     NOT NULL DEFAULT FALSE,
+    -- 消息评分：1=点赞，0=未评价，-1=点踩
+    rating           INT         NOT NULL DEFAULT 0,
+    -- 分支别名：AI 自动生成的 4-8 字命名，仅命名分支叶节点有值
+    branch_alias     VARCHAR(20)
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_session_time  ON chat_messages(session_uuid, created_at ASC);
@@ -260,6 +264,8 @@ CREATE INDEX IF NOT EXISTS idx_messages_parent        ON chat_messages(parent_uu
 -- 兼容旧库：为已存在的 chat_messages 表添加新列（IF NOT EXISTS 保证幂等）
 ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS parent_uuid  UUID;
 ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message_type VARCHAR(30) NOT NULL DEFAULT 'TEXT';
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS rating       INT         NOT NULL DEFAULT 0;
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS branch_alias VARCHAR(20);
 -- content 列旧版为 NOT NULL 但无 DEFAULT，补充 DEFAULT 值（DDL 不可重复执行跳过）
 CREATE INDEX IF NOT EXISTS idx_messages_parent ON chat_messages(parent_uuid);
 

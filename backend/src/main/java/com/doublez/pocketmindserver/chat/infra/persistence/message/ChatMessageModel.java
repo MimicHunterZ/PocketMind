@@ -41,4 +41,13 @@ public class ChatMessageModel {
 
     @TableLogic
     private Boolean isDeleted;
+
+    /** 消息评分：1=点赞，0=未评价，-1=点踩 */
+    private Integer rating;
+
+    /**
+     * 分支别名：4-8 个中文字符，由 AI 自动生成，标记命名分支的叶节点。
+     * 普通线性消息此字段为 null。
+     */
+    private String branchAlias;
 }

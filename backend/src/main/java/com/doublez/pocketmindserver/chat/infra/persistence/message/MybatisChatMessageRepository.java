@@ -76,4 +76,36 @@ public class MybatisChatMessageRepository implements ChatMessageRepository {
         return mapper.findChain(leafUuid, userId)
                 .stream().map(chatStructMapper::toMessageDomain).toList();
     }
+
+    @Override
+    public List<ChatMessageEntity> findChildrenByParentUuid(UUID parentUuid, long userId) {
+        return mapper.findChildrenByParentUuid(parentUuid, userId)
+                .stream().map(chatStructMapper::toMessageDomain).toList();
+    }
+
+    @Override
+    public void updateRating(UUID uuid, long userId, int rating) {
+        mapper.updateRating(uuid, userId, rating, System.currentTimeMillis());
+    }
+
+    @Override
+    public void updateContent(UUID uuid, long userId, String content) {
+        mapper.updateContent(uuid, userId, content, System.currentTimeMillis());
+    }
+
+    @Override
+    public void updateBranchAlias(UUID uuid, long userId, String alias) {
+        mapper.updateBranchAlias(uuid, userId, alias, System.currentTimeMillis());
+    }
+
+    @Override
+    public void softDeleteByUuids(List<UUID> uuids, long userId) {
+        if (uuids == null || uuids.isEmpty()) return;
+        mapper.softDeleteByUuids(uuids, userId, System.currentTimeMillis());
+    }
+
+    @Override
+    public void softDeleteAssistantChildren(UUID parentUuid, long userId) {
+        mapper.softDeleteAssistantChildren(parentUuid, userId, System.currentTimeMillis());
+    }
 }

@@ -38,5 +38,6 @@ public interface ChatStructMapper {
     @Mapping(target = "deleted", source = "isDeleted")
     @Mapping(target = "updatedAt", defaultValue = "0L")
     @Mapping(target = "messageType", defaultValue = "TEXT")
+    @Mapping(target = "rating", defaultValue = "0")
     ChatMessageEntity toMessageDomain(ChatMessageModel model);
 }

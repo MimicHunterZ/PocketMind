@@ -23,10 +23,14 @@ public class ChatMessageEntity {
     /** 消息类型：TEXT | TOOL_CALL | TOOL_RESULT */
     private final String messageType;
     private final ChatRole role;
-    private final String content;
+    private String content;
     private final List<UUID> attachmentUuids;
     private long updatedAt;
     private boolean deleted;
+    /** 消息评分：1=点赞，0=未评价，-1=点踩 */
+    private int rating;
+    /** 分支别名：AI 静默生成的 4-8 字命名，仅叶节点有值 */
+    private String branchAlias;
 
     /**
      * 构造函数仅用于持久化反序列化 / 映射（由 MapStruct 调用）。
@@ -41,7 +45,9 @@ public class ChatMessageEntity {
             "content",
             "attachmentUuids",
             "updatedAt",
-            "deleted"
+            "deleted",
+            "rating",
+            "branchAlias"
     })
     public ChatMessageEntity(UUID uuid,
                              long userId,
@@ -52,7 +58,9 @@ public class ChatMessageEntity {
                              String content,
                              List<UUID> attachmentUuids,
                              long updatedAt,
-                             boolean deleted) {
+                             boolean deleted,
+                             int rating,
+                             String branchAlias) {
         this.uuid = Objects.requireNonNull(uuid, "uuid 不能为空");
         this.userId = userId;
         this.sessionUuid = Objects.requireNonNull(sessionUuid, "sessionUuid 不能为空");
@@ -63,6 +71,8 @@ public class ChatMessageEntity {
         this.attachmentUuids = attachmentUuids != null ? List.copyOf(attachmentUuids) : Collections.emptyList();
         this.updatedAt = updatedAt;
         this.deleted = deleted;
+        this.rating = rating;
+        this.branchAlias = branchAlias;
     }
 
     // 工厂方法
@@ -93,7 +103,9 @@ public class ChatMessageEntity {
                 content,
                 attachmentUuids,
                 System.currentTimeMillis(),
-                false
+                false,
+                0,
+                null
         );
     }
 
@@ -119,7 +131,9 @@ public class ChatMessageEntity {
             content,
             List.of(),
             System.currentTimeMillis(),
-            false
+            false,
+            0,
+            null
         );
         }
 
@@ -127,6 +141,24 @@ public class ChatMessageEntity {
     /** 软删除 */
     public void softDelete() {
         this.deleted = true;
+        this.updatedAt = System.currentTimeMillis();
+    }
+
+    /** 更新 rating */
+    public void updateRating(int rating) {
+        this.rating = rating;
+        this.updatedAt = System.currentTimeMillis();
+    }
+
+    /** 更新内容（编辑消息） */
+    public void updateContent(String content) {
+        this.content = content;
+        this.updatedAt = System.currentTimeMillis();
+    }
+
+    /** 设置分支别名 */
+    public void setBranchAlias(String alias) {
+        this.branchAlias = alias;
         this.updatedAt = System.currentTimeMillis();
     }
 }

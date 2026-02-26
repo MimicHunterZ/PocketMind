@@ -35,7 +35,11 @@ public record ChatMessageResponse(
          * 工具调用元数据（仅 TOOL_CALL / TOOL_RESULT 时非 null）。
          * 供客户端渲染工具调用 UI 组件使用。
          */
-        ToolCallData toolData
+        ToolCallData toolData,
+        // 消息评分：1=点赞，0=未评价，-1=点踩
+        int rating,
+        // 分支别名：AI 自动生成的 4-8 字命名，仅命名分支叶节点有值
+        String branchAlias
 ) {
 
     /**

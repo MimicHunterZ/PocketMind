@@ -29,10 +29,38 @@ public interface ChatMessageRepository {
     /**
      * 从叶节点沿 parent_uuid 链向上追溯，返回完整对话链（从链头到叶节点，正序排列）。
      * 用于重新生成、分支对话等场景，重建当前分支的完整上下文。
-     *
-     * @param leafUuid 叶节点消息 uuid
-     * @param userId   当前用户 id（防止越权）
-     * @return 从链头到叶节点的消息列表（正序）
      */
     List<ChatMessageEntity> findChain(UUID leafUuid, long userId);
+
+    /**
+     * 查询指定节点的所有直接子节点（即从该节点分叉出的第一层消息）。
+     * 用于获取可供导航的分支列表。
+     */
+    List<ChatMessageEntity> findChildrenByParentUuid(UUID parentUuid, long userId);
+
+    /**
+     * 更新消息评分。
+     * @param rating 1=点赞，0=取消，-1=点踩
+     */
+    void updateRating(UUID uuid, long userId, int rating);
+
+    /**
+     * 更新 USER 消息内容（编辑消息场景）。
+     */
+    void updateContent(UUID uuid, long userId, String content);
+
+    /**
+     * 更新分支别名（AI 静默生成后写入叶节点）。
+     */
+    void updateBranchAlias(UUID uuid, long userId, String alias);
+
+    /**
+     * 批量软删除消息。
+     */
+    void softDeleteByUuids(List<UUID> uuids, long userId);
+
+    /**
+     * 软删除指定父消息节点的所有 ASSISTANT 子消息（单次 SQL，用于编辑 USER 消息后清理回复）。
+     */
+    void softDeleteAssistantChildren(UUID parentUuid, long userId);
 }
