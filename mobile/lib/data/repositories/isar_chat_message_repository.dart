@@ -39,6 +39,80 @@ class IsarChatMessageRepository {
     return _isar.chatMessages.filter().uuidEqualTo(uuid).findFirst();
   }
 
+  /// 从本地消息构建分支摘要列表（离线降级使用）。
+  ///
+  /// 规则与后端保持一致：
+  /// - 叶子节点定义：没有任何子节点的消息。
+  /// - 仅当叶子节点数量 > 1 时才视为存在分支。
+  /// - 每个叶子节点沿 parent 链向上回溯，提取最近一轮 USER/ASSISTANT 文本摘要。
+  Future<List<ChatBranchSummaryModel>> buildLocalBranchSummaries(
+    String sessionUuid,
+  ) async {
+    final allMessages = await _isar.chatMessages
+        .filter()
+        .sessionUuidEqualTo(sessionUuid)
+        .and()
+        .isDeletedEqualTo(false)
+        .findAll();
+
+    if (allMessages.isEmpty) {
+      return const [];
+    }
+
+    final parentUuidSet = allMessages
+        .map((message) => message.parentUuid)
+        .whereType<String>()
+        .toSet();
+
+    final leaves = allMessages
+        .where((message) => !parentUuidSet.contains(message.uuid))
+        .toList();
+
+    if (leaves.length <= 1) {
+      return const [];
+    }
+
+    final messageMap = {
+      for (final message in allMessages) message.uuid: message,
+    };
+
+    final summaries =
+        leaves.map((leaf) {
+            String? lastUserContent;
+            String? lastAssistantContent;
+            String? cursor = leaf.uuid;
+
+            while (cursor != null) {
+              final current = messageMap[cursor];
+              if (current == null) {
+                break;
+              }
+
+              if (lastAssistantContent == null && current.role == 'ASSISTANT') {
+                lastAssistantContent = _truncate(current.content, 200);
+              }
+              if (lastUserContent == null && current.role == 'USER') {
+                lastUserContent = _truncate(current.content, 200);
+              }
+              if (lastUserContent != null && lastAssistantContent != null) {
+                break;
+              }
+              cursor = current.parentUuid;
+            }
+
+            return ChatBranchSummaryModel(
+              leafUuid: leaf.uuid,
+              branchAlias: leaf.branchAlias,
+              lastUserContent: lastUserContent ?? '',
+              lastAssistantContent: lastAssistantContent ?? '',
+              updatedAt: leaf.updatedAt,
+            );
+          }).toList()
+          ..sort((left, right) => right.updatedAt.compareTo(left.updatedAt));
+
+    return summaries;
+  }
+
   /// 监听特定叶子节点所在的分支消息链（从根到叶，升序）。
   ///
   /// 通过加载会话全量消息，在内存中沿 [ChatMessage.parentUuid] 向上回溯，
@@ -190,5 +264,12 @@ class IsarChatMessageRepository {
       ..rating = m.rating
       ..branchAlias = m.branchAlias
       ..isDeleted = false;
+  }
+
+  static String _truncate(String content, int maxChars) {
+    if (content.length <= maxChars) {
+      return content;
+    }
+    return content.substring(0, maxChars);
   }
 }
