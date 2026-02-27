@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocketmind/model/note.dart';
+import 'package:pocketmind/model/note_asset.dart';
 import 'package:pocketmind/providers/category_providers.dart';
 import 'package:pocketmind/providers/app_config_provider.dart';
 import 'package:pocketmind/providers/chat_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/util/image_prefetcher.dart';
+import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/util/responsive_breakpoints.dart';
+import 'package:pocketmind/util/url_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../router/route_paths.dart';
 import '../widget/creative_toast.dart';
@@ -169,10 +172,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
   ) {
     final noteAssets =
         ref.watch(noteAssetImagesProvider(state.note.uuid ?? '')).value ?? [];
-    final previewImages = noteAssets
-        .map((a) => a.localPath ?? a.serverUrl ?? '')
-        .where((s) => s.isNotEmpty)
-        .toList();
+    final previewImages = _resolveDisplayImages(state.note, noteAssets);
     // 如果全部资产都有存储的宽高，直接预填轮播比例缓存，避免画廊启动时 loading 跳动
     ImagePrefetcher.seedRatioFromJson(
       previewImages,
@@ -261,10 +261,7 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
   ) {
     final noteAssets =
         ref.watch(noteAssetImagesProvider(state.note.uuid ?? '')).value ?? [];
-    final previewImages = noteAssets
-        .map((a) => a.localPath ?? a.serverUrl ?? '')
-        .where((s) => s.isNotEmpty)
-        .toList();
+    final previewImages = _resolveDisplayImages(state.note, noteAssets);
     // 如果全部资产都有存储的宽高，直接预填轮播比例缓存，避免画廊启动时 loading 跳动
     ImagePrefetcher.seedRatioFromJson(
       previewImages,
@@ -335,6 +332,40 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
         ],
       ),
     );
+  }
+
+  List<String> _resolveDisplayImages(Note note, List<NoteAsset> noteAssets) {
+    final images = <String>[];
+    for (final asset in noteAssets) {
+      final String? localPath = asset.localPath;
+      final String? serverUrl = asset.serverUrl;
+      if (localPath != null && localPath.isNotEmpty) {
+        final file = ImageStorageHelper().getFileByRelativePath(localPath);
+        if (file.existsSync()) {
+          images.add(localPath);
+          continue;
+        }
+      }
+      if (serverUrl != null && serverUrl.isNotEmpty) {
+        images.add(serverUrl);
+      }
+    }
+
+    if (images.isEmpty) {
+      final preview = note.previewImageUrl;
+      if (preview != null && preview.isNotEmpty) {
+        if (UrlHelper.isLocalImagePath(preview)) {
+          final file = ImageStorageHelper().getFileByRelativePath(preview);
+          if (file.existsSync()) {
+            images.add(preview);
+          }
+        } else {
+          images.add(preview);
+        }
+      }
+    }
+
+    return images;
   }
 
   /// 分享笔记

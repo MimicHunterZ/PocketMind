@@ -15,6 +15,7 @@ import 'package:pocketmind/providers/shared_preferences_provider.dart';
 import 'package:pocketmind/service/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
+import 'package:uuid/uuid.dart';
 
 import '../api/asset_api_service.dart';
 import '../api/note_api_service.dart';
@@ -214,30 +215,40 @@ Future<void> scrapeAndSave(
                 relativePath,
               );
               if (await file.exists()) {
-                final res = await assetApiService.uploadImage(
-                  file,
-                  noteUuid: note.uuid!,
-                  sortOrder: sortOrder,
-                );
-                final noteAsset = NoteAsset()
-                  ..noteUuid = note.uuid!
-                  ..assetUuid = res.uuid
-                  ..type = 'image'
-                  ..mime = res.mime
-                  ..fileSize = res.size
-                  ..sortOrder = sortOrder
-                  ..localPath = relativePath
-                  ..serverUrl = '${ApiConstants.assetsImages}/${res.uuid}'
-                  ..metadataJson = jsonEncode({
-                    'width': res.width,
-                    'height': res.height,
-                  })
-                  ..createdAt = DateTime.now();
-                await isar.writeTxn(() async {
-                  await isar.noteAssets.put(noteAsset);
-                });
+                try {
+                  final res = await assetApiService.uploadImage(
+                    file,
+                    noteUuid: note.uuid!,
+                    sortOrder: sortOrder,
+                  );
+                  await _upsertImageNoteAsset(
+                    isar: isar,
+                    noteUuid: note.uuid!,
+                    relativePath: relativePath,
+                    sortOrder: sortOrder,
+                    fileSize: res.size,
+                    mime: res.mime,
+                    serverAssetUuid: res.uuid,
+                    serverUrl: '${ApiConstants.assetsImages}/${res.uuid}',
+                    metadataJson: jsonEncode({
+                      'width': res.width,
+                      'height': res.height,
+                    }),
+                  );
+                } catch (e) {
+                  final fileSize = await file.length();
+                  await _upsertImageNoteAsset(
+                    isar: isar,
+                    noteUuid: note.uuid!,
+                    relativePath: relativePath,
+                    sortOrder: sortOrder,
+                    fileSize: fileSize,
+                    mime: _guessImageMime(relativePath),
+                  );
+                  PMlog.w(tag, '上传失败，已保留本地资产: $relativePath, e=$e');
+                }
                 sortOrder++;
-                PMlog.d(tag, '图片上传并创建 NoteAsset: $relativePath');
+                PMlog.d(tag, '已写入 NoteAsset: $relativePath');
               }
             } catch (e) {
               PMlog.e(tag, '图片上传失败，静默跳过: $relativePath, e=$e');
@@ -458,4 +469,51 @@ Future<void> _enqueueAiAnalysis(
     await prefs.setStringList(AppConstants.keyPendingAiAnalysis, pending);
     PMlog.d(tag, '已入队 AI 待轮询: $noteUuid');
   }
+}
+
+Future<void> _upsertImageNoteAsset({
+  required Isar isar,
+  required String noteUuid,
+  required String relativePath,
+  required int sortOrder,
+  required int fileSize,
+  required String mime,
+  String? serverAssetUuid,
+  String? serverUrl,
+  String? metadataJson,
+}) async {
+  await isar.writeTxn(() async {
+    final existing = await isar.noteAssets
+        .filter()
+        .noteUuidEqualTo(noteUuid)
+        .and()
+        .localPathEqualTo(relativePath)
+        .findFirst();
+
+    final asset = existing ?? NoteAsset();
+    asset.noteUuid = noteUuid;
+    asset.assetUuid =
+        serverAssetUuid ??
+        (existing != null ? existing.assetUuid : 'local-${Uuid().v4()}');
+    asset.type = 'image';
+    asset.mime = mime;
+    asset.fileSize = fileSize;
+    asset.sortOrder = sortOrder;
+    asset.localPath = relativePath;
+    asset.serverUrl = serverUrl ?? asset.serverUrl;
+    asset.metadataJson = metadataJson ?? asset.metadataJson;
+    if (existing == null) {
+      asset.createdAt = DateTime.now();
+    }
+
+    await isar.noteAssets.put(asset);
+  });
+}
+
+String _guessImageMime(String path) {
+  final lower = path.toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  return 'image/jpeg';
 }

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
+import 'package:pocketmind/util/theme_data.dart';
 import 'package:pocketmind/util/url_helper.dart';
 
 /// 统一图片渲染组件
@@ -60,11 +61,18 @@ class PMImage extends StatelessWidget {
       provider = CachedNetworkImageProvider(pathOrUrl);
     } else if (UrlHelper.isLocalImagePath(pathOrUrl)) {
       final file = ImageStorageHelper().getFileByRelativePath(pathOrUrl);
+      if (!file.existsSync()) {
+        return null;
+      }
       provider = FileImage(file);
     } else if (pathOrUrl.contains(':\\') ||
         pathOrUrl.contains(':/') ||
         pathOrUrl.startsWith('/')) {
-      provider = FileImage(File(pathOrUrl));
+      final file = File(pathOrUrl);
+      if (!file.existsSync()) {
+        return null;
+      }
+      provider = FileImage(file);
     } else {
       provider = AssetImage(pathOrUrl);
     }
@@ -104,6 +112,10 @@ class PMImage extends StatelessWidget {
         builder: (context, snapshot) {
           final file = ImageStorageHelper().getFileByRelativePath(pathOrUrl);
 
+          if (!file.existsSync()) {
+            return _buildErrorWidget(context);
+          }
+
           // 如果收到当前图片的保存通知，清除缓存以强制重新加载
           if (snapshot.hasData && snapshot.data == pathOrUrl) {
             PaintingBinding.instance.imageCache.evict(FileImage(file));
@@ -134,8 +146,12 @@ class PMImage extends StatelessWidget {
     if (pathOrUrl.contains(':\\') ||
         pathOrUrl.contains(':/') ||
         pathOrUrl.startsWith('/')) {
+      final file = File(pathOrUrl);
+      if (!file.existsSync()) {
+        return _buildErrorWidget(context);
+      }
       return Image.file(
-        File(pathOrUrl),
+        file,
         fit: fit,
         width: width,
         height: height,
@@ -172,14 +188,12 @@ class PMImage extends StatelessWidget {
 
   Widget _buildErrorWidget(BuildContext context) {
     if (errorWidget != null) return errorWidget!;
+    final appColors = AppColors.of(context);
     return Container(
       width: width,
       height: height,
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      child: Icon(
-        Icons.broken_image_outlined,
-        color: Theme.of(context).colorScheme.error,
-      ),
+      color: appColors.errorBackground,
+      child: Icon(Icons.broken_image_outlined, color: appColors.errorIcon),
     );
   }
 }
