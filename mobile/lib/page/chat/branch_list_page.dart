@@ -19,9 +19,14 @@ class BranchListPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final branchesAsync = ref.watch(chatBranchesProvider(sessionUuid));
     final cs = Theme.of(context).colorScheme;
-
+    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: PMAppBar(title: const Text('会话分支')),
+      appBar: PMAppBar(title: Text(
+          '会话分支',
+          style: textTheme.titleMedium?.copyWith(color: cs.onSurface),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+      )),
       body: branchesAsync.when(
         data: (branches) {
           if (branches.isEmpty) {
@@ -37,18 +42,12 @@ class BranchListPage extends ConsumerWidget {
                   SizedBox(height: 12.h),
                   Text(
                     '暂无分支',
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      color: cs.onSurfaceVariant,
-                    ),
+                    style: textTheme.bodyLarge?.copyWith(color: cs.onSurface),
                   ),
                   SizedBox(height: 8.h),
                   Text(
                     '在对话中点击气泡底部的分支图标创建分支',
-                    style: TextStyle(
-                      fontSize: 13.sp,
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-                    ),
+                    style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant.withValues(alpha: 0.7)),
                     textAlign: TextAlign.center,
                   ),
                 ],
