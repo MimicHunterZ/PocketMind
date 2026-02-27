@@ -42,6 +42,18 @@ class ChatService {
     }
   }
 
+  /// 同步单个会话。
+  Future<void> syncSessionByUuid(String sessionUuid) async {
+    try {
+      final model = await _apiService.getSession(sessionUuid);
+      await _sessionRepo.upsertFromModels([model]);
+      PMlog.d(_tag, '同步单会话完成: sessionUuid=$sessionUuid');
+    } catch (e) {
+      PMlog.w(_tag, '同步单会话失败: sessionUuid=$sessionUuid, error=$e');
+      rethrow;
+    }
+  }
+
   /// 在服务端创建新会话，并将其写入本地 Isar，返回本地对象。
   Future<ChatSession> createSession({String? noteUuid, String? title}) async {
     final model = await _apiService.createSession(
@@ -68,6 +80,11 @@ class ChatService {
   /// 本地更新会话激活的叶子节点（分支模式）。null = 回到主线。
   Future<void> updateActiveLeaf(String sessionUuid, String? leafUuid) async {
     await _sessionRepo.updateActiveLeaf(sessionUuid, leafUuid);
+  }
+
+  /// 本地更新会话标题（用于 SSE done 携带标题时即时刷新）。
+  Future<void> updateSessionTitleLocal(String sessionUuid, String title) async {
+    await _sessionRepo.updateTitle(sessionUuid, title);
   }
 
   // 消息管理
@@ -153,9 +170,29 @@ class ChatService {
     PMlog.d(_tag, '评分 $messageUuid -> $rating');
   }
 
-  /// 获取会话所有分支摘要（不落本地缓存，页面按需拉取）。
-  Future<List<ChatBranchSummaryModel>> fetchBranches(String sessionUuid) {
-    return _apiService.fetchBranches(sessionUuid);
+  /// 获取会话所有分支摘要。
+  ///
+  /// 优先请求服务端；网络异常或服务不可用时，自动降级到本地 Isar 推导。
+  /// 对调用方无感知，始终返回同一模型结构。
+  Future<List<ChatBranchSummaryModel>> fetchBranches(String sessionUuid) async {
+    try {
+      final remote = await _apiService.fetchBranches(sessionUuid);
+      if (remote.isNotEmpty) {
+        return remote;
+      }
+      final local = await _messageRepo.buildLocalBranchSummaries(sessionUuid);
+      PMlog.d(
+        _tag,
+        '分支列表为空，返回本地推导结果: sessionUuid=$sessionUuid, count=${local.length}',
+      );
+      return local;
+    } on DioException catch (e) {
+      PMlog.w(_tag, '拉取分支失败，降级本地: sessionUuid=$sessionUuid, error=$e');
+      return _messageRepo.buildLocalBranchSummaries(sessionUuid);
+    } catch (e) {
+      PMlog.w(_tag, '拉取分支异常，降级本地: sessionUuid=$sessionUuid, error=$e');
+      return _messageRepo.buildLocalBranchSummaries(sessionUuid);
+    }
   }
 
   /// 更新分支叶子节点的别名（同步服务端 + 本地缓存）。

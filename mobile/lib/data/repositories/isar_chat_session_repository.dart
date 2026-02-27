@@ -107,6 +107,22 @@ class IsarChatSessionRepository {
     });
   }
 
+  /// 本地更新会话标题。
+  Future<void> updateTitle(String sessionUuid, String title) async {
+    await _isar.writeTxn(() async {
+      final s = await _isar.chatSessions
+          .filter()
+          .uuidEqualTo(sessionUuid)
+          .findFirst();
+      if (s != null) {
+        s.title = title;
+        s.updatedAt = DateTime.now().millisecondsSinceEpoch;
+        await _isar.chatSessions.put(s);
+        PMlog.d(_tag, '更新会话标题: $sessionUuid -> $title');
+      }
+    });
+  }
+
   // 私有工具
 
   static ChatSession _fromModel(ChatSessionModel m) {

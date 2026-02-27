@@ -13,7 +13,10 @@ List<ChatListItem> buildChatListItems({
   final items = <ChatListItem>[];
   DateTime? lastTime;
 
-  final parentUuidSet = messages.map((m) => m.parentUuid).whereType<String>().toSet();
+  final parentUuidSet = messages
+      .map((m) => m.parentUuid)
+      .whereType<String>()
+      .toSet();
 
   String? lastUserMsgUuid;
   for (final message in messages) {

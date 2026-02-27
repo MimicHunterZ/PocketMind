@@ -1,6 +1,7 @@
 package com.doublez.pocketmindserver.chat.infra.persistence.session;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
@@ -44,6 +45,17 @@ public class MybatisChatSessionRepository implements ChatSessionRepository {
         mapper.update(model, new LambdaQueryWrapper<ChatSessionModel>()
                 .eq(ChatSessionModel::getUuid, session.getUuid())
                 .eq(ChatSessionModel::getUserId, session.getUserId()));
+    }
+
+    @Override
+    public void updateTitleByUuidAndUserId(UUID uuid, long userId, String title) {
+        mapper.update(
+                null,
+                new LambdaUpdateWrapper<ChatSessionModel>()
+                        .eq(ChatSessionModel::getUuid, uuid)
+                        .eq(ChatSessionModel::getUserId, userId)
+                        .set(ChatSessionModel::getTitle, title)
+        );
     }
 
     @Override

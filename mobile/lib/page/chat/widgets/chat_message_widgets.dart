@@ -130,7 +130,7 @@ class ChatPendingUserBubble extends StatelessWidget {
 }
 
 /// 流式打字气泡。
-class ChatStreamingBubble extends StatefulWidget {
+class ChatStreamingBubble extends StatelessWidget {
   final String content;
   final ChatBubbleColors colors;
 
@@ -139,29 +139,6 @@ class ChatStreamingBubble extends StatefulWidget {
     required this.content,
     required this.colors,
   });
-
-  @override
-  State<ChatStreamingBubble> createState() => _ChatStreamingBubbleState();
-}
-
-class _ChatStreamingBubbleState extends State<ChatStreamingBubble>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _dotCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _dotCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _dotCtrl.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -174,29 +151,20 @@ class _ChatStreamingBubbleState extends State<ChatStreamingBubble>
           Flexible(
             child: ChatBubbleShape(
               isUser: false,
-              colors: widget.colors,
-              child: widget.content.isEmpty
-                  ? _DotsIndicator(
-                      ctrl: _dotCtrl,
-                      color: widget.colors.streamingDot,
+              colors: colors,
+              child: content.isEmpty
+                  ? Text(
+                      '…',
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: colors.assistantBubbleText,
+                      ),
                     )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        MarkdownText(
-                          data: widget.content,
-                          isStreaming: true,
-                          baseStyle: textTheme.bodyLarge?.copyWith(
-                            color: widget.colors.assistantBubbleText,
-                          ),
-                        ),
-                        SizedBox(height: 4.h),
-                        _DotsIndicator(
-                          ctrl: _dotCtrl,
-                          color: widget.colors.streamingDot,
-                        ),
-                      ],
+                  : MarkdownText(
+                      data: content,
+                      isStreaming: true,
+                      baseStyle: textTheme.bodyLarge?.copyWith(
+                        color: colors.assistantBubbleText,
+                      ),
                     ),
             ),
           ),
@@ -458,43 +426,6 @@ class _ActionIconButton extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 3.h),
           child: Icon(icon, size: size, color: color),
         ),
-      ),
-    );
-  }
-}
-
-class _DotsIndicator extends StatelessWidget {
-  final AnimationController ctrl;
-  final Color color;
-
-  const _DotsIndicator({required this.ctrl, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 16.h,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: List.generate(3, (i) {
-          final begin = i * 0.2;
-          final end = begin + 0.5;
-          final anim = Tween<double>(begin: 0.3, end: 1.0).animate(
-            CurvedAnimation(
-              parent: ctrl,
-              curve: Interval(begin, end, curve: Curves.easeInOut),
-            ),
-          );
-          return AnimatedBuilder(
-            animation: anim,
-            builder: (_, _) => Padding(
-              padding: EdgeInsets.symmetric(horizontal: 2.w),
-              child: Opacity(
-                opacity: anim.value,
-                child: CircleAvatar(radius: 3.5.r, backgroundColor: color),
-              ),
-            ),
-          );
-        }),
       ),
     );
   }

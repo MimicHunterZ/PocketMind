@@ -13,6 +13,11 @@ public interface ChatSessionRepository {
 
     void update(ChatSessionEntity session);
 
+    /**
+     * 仅更新会话标题字段。
+     */
+    void updateTitleByUuidAndUserId(UUID uuid, long userId, String title);
+
     Optional<ChatSessionEntity> findByUuidAndUserId(UUID uuid, long userId);
 
     List<ChatSessionEntity> findByUserId(long userId, PageQuery pageQuery);

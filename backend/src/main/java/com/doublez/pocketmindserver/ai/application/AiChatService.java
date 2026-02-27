@@ -49,6 +49,7 @@ public class AiChatService {
     private final ChatMessageRepository chatMessageRepository;
     private final NoteRepository noteRepository;
     private final AttachmentVisionMapper attachmentVisionMapper;
+    private final AiChatTitleService aiChatTitleService;
 
     @Value("classpath:prompts/chat/global_system.md")
     private Resource globalSystemTemplate;
@@ -67,12 +68,14 @@ public class AiChatService {
             ChatSessionRepository chatSessionRepository,
             ChatMessageRepository chatMessageRepository,
             NoteRepository noteRepository,
-            AttachmentVisionMapper attachmentVisionMapper) {
+            AttachmentVisionMapper attachmentVisionMapper,
+            AiChatTitleService aiChatTitleService) {
         this.aiFailoverRouter = aiFailoverRouter;
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.noteRepository = noteRepository;
         this.attachmentVisionMapper = attachmentVisionMapper;
+        this.aiChatTitleService = aiChatTitleService;
     }
 
     
@@ -84,8 +87,9 @@ public class AiChatService {
      */
     public ChatSessionEntity createSession(long userId, UUID noteUuid, String title) {
         UUID sessionUuid = UUID.randomUUID();
+        String finalTitle = (title == null || title.isBlank()) ? "新对话" : title;
         ChatSessionEntity session = ChatSessionEntity.create(
-                sessionUuid, userId, noteUuid, title != null ? title : "");
+            sessionUuid, userId, noteUuid, finalTitle);
         chatSessionRepository.save(session);
         log.info("创建会话: userId={}, sessionUuid={}, noteUuid={}", userId, sessionUuid, noteUuid);
         return session;
@@ -98,6 +102,13 @@ public class AiChatService {
         return noteUuid != null
                 ? chatSessionRepository.findByNoteUuid(userId, noteUuid)
                 : chatSessionRepository.findByUserId(userId, pageQuery);
+    }
+
+    /**
+     * 查询单个会话详情。
+     */
+    public ChatSessionEntity getSession(long userId, UUID sessionUuid) {
+        return validateAndGetSession(sessionUuid, userId);
     }
 
     /**
@@ -172,14 +183,11 @@ public class AiChatService {
                 ChatRole.USER, userPrompt, attachmentUuids);
         chatMessageRepository.save(userMsg);
 
-        // 若会话尚无标题，以用户首条消息前 40 字自动命名
-        if (history.isEmpty() && (session.getTitle() == null || session.getTitle().isBlank())) {
-            String autoTitle = userPrompt.length() > 40
-                    ? userPrompt.substring(0, 40) + "…"
-                    : userPrompt;
-            session.updateTitle(autoTitle);
-            chatSessionRepository.update(session);
-        }
+        // 若会话尚无标题，以用户首条消息前 40 字自动命名（即时兜底）
+        final boolean shouldGenerateSessionTitle = history.isEmpty()
+            && (session.getTitle() == null
+            || session.getTitle().isBlank()
+            || "新对话".equals(session.getTitle()));
 
         // 5. 检测分叉：若 parentUuid 非空，则本次是显式分岔操作
         final boolean isFork = (parentUuid != null);
@@ -188,8 +196,8 @@ public class AiChatService {
         List<Message> historyMessages = toSpringAiMessages(history);
 
         // 7. 流式调用 AI
-        return buildAndStream(userId, sessionUuid, session, userMsgUuid,
-                userPrompt, systemText, historyMessages, isFork);
+        return buildAndStream(userId, sessionUuid, userMsgUuid,
+            userPrompt, systemText, historyMessages, isFork, shouldGenerateSessionTitle);
     }
 
     /**
@@ -280,8 +288,8 @@ public class AiChatService {
         String systemText = buildSystemPrompt(userId, session);
         List<Message> historyMessages = toSpringAiMessages(history);
 
-        return buildAndStream(userId, sessionUuid, session, userMsg.getUuid(),
-                userMsg.getContent(), systemText, historyMessages, false);
+        return buildAndStream(userId, sessionUuid, userMsg.getUuid(),
+            userMsg.getContent(), systemText, historyMessages, false, false);
     }
 
     
@@ -359,12 +367,12 @@ public class AiChatService {
      */
     private Flux<ServerSentEvent<String>> buildAndStream(long userId,
                                                           UUID sessionUuid,
-                                                          ChatSessionEntity session,
                                                           UUID userMsgUuid,
                                                           String userPrompt,
                                                           String systemText,
                                                           List<Message> historyMessages,
-                                                          boolean isFork) {
+                                                          boolean isFork,
+                                                          boolean shouldGenerateSessionTitle) {
         StringBuilder accumulator = new StringBuilder();
         Flux<String> contentFlux = aiFailoverRouter.executeChatStream(
                 "streamReply",
@@ -394,11 +402,16 @@ public class AiChatService {
                                     fullContent, List.of());
                             chatMessageRepository.save(assistantMsg);
 
-                            session.updateTitle(session.getTitle() != null ? session.getTitle() : "");
-                            chatSessionRepository.update(session);
-
                             log.info("AI 流式回复完成: userId={}, sessionUuid={}, assistantMsgUuid={}",
                                     userId, sessionUuid, assistantMsgUuid);
+
+                            if (shouldGenerateSessionTitle) {
+                                aiChatTitleService.generateAndPublishTitleAsync(
+                                        userId,
+                                        sessionUuid,
+                                        userPrompt
+                                );
+                            }
 
                             // 若产生了分叉，异步生成 branchAlias
                             if (isFork) {

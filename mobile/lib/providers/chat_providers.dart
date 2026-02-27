@@ -118,13 +118,21 @@ class ChatSend extends _$ChatSend {
 
   /// 进入聊天页面时调用，从服务端拉取历史消息同步到本地。
   Future<void> initSession() async {
+    final service = ref.read(chatServiceProvider);
+    try {
+      await service.syncSessionByUuid(sessionUuid);
+    } catch (e) {
+      PMlog.w(_tag, '初始化会话标题失败（使用本地缓存）: $e');
+    }
+
     try {
       final session = await ref
           .read(chatSessionRepositoryProvider)
           .findByUuid(sessionUuid);
-      await ref
-          .read(chatServiceProvider)
-          .syncMessages(sessionUuid, leafUuid: session?.activeLeafUuid);
+      await service.syncMessages(
+        sessionUuid,
+        leafUuid: session?.activeLeafUuid,
+      );
     } catch (e) {
       PMlog.w(_tag, '初始化消息失败（已有本地缓存）: $e');
     }
@@ -177,6 +185,8 @@ class ChatSend extends _$ChatSend {
               await service.syncMessages(sessionUuid);
             }
             state = const ChatSendState.idle();
+          case ChatTitleUpdateEvent(:final title):
+            await service.updateSessionTitleLocal(sessionUuid, title);
           case ChatErrorEvent(:final message):
             PMlog.w(_tag, 'AI 回复异常: $message');
             state = ChatSendState.error(message: message);
@@ -238,6 +248,8 @@ class ChatSend extends _$ChatSend {
               await service.syncMessages(sessionUuid);
             }
             state = const ChatSendState.idle();
+          case ChatTitleUpdateEvent(:final title):
+            await service.updateSessionTitleLocal(sessionUuid, title);
           case ChatErrorEvent(:final message):
             PMlog.w(_tag, '编辑重发异常: $message');
             state = ChatSendState.error(message: message);
@@ -297,6 +309,8 @@ class ChatSend extends _$ChatSend {
               await service.syncMessages(sessionUuid);
             }
             state = const ChatSendState.idle();
+          case ChatTitleUpdateEvent(:final title):
+            await service.updateSessionTitleLocal(sessionUuid, title);
           case ChatErrorEvent(:final message):
             PMlog.w(_tag, '重新生成异常: $message');
             state = ChatSendState.error(message: message);

@@ -11,7 +11,10 @@ class ChatBranchChip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final session = ref.watch(chatSessionStreamProvider(sessionUuid)).asData?.value;
+    final session = ref
+        .watch(chatSessionStreamProvider(sessionUuid))
+        .asData
+        ?.value;
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final leafUuid = session?.activeLeafUuid;

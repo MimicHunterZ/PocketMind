@@ -244,11 +244,22 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       }
     });
 
-    final session = ref.watch(chatSessionByUuidProvider(widget.sessionUuid)).asData?.value;
+    final sessionAsync = ref.watch(
+      chatSessionStreamProvider(widget.sessionUuid),
+    );
+    final session = sessionAsync.asData?.value;
     final messagesAsync = ref.watch(chatMessagesProvider(widget.sessionUuid));
     final sendState = ref.watch(chatSendProvider(widget.sessionUuid));
     final colors = ChatBubbleColors.of(context);
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final String displayTitle;
+    if (sessionAsync.isLoading && !sessionAsync.hasValue) {
+      displayTitle = '';
+    } else {
+      final title = session?.title?.trim();
+      displayTitle = (title == null || title.isEmpty) ? 'AI 对话' : title;
+    }
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -262,15 +273,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Flexible(
-                  child: Text(
-                    session?.title ?? 'AI 对话',
-                    style: TextStyle(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurface,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 400),
+                    transitionBuilder: (child, animation) {
+                      return FadeTransition(opacity: animation, child: child);
+                    },
+                    child: Text(
+                      displayTitle,
+                      key: ValueKey(displayTitle),
+                      style: textTheme.titleMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 ChatBranchChip(sessionUuid: widget.sessionUuid),

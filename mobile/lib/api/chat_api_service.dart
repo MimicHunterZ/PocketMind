@@ -91,6 +91,15 @@ class ChatApiService {
     );
   }
 
+  /// 获取单个会话详情。
+  Future<ChatSessionModel> getSession(String sessionUuid) async {
+    PMlog.d(_tag, '拉取单会话: sessionUuid=$sessionUuid');
+    final data = await _http.get<Map<String, dynamic>>(
+      ApiConstants.chatSession(sessionUuid),
+    );
+    return ChatSessionModel.fromJson(data);
+  }
+
   /// 软删除会话。
   Future<void> deleteSession(String sessionUuid) async {
     PMlog.d(_tag, '删除会话: sessionUuid=$sessionUuid');
@@ -292,6 +301,16 @@ class ChatApiService {
                   yield ChatDoneEvent(json['messageUuid'] as String);
                 } catch (_) {
                   PMlog.w(_tag, 'done 事件解析失败: $data');
+                }
+              case 'title_update':
+                try {
+                  final json = jsonDecode(data) as Map<String, dynamic>;
+                  final title = (json['title'] as String?)?.trim();
+                  if (title != null && title.isNotEmpty) {
+                    yield ChatTitleUpdateEvent(title);
+                  }
+                } catch (_) {
+                  PMlog.w(_tag, 'title_update 事件解析失败: $data');
                 }
               case 'error':
                 try {

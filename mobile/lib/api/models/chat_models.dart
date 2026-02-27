@@ -178,6 +178,12 @@ final class ChatDoneEvent extends ChatStreamEvent {
   const ChatDoneEvent(this.messageUuid);
 }
 
+/// 标题更新事件（event: title_update）
+final class ChatTitleUpdateEvent extends ChatStreamEvent {
+  final String title;
+  const ChatTitleUpdateEvent(this.title);
+}
+
 /// 错误事件（event: error）
 final class ChatErrorEvent extends ChatStreamEvent {
   final String message;
