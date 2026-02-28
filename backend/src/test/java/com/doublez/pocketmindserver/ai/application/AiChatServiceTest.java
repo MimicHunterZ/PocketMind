@@ -1,7 +1,7 @@
 package com.doublez.pocketmindserver.ai.application;
 
 import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
-import com.doublez.pocketmindserver.attachment.infra.persistence.vision.AttachmentVisionMapper;
+import com.doublez.pocketmindserver.attachment.domain.vision.AttachmentVisionRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
@@ -39,7 +39,7 @@ class AiChatServiceTest {
     @Mock private ChatSessionRepository    chatSessionRepository;
     @Mock private ChatMessageRepository    chatMessageRepository;
     @Mock private NoteRepository           noteRepository;
-    @Mock private AttachmentVisionMapper   attachmentVisionMapper;
+    @Mock private AttachmentVisionRepository attachmentVisionRepository;
 
     private AiChatService service;
         private ChatStreamCancellationManager chatStreamCancellationManager;
@@ -59,7 +59,7 @@ class AiChatServiceTest {
                 chatSessionRepository,
                 chatMessageRepository,
                 noteRepository,
-                attachmentVisionMapper,
+                attachmentVisionRepository,
                 chatStreamCancellationManager,
                 chatSseEventFactory);
         injectResource("globalSystemTemplate",      "global system prompt");

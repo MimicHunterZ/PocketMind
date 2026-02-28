@@ -29,4 +29,9 @@ public interface AttachmentVisionRepository {
     List<AttachmentVisionEntity> findPendingByUserId(long userId, LimitQuery query);
 
     List<AttachmentVisionEntity> findChangedSince(long userId, SyncCursorQuery query);
+
+    /**
+     * 查询指定笔记下已完成识别的图片结果
+     */
+    List<AttachmentVisionEntity> findDoneByNoteUuid(long userId, UUID noteUuid);
 }

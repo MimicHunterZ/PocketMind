@@ -77,4 +77,10 @@ public class MybatisAttachmentVisionRepository implements AttachmentVisionReposi
         return mapper.findChangedSince(userId, query.cursor(), query.limit())
                 .stream().map(structMapper::toVisionDomain).toList();
     }
+
+    @Override
+    public List<AttachmentVisionEntity> findDoneByNoteUuid(long userId, UUID noteUuid) {
+        return mapper.findDoneByNoteUuid(userId, noteUuid)
+                .stream().map(structMapper::toVisionDomain).toList();
+    }
 }

@@ -1,7 +1,7 @@
 package com.doublez.pocketmindserver.ai.application;
 
 import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
-import com.doublez.pocketmindserver.attachment.infra.persistence.vision.AttachmentVisionMapper;
+import com.doublez.pocketmindserver.attachment.domain.vision.AttachmentVisionRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
@@ -41,7 +41,7 @@ class AiChatServicePauseTest {
     private ChatSessionRepository chatSessionRepository;
     private ChatMessageRepository chatMessageRepository;
     private NoteRepository noteRepository;
-    private AttachmentVisionMapper attachmentVisionMapper;
+    private AttachmentVisionRepository attachmentVisionRepository;
     private ChatStreamCancellationManager chatStreamCancellationManager;
     private ObjectMapper objectMapper;
     private ChatSseEventFactory chatSseEventFactory;
@@ -53,7 +53,7 @@ class AiChatServicePauseTest {
         chatSessionRepository = mock(ChatSessionRepository.class);
         chatMessageRepository = mock(ChatMessageRepository.class);
         noteRepository = mock(NoteRepository.class);
-        attachmentVisionMapper = mock(AttachmentVisionMapper.class);
+        attachmentVisionRepository = mock(AttachmentVisionRepository.class);
         chatStreamCancellationManager = new ChatStreamCancellationManager();
         objectMapper = new ObjectMapper();
         chatSseEventFactory = new ChatSseEventFactory(objectMapper);
@@ -63,7 +63,7 @@ class AiChatServicePauseTest {
                 chatSessionRepository,
                 chatMessageRepository,
                 noteRepository,
-                attachmentVisionMapper,
+                attachmentVisionRepository,
                 chatStreamCancellationManager,
                 chatSseEventFactory
         );

@@ -2,8 +2,8 @@ package com.doublez.pocketmindserver.ai.application;
 
 import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
 import com.doublez.pocketmindserver.ai.api.dto.chat.ChatBranchSummaryResponse;
-import com.doublez.pocketmindserver.attachment.infra.persistence.vision.AttachmentVisionMapper;
-import com.doublez.pocketmindserver.attachment.infra.persistence.vision.AttachmentVisionModel;
+import com.doublez.pocketmindserver.attachment.domain.vision.AttachmentVisionEntity;
+import com.doublez.pocketmindserver.attachment.domain.vision.AttachmentVisionRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
@@ -50,7 +50,7 @@ public class AiChatService {
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final NoteRepository noteRepository;
-    private final AttachmentVisionMapper attachmentVisionMapper;
+    private final AttachmentVisionRepository attachmentVisionRepository;
     private final ChatStreamCancellationManager chatStreamCancellationManager;
     private final ChatSseEventFactory chatSseEventFactory;
 
@@ -71,14 +71,14 @@ public class AiChatService {
             ChatSessionRepository chatSessionRepository,
             ChatMessageRepository chatMessageRepository,
             NoteRepository noteRepository,
-            AttachmentVisionMapper attachmentVisionMapper,
+            AttachmentVisionRepository attachmentVisionRepository,
             ChatStreamCancellationManager chatStreamCancellationManager,
             ChatSseEventFactory chatSseEventFactory) {
         this.aiFailoverRouter = aiFailoverRouter;
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.noteRepository = noteRepository;
-        this.attachmentVisionMapper = attachmentVisionMapper;
+        this.attachmentVisionRepository = attachmentVisionRepository;
         this.chatStreamCancellationManager = chatStreamCancellationManager;
         this.chatSseEventFactory = chatSseEventFactory;
     }
@@ -673,10 +673,10 @@ public class AiChatService {
             }
 
             // 图片识别结果（status=DONE）
-            List<AttachmentVisionModel> visions = attachmentVisionMapper
+            List<AttachmentVisionEntity> visions = attachmentVisionRepository
                     .findDoneByNoteUuid(userId, session.getScopeNoteUuid());
             List<String> imageTexts = visions.stream()
-                    .map(AttachmentVisionModel::getContent)
+                    .map(AttachmentVisionEntity::getContent)
                     .filter(Objects::nonNull)
                     .filter(c -> !c.isBlank())
                     .toList();
