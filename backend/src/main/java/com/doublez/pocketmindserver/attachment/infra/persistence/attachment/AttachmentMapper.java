@@ -11,11 +11,13 @@ import java.util.List;
 public interface AttachmentMapper extends BaseMapper<AttachmentModel> {
 
     @Select("""
-            SELECT * FROM note_attachments
-            WHERE user_id = #{userId}
-              AND updated_at > #{cursor}
-            ORDER BY updated_at ASC
-            LIMIT #{limit}
+            SELECT id, uuid, user_id, note_uuid, type, mime, storage_key,
+                   storage_type, sha256, source, created_at, updated_at, is_deleted
+              FROM assets
+             WHERE user_id = #{userId}
+               AND updated_at > #{cursor}
+             ORDER BY updated_at ASC
+             LIMIT #{limit}
             """)
     List<AttachmentModel> findChangedSince(
             @Param("userId") long userId,

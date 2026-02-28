@@ -13,12 +13,15 @@ import java.util.UUID;
 public interface ChatMessageMapper extends BaseMapper<ChatMessageModel> {
 
     @Select("""
-            SELECT * FROM chat_messages
-            WHERE user_id = #{userId}
-              AND session_uuid = #{sessionUuid}
-              AND is_deleted = FALSE
-            ORDER BY created_at ASC
-            LIMIT #{limit} OFFSET #{offset}
+            SELECT id, uuid, user_id, session_uuid, parent_uuid, message_type,
+                   role, content, attachment_uuids, created_at, updated_at,
+                   is_deleted, rating, branch_alias
+              FROM chat_messages
+             WHERE user_id = #{userId}
+               AND session_uuid = #{sessionUuid}
+               AND is_deleted = FALSE
+             ORDER BY created_at ASC
+             LIMIT #{limit} OFFSET #{offset}
             """)
     List<ChatMessageModel> findBySessionUuid(
             @Param("userId") long userId,
@@ -27,11 +30,14 @@ public interface ChatMessageMapper extends BaseMapper<ChatMessageModel> {
             @Param("offset") int offset);
 
     @Select("""
-            SELECT * FROM chat_messages
-            WHERE user_id = #{userId}
-              AND updated_at > #{cursor}
-            ORDER BY updated_at ASC
-            LIMIT #{limit}
+            SELECT id, uuid, user_id, session_uuid, parent_uuid, message_type,
+                   role, content, attachment_uuids, created_at, updated_at,
+                   is_deleted, rating, branch_alias
+              FROM chat_messages
+             WHERE user_id = #{userId}
+               AND updated_at > #{cursor}
+             ORDER BY updated_at ASC
+             LIMIT #{limit}
             """)
     List<ChatMessageModel> findChangedSince(
             @Param("userId") long userId,
@@ -60,18 +66,27 @@ public interface ChatMessageMapper extends BaseMapper<ChatMessageModel> {
      */
     @Select("""
             WITH RECURSIVE chain AS (
-                SELECT * FROM chat_messages
+                SELECT id, uuid, user_id, session_uuid, parent_uuid, message_type,
+                       role, content, attachment_uuids, created_at, updated_at,
+                       is_deleted, rating, branch_alias
+                  FROM chat_messages
                  WHERE uuid = #{leafUuid}::uuid
                    AND user_id = #{userId}
                    AND is_deleted = FALSE
                 UNION ALL
-                SELECT m.* FROM chat_messages m
+                SELECT m.id, m.uuid, m.user_id, m.session_uuid, m.parent_uuid, m.message_type,
+                       m.role, m.content, m.attachment_uuids, m.created_at, m.updated_at,
+                       m.is_deleted, m.rating, m.branch_alias
+                  FROM chat_messages m
                   JOIN chain c ON m.uuid = c.parent_uuid
                  WHERE m.user_id = #{userId}
                    AND m.is_deleted = FALSE
             )
-            SELECT * FROM chain
-            ORDER BY created_at ASC
+            SELECT id, uuid, user_id, session_uuid, parent_uuid, message_type,
+                   role, content, attachment_uuids, created_at, updated_at,
+                   is_deleted, rating, branch_alias
+              FROM chain
+             ORDER BY created_at ASC
             """)
     List<ChatMessageModel> findChain(
             @Param("leafUuid") UUID leafUuid,
@@ -81,11 +96,14 @@ public interface ChatMessageMapper extends BaseMapper<ChatMessageModel> {
      * 查询指定节点的直接子节点（用于获取分叉分支）。
      */
     @Select("""
-            SELECT * FROM chat_messages
+            SELECT id, uuid, user_id, session_uuid, parent_uuid, message_type,
+                   role, content, attachment_uuids, created_at, updated_at,
+                   is_deleted, rating, branch_alias
+              FROM chat_messages
              WHERE parent_uuid = #{parentUuid}::uuid
                AND user_id = #{userId}
                AND is_deleted = FALSE
-            ORDER BY created_at ASC
+             ORDER BY created_at ASC
             """)
     List<ChatMessageModel> findChildrenByParentUuid(
             @Param("parentUuid") UUID parentUuid,

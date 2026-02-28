@@ -14,11 +14,12 @@ public interface SyncChangeLogMapper extends BaseMapper<SyncChangeLogModel> {
      * 拉取 updatedAt > cursor 的变更事件，按时间升序
      */
     @Select("""
-            SELECT * FROM sync_change_log
-            WHERE user_id = #{userId}
-              AND updated_at > #{cursor}
-            ORDER BY updated_at ASC
-            LIMIT #{limit}
+            SELECT id, user_id, entity_type, entity_uuid, op, updated_at
+              FROM sync_change_log
+             WHERE user_id = #{userId}
+               AND updated_at > #{cursor}
+             ORDER BY updated_at ASC
+             LIMIT #{limit}
             """)
     List<SyncChangeLogModel> findSince(
             @Param("userId") long userId,

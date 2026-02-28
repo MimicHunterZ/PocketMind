@@ -12,22 +12,26 @@ import java.util.UUID;
 public interface ChatSessionMapper extends BaseMapper<ChatSessionModel> {
 
     @Select("""
-            SELECT * FROM chat_sessions
-            WHERE user_id = #{userId}
-              AND scope_note_uuid = #{noteUuid}
-              AND is_deleted = FALSE
-            ORDER BY updated_at DESC
+            SELECT id, uuid, user_id, scope_note_uuid, title, memory_snapshot,
+                   created_at, updated_at, is_deleted
+              FROM chat_sessions
+             WHERE user_id = #{userId}
+               AND scope_note_uuid = #{noteUuid}
+               AND is_deleted = FALSE
+             ORDER BY updated_at DESC
             """)
     List<ChatSessionModel> findByNoteUuid(
             @Param("userId") long userId,
             @Param("noteUuid") UUID noteUuid);
 
     @Select("""
-            SELECT * FROM chat_sessions
-            WHERE user_id = #{userId}
-              AND updated_at > #{cursor}
-            ORDER BY updated_at ASC
-            LIMIT #{limit}
+            SELECT id, uuid, user_id, scope_note_uuid, title, memory_snapshot,
+                   created_at, updated_at, is_deleted
+              FROM chat_sessions
+             WHERE user_id = #{userId}
+               AND updated_at > #{cursor}
+             ORDER BY updated_at ASC
+             LIMIT #{limit}
             """)
     List<ChatSessionModel> findChangedSince(
             @Param("userId") long userId,

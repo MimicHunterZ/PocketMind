@@ -12,23 +12,27 @@ import java.util.UUID;
 public interface AttachmentVisionMapper extends BaseMapper<AttachmentVisionModel> {
 
     @Select("""
-            SELECT * FROM asset_extractions
-            WHERE user_id = #{userId}
-              AND status = 'PENDING'
-              AND is_deleted = FALSE
-            ORDER BY created_at ASC
-            LIMIT #{limit}
+            SELECT id, uuid, user_id, asset_uuid, note_uuid, content_type,
+                   content, model, status, created_at, updated_at, is_deleted
+              FROM asset_extractions
+             WHERE user_id = #{userId}
+               AND status = 'PENDING'
+               AND is_deleted = FALSE
+             ORDER BY created_at ASC
+             LIMIT #{limit}
             """)
     List<AttachmentVisionModel> findPendingByUserId(
             @Param("userId") long userId,
             @Param("limit") int limit);
 
     @Select("""
-            SELECT * FROM asset_extractions
-            WHERE user_id = #{userId}
-              AND updated_at > #{cursor}
-            ORDER BY updated_at ASC
-            LIMIT #{limit}
+            SELECT id, uuid, user_id, asset_uuid, note_uuid, content_type,
+                   content, model, status, created_at, updated_at, is_deleted
+              FROM asset_extractions
+             WHERE user_id = #{userId}
+               AND updated_at > #{cursor}
+             ORDER BY updated_at ASC
+             LIMIT #{limit}
             """)
     List<AttachmentVisionModel> findChangedSince(
             @Param("userId") long userId,
@@ -36,23 +40,27 @@ public interface AttachmentVisionMapper extends BaseMapper<AttachmentVisionModel
             @Param("limit") int limit);
 
     @Select("""
-            SELECT * FROM asset_extractions
-            WHERE user_id = #{userId}
-              AND note_uuid = #{noteUuid}
-              AND status = 'DONE'
-              AND is_deleted = FALSE
-            ORDER BY created_at ASC
+            SELECT id, uuid, user_id, asset_uuid, note_uuid, content_type,
+                   content, model, status, created_at, updated_at, is_deleted
+              FROM asset_extractions
+             WHERE user_id = #{userId}
+               AND note_uuid = #{noteUuid}
+               AND status = 'DONE'
+               AND is_deleted = FALSE
+             ORDER BY created_at ASC
             """)
     List<AttachmentVisionModel> findDoneByNoteUuid(
             @Param("userId") long userId,
             @Param("noteUuid") UUID noteUuid);
 
     @Select("""
-            SELECT * FROM asset_extractions
-            WHERE user_id = #{userId}
-              AND asset_uuid = #{assetUuid}
-              AND is_deleted = FALSE
-            ORDER BY created_at ASC
+            SELECT id, uuid, user_id, asset_uuid, note_uuid, content_type,
+                   content, model, status, created_at, updated_at, is_deleted
+              FROM asset_extractions
+             WHERE user_id = #{userId}
+               AND asset_uuid = #{assetUuid}
+               AND is_deleted = FALSE
+             ORDER BY created_at ASC
             """)
     List<AttachmentVisionModel> findAllByAssetsUuid(
             @Param("userId") long userId,
