@@ -75,7 +75,7 @@ public class ChatController {
      */
     @PostMapping
     public ResponseEntity<ChatSessionResponse> createSession(
-            @RequestBody CreateSessionRequest request) {
+            @Valid @RequestBody CreateSessionRequest request) {
         long userId = parseUserId();
         ChatSessionEntity session = aiChatService.createSession(
                 userId, request.noteUuid(), request.title());
@@ -95,7 +95,7 @@ public class ChatController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
         long userId = parseUserId();
-        return aiChatService.listSessions(userId, noteUuid, new PageQuery(size, page))
+        return aiChatService.listSessions(userId, noteUuid, PageQuery.of(size, page))
                 .stream().map(this::toSessionResponse).toList();
     }
 
@@ -114,7 +114,7 @@ public class ChatController {
     @PatchMapping("/{sessionUuid}")
     public void renameSession(
             @PathVariable UUID sessionUuid,
-            @RequestBody UpdateSessionRequest request) {
+            @Valid @RequestBody UpdateSessionRequest request) {
         long userId = parseUserId();
         aiChatService.renameSession(userId, sessionUuid, request.title());
     }
@@ -252,7 +252,7 @@ public class ChatController {
     public void rateMessage(
             @PathVariable UUID sessionUuid,
             @PathVariable UUID messageUuid,
-            @RequestBody RateMessageRequest request) {
+            @Valid @RequestBody RateMessageRequest request) {
         long userId = parseUserId();
         aiChatService.rateMessage(userId, messageUuid, request.rating());
     }

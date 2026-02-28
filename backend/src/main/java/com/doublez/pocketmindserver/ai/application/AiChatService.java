@@ -344,7 +344,7 @@ public class AiChatService {
     public List<ChatBranchSummaryResponse> getBranches(long userId, UUID sessionUuid) {
         // 加载会话全量消息（用于分析分叉结构）
         List<ChatMessageEntity> allMessages = chatMessageRepository.findBySessionUuid(
-                userId, sessionUuid, new PageQuery(1000, 0));
+                userId, sessionUuid, PageQuery.unbounded(1000));
         if (allMessages.isEmpty()) return List.of();
 
         List<ChatMessageEntity> leaves = findLeafMessages(allMessages);
@@ -592,7 +592,7 @@ public class AiChatService {
         List<ChatMessageEntity> allMessages = chatMessageRepository.findBySessionUuid(
                 userId,
                 sessionUuid,
-                new PageQuery(1000, 0)
+                PageQuery.unbounded(1000)
         );
         if (allMessages.isEmpty()) {
             return List.of();

@@ -1,6 +1,7 @@
 package com.doublez.pocketmindserver.ai.api.dto.chat;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 import java.util.List;
 import java.util.UUID;
@@ -9,8 +10,9 @@ import java.util.UUID;
  * 发送消息请求体
  */
 public record SendMessageRequest(
-        // 用户消息内容
+        // 用户消息内容（最大 20000 字符）
         @NotBlank(message = "消息内容不能为空")
+        @Size(max = 20000, message = "消息内容最多 20000 个字符")
         String content,
         // 附件 UUID 列表（可选）
         List<UUID> attachmentUuids,
