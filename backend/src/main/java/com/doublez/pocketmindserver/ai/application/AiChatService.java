@@ -50,7 +50,6 @@ public class AiChatService {
     private final ChatMessageRepository chatMessageRepository;
     private final NoteRepository noteRepository;
     private final AttachmentVisionMapper attachmentVisionMapper;
-    private final AiChatTitleService aiChatTitleService;
     private final ChatStreamCancellationManager chatStreamCancellationManager;
     private final ChatSseEventFactory chatSseEventFactory;
 
@@ -72,7 +71,6 @@ public class AiChatService {
             ChatMessageRepository chatMessageRepository,
             NoteRepository noteRepository,
             AttachmentVisionMapper attachmentVisionMapper,
-            AiChatTitleService aiChatTitleService,
             ChatStreamCancellationManager chatStreamCancellationManager,
             ChatSseEventFactory chatSseEventFactory) {
         this.aiFailoverRouter = aiFailoverRouter;
@@ -80,7 +78,6 @@ public class AiChatService {
         this.chatMessageRepository = chatMessageRepository;
         this.noteRepository = noteRepository;
         this.attachmentVisionMapper = attachmentVisionMapper;
-        this.aiChatTitleService = aiChatTitleService;
         this.chatStreamCancellationManager = chatStreamCancellationManager;
         this.chatSseEventFactory = chatSseEventFactory;
     }
@@ -143,9 +140,10 @@ public class AiChatService {
      */
     public List<ChatMessageEntity> listMessages(long userId, UUID sessionUuid, UUID leafUuid) {
         validateAndGetSession(sessionUuid, userId);
-        return leafUuid != null
-                ? chatMessageRepository.findChain(leafUuid, userId)
-                : chatMessageRepository.findBySessionUuid(userId, sessionUuid, new PageQuery(500, 0));
+        if (leafUuid != null) {
+            return chatMessageRepository.findChain(leafUuid, userId);
+        }
+        return listMainlineMessages(userId, sessionUuid);
     }
 
     
@@ -164,9 +162,7 @@ public class AiChatService {
                                                       UUID parentUuid,
                                                       String requestId) {
         // 1. 校验 session 归属
-        ChatSessionEntity session = chatSessionRepository.findByUuidAndUserId(sessionUuid, userId)
-                .orElseThrow(() -> new BusinessException(
-                        ApiCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, "sessionUuid=" + sessionUuid));
+        ChatSessionEntity session = validateAndGetSession(sessionUuid, userId);
 
         // 2. 加载历史消息
         final List<ChatMessageEntity> history;
@@ -191,12 +187,6 @@ public class AiChatService {
                 ChatRole.USER, userPrompt, attachmentUuids);
         chatMessageRepository.save(userMsg);
 
-        // 若会话尚无标题，以用户首条消息前 40 字自动命名（即时兜底）
-        final boolean shouldGenerateSessionTitle = history.isEmpty()
-            && (session.getTitle() == null
-            || session.getTitle().isBlank()
-            || "新对话".equals(session.getTitle()));
-
         // 5. 检测分叉：若 parentUuid 非空，则本次是显式分岔操作
         final boolean isFork = (parentUuid != null);
 
@@ -205,7 +195,7 @@ public class AiChatService {
 
         // 7. 流式调用 AI
         return buildAndStream(userId, sessionUuid, userMsgUuid,
-            userPrompt, systemText, historyMessages, isFork, shouldGenerateSessionTitle, requestId);
+            userPrompt, systemText, historyMessages, isFork, requestId);
     }
 
     /**
@@ -259,9 +249,7 @@ public class AiChatService {
                                                           UUID sessionUuid,
                                                           UUID messageUuid,
                                                           String requestId) {
-        ChatSessionEntity session = chatSessionRepository.findByUuidAndUserId(sessionUuid, userId)
-                .orElseThrow(() -> new BusinessException(
-                        ApiCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, "sessionUuid=" + sessionUuid));
+        ChatSessionEntity session = validateAndGetSession(sessionUuid, userId);
 
         ChatMessageEntity msg = chatMessageRepository.findByUuidAndUserId(messageUuid, userId)
                 .orElseThrow(() -> new BusinessException(
@@ -298,7 +286,7 @@ public class AiChatService {
         List<Message> historyMessages = toSpringAiMessages(history);
 
         return buildAndStream(userId, sessionUuid, userMsg.getUuid(),
-            userMsg.getContent(), systemText, historyMessages, false, false, requestId);
+            userMsg.getContent(), systemText, historyMessages, false, requestId);
     }
 
     /**
@@ -359,15 +347,7 @@ public class AiChatService {
                 userId, sessionUuid, new PageQuery(1000, 0));
         if (allMessages.isEmpty()) return List.of();
 
-        // 找出所有叶节点（没有子节点的消息）
-        java.util.Set<UUID> parentUuids = allMessages.stream()
-                .map(ChatMessageEntity::getParentUuid)
-                .filter(Objects::nonNull)
-                .collect(java.util.stream.Collectors.toSet());
-
-        List<ChatMessageEntity> leaves = allMessages.stream()
-                .filter(m -> !parentUuids.contains(m.getUuid()))
-                .toList();
+        List<ChatMessageEntity> leaves = findLeafMessages(allMessages);
 
         // 若只有一个叶节点，则没有分支
         if (leaves.size() <= 1) return List.of();
@@ -394,7 +374,6 @@ public class AiChatService {
                                                           String systemText,
                                                           List<Message> historyMessages,
                                                           boolean isFork,
-                                                          boolean shouldGenerateSessionTitle,
                                                           String requestId) {
         String effectiveRequestId = (requestId == null || requestId.isBlank())
                 ? UUID.randomUUID().toString()
@@ -423,7 +402,6 @@ public class AiChatService {
                     userPrompt,
                     historyMessages,
                     isFork,
-                    shouldGenerateSessionTitle,
                     accumulator,
                     effectiveRequestId
             );
@@ -484,7 +462,6 @@ public class AiChatService {
                                                         String userPrompt,
                                                         List<Message> historyMessages,
                                                         boolean isFork,
-                                                        boolean shouldGenerateSessionTitle,
                                                         StringBuilder accumulator,
                                                         String requestId) {
         String fullContent = accumulator.toString();
@@ -493,9 +470,6 @@ public class AiChatService {
         log.info("AI 流式回复完成: userId={}, sessionUuid={}, assistantMsgUuid={}",
                 userId, sessionUuid, assistantMsgUuid);
 
-        if (shouldGenerateSessionTitle) {
-            aiChatTitleService.generateAndPublishTitleAsync(userId, sessionUuid, userPrompt);
-        }
         if (isFork) {
             generateBranchAliasAsync(userId, assistantMsgUuid, userMsgUuid, historyMessages, userPrompt);
         }
@@ -606,6 +580,45 @@ public class AiChatService {
     private String truncate(String s, int maxChars) {
         if (s == null) return null;
         return s.length() > maxChars ? s.substring(0, maxChars) : s;
+    }
+
+    /**
+     * 获取会话主链消息。
+     *
+     * 规则：当未指定 leafUuid 时，取“最后创建的叶子节点”作为当前主链叶子，
+     * 并返回该叶子的完整链路，避免把多分支全量混在一起返回给前端。
+     */
+    private List<ChatMessageEntity> listMainlineMessages(long userId, UUID sessionUuid) {
+        List<ChatMessageEntity> allMessages = chatMessageRepository.findBySessionUuid(
+                userId,
+                sessionUuid,
+                new PageQuery(1000, 0)
+        );
+        if (allMessages.isEmpty()) {
+            return List.of();
+        }
+
+        List<ChatMessageEntity> leaves = findLeafMessages(allMessages);
+        if (leaves.isEmpty()) {
+            return allMessages;
+        }
+
+        ChatMessageEntity latestLeaf = leaves.get(leaves.size() - 1);
+        return chatMessageRepository.findChain(latestLeaf.getUuid(), userId);
+    }
+
+    /**
+     * 从全量消息中找出所有叶子节点（无子节点）。
+     */
+    private List<ChatMessageEntity> findLeafMessages(List<ChatMessageEntity> allMessages) {
+        java.util.Set<UUID> parentUuids = allMessages.stream()
+                .map(ChatMessageEntity::getParentUuid)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+
+        return allMessages.stream()
+                .filter(m -> !parentUuids.contains(m.getUuid()))
+                .toList();
     }
 
     /**

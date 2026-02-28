@@ -29,6 +29,10 @@ class ApiConstants {
   static String chatMessages(String sessionUuid) =>
       '/api/ai/sessions/$sessionUuid/messages';
 
+  /// 单独生成会话标题（POST）
+  static String chatSessionTitle(String sessionUuid) =>
+      '/api/ai/sessions/$sessionUuid/title';
+
   /// 停止当前流式回复（POST）
   static String chatMessageStop(String sessionUuid) =>
       '/api/ai/sessions/$sessionUuid/messages/stop';

@@ -6,13 +6,14 @@ import com.doublez.pocketmindserver.ai.api.dto.chat.ChatMessageResponse.ToolCall
 import com.doublez.pocketmindserver.ai.api.dto.chat.ChatSessionResponse;
 import com.doublez.pocketmindserver.ai.api.dto.chat.CreateSessionRequest;
 import com.doublez.pocketmindserver.ai.api.dto.chat.EditMessageRequest;
+import com.doublez.pocketmindserver.ai.api.dto.chat.GenerateTitleRequest;
 import com.doublez.pocketmindserver.ai.api.dto.chat.RateMessageRequest;
 import com.doublez.pocketmindserver.ai.api.dto.chat.SendMessageRequest;
 import com.doublez.pocketmindserver.ai.api.dto.chat.StopMessageRequest;
 import com.doublez.pocketmindserver.ai.api.dto.chat.UpdateAliasRequest;
 import com.doublez.pocketmindserver.ai.api.dto.chat.UpdateSessionRequest;
 import com.doublez.pocketmindserver.ai.application.AiChatService;
-import com.doublez.pocketmindserver.ai.application.SseEventSinkManager;
+import com.doublez.pocketmindserver.ai.application.AiChatTitleService;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
 import com.doublez.pocketmindserver.shared.domain.PageQuery;
@@ -41,8 +42,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
-import java.time.Duration;
-import java.util.concurrent.TimeoutException;
 import java.util.List;
 import java.util.UUID;
 
@@ -66,7 +65,7 @@ import java.util.UUID;
 public class ChatController {
 
     private final AiChatService aiChatService;
-    private final SseEventSinkManager sseEventSinkManager;
+    private final AiChatTitleService aiChatTitleService;
     private final ObjectMapper objectMapper;
 
     // 会话管理
@@ -151,9 +150,6 @@ public class ChatController {
      * <pre>
      *   event: delta
      *   data: <文字片段>
-     *
-    *   event: title_update
-    *   data: {"title":"<标题>"}
     *
      *   event: done
     *   data: {"messageUuid":"<uuid>"}
@@ -178,7 +174,6 @@ public class ChatController {
         log.info("收到对话消息: userId={}, sessionUuid={}, contentLen={}",
                 userId, sessionUuid, request.content().length());
 
-        String chatId = sessionUuid.toString();
         Flux<ServerSentEvent<String>> tokenFlux = aiChatService.streamReply(
                 userId,
                 sessionUuid,
@@ -186,15 +181,19 @@ public class ChatController {
                 request.safeAttachmentUuids(),
             request.parentUuid(),
             effectiveRequestId);
-        Flux<ServerSentEvent<String>> titleFlux = sseEventSinkManager.listen(chatId)
-            .timeout(Duration.ofSeconds(120))
-            .onErrorResume(TimeoutException.class, ex -> {
-                log.debug("标题旁路流超时，回退为空流: chatId={}", chatId);
-                return Flux.empty();
-            });
+        return tokenFlux;
+    }
 
-        return Flux.merge(tokenFlux, titleFlux)
-            .doFinally(signalType -> sseEventSinkManager.cleanup(chatId));
+    /**
+     * 单独生成并更新会话标题。
+     */
+    @PostMapping("/{sessionUuid}/title")
+    public ChatSessionResponse generateSessionTitle(
+            @PathVariable UUID sessionUuid,
+            @Valid @RequestBody GenerateTitleRequest request) {
+        long userId = parseUserId();
+        aiChatTitleService.generateAndUpdateTitle(userId, sessionUuid, request.content());
+        return toSessionResponse(aiChatService.getSession(userId, sessionUuid));
     }
 
     /**

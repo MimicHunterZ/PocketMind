@@ -42,7 +42,6 @@ class AiChatServicePauseTest {
     private ChatMessageRepository chatMessageRepository;
     private NoteRepository noteRepository;
     private AttachmentVisionMapper attachmentVisionMapper;
-    private AiChatTitleService aiChatTitleService;
     private ChatStreamCancellationManager chatStreamCancellationManager;
     private ObjectMapper objectMapper;
     private ChatSseEventFactory chatSseEventFactory;
@@ -55,7 +54,6 @@ class AiChatServicePauseTest {
         chatMessageRepository = mock(ChatMessageRepository.class);
         noteRepository = mock(NoteRepository.class);
         attachmentVisionMapper = mock(AttachmentVisionMapper.class);
-        aiChatTitleService = mock(AiChatTitleService.class);
         chatStreamCancellationManager = new ChatStreamCancellationManager();
         objectMapper = new ObjectMapper();
         chatSseEventFactory = new ChatSseEventFactory(objectMapper);
@@ -66,7 +64,6 @@ class AiChatServicePauseTest {
                 chatMessageRepository,
                 noteRepository,
                 attachmentVisionMapper,
-                aiChatTitleService,
                 chatStreamCancellationManager,
                 chatSseEventFactory
         );

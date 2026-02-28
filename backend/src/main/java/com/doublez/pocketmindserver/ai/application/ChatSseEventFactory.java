@@ -50,10 +50,6 @@ public class ChatSseEventFactory {
         return event("error", Map.of("message", message));
     }
 
-    public ServerSentEvent<String> titleUpdate(String title) {
-        return event("title_update", Map.of("title", title));
-    }
-
     public ServerSentEvent<String> event(String eventName, Map<String, Object> payload) {
         return ServerSentEvent.<String>builder()
                 .event(eventName)

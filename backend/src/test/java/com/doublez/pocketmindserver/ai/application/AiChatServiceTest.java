@@ -40,7 +40,6 @@ class AiChatServiceTest {
     @Mock private ChatMessageRepository    chatMessageRepository;
     @Mock private NoteRepository           noteRepository;
     @Mock private AttachmentVisionMapper   attachmentVisionMapper;
-        @Mock private AiChatTitleService       aiChatTitleService;
 
     private AiChatService service;
         private ChatStreamCancellationManager chatStreamCancellationManager;
@@ -61,7 +60,6 @@ class AiChatServiceTest {
                 chatMessageRepository,
                 noteRepository,
                 attachmentVisionMapper,
-                aiChatTitleService,
                 chatStreamCancellationManager,
                 chatSseEventFactory);
         injectResource("globalSystemTemplate",      "global system prompt");
@@ -153,6 +151,60 @@ class AiChatServiceTest {
     // =========================================================================
     // regenerateReply -- validation paths only
     // =========================================================================
+
+    @Nested
+    class ListMessagesTest {
+
+        @Test
+        void leafNull_shouldReturnLatestLeafChainOnly() {
+            UUID user1 = UUID.randomUUID();
+            UUID ai1 = UUID.randomUUID();
+            UUID userA = UUID.randomUUID();
+            UUID aiA = UUID.randomUUID();
+            UUID userB = UUID.randomUUID();
+            UUID aiB = UUID.randomUUID();
+
+            when(chatSessionRepository.findByUuidAndUserId(SESSION_UUID, USER_ID))
+                    .thenReturn(Optional.of(makeSession()));
+
+            List<ChatMessageEntity> allMessages = List.of(
+                    makeUser(user1, null),
+                    makeAssistant(ai1, user1),
+                    makeUser(userA, ai1),
+                    makeAssistant(aiA, userA),
+                    makeUser(userB, ai1),
+                    makeAssistant(aiB, userB)
+            );
+            when(chatMessageRepository.findBySessionUuid(eq(USER_ID), eq(SESSION_UUID), any()))
+                    .thenReturn(allMessages);
+
+            List<ChatMessageEntity> latestBranchChain = List.of(
+                    makeUser(user1, null),
+                    makeAssistant(ai1, user1),
+                    makeUser(userB, ai1),
+                    makeAssistant(aiB, userB)
+            );
+            when(chatMessageRepository.findChain(aiB, USER_ID)).thenReturn(latestBranchChain);
+
+            List<ChatMessageEntity> result = service.listMessages(USER_ID, SESSION_UUID, null);
+
+            assertEquals(latestBranchChain, result);
+            verify(chatMessageRepository).findChain(aiB, USER_ID);
+        }
+
+        @Test
+        void leafNull_noMessages_shouldReturnEmptyList() {
+            when(chatSessionRepository.findByUuidAndUserId(SESSION_UUID, USER_ID))
+                    .thenReturn(Optional.of(makeSession()));
+            when(chatMessageRepository.findBySessionUuid(eq(USER_ID), eq(SESSION_UUID), any()))
+                    .thenReturn(List.of());
+
+            List<ChatMessageEntity> result = service.listMessages(USER_ID, SESSION_UUID, null);
+
+            assertTrue(result.isEmpty());
+            verify(chatMessageRepository, never()).findChain(any(), anyLong());
+        }
+    }
 
     @Nested
     class RegenerateReplyValidationTest {

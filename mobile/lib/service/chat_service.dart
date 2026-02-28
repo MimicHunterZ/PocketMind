@@ -82,9 +82,16 @@ class ChatService {
     await _sessionRepo.updateActiveLeaf(sessionUuid, leafUuid);
   }
 
-  /// 本地更新会话标题（用于 SSE done 携带标题时即时刷新）。
+  /// 本地更新会话标题。
   Future<void> updateSessionTitleLocal(String sessionUuid, String title) async {
     await _sessionRepo.updateTitle(sessionUuid, title);
+  }
+
+  /// 调用后端独立接口生成并更新会话标题。
+  Future<void> generateSessionTitle(String sessionUuid, String content) async {
+    final model = await _apiService.generateSessionTitle(sessionUuid, content);
+    await _sessionRepo.upsertFromModels([model]);
+    PMlog.d(_tag, '生成会话标题完成: sessionUuid=$sessionUuid');
   }
 
   // 消息管理

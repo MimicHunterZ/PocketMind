@@ -91,6 +91,19 @@ class ChatApiService {
     );
   }
 
+  /// 单独生成会话标题。
+  Future<ChatSessionModel> generateSessionTitle(
+    String sessionUuid,
+    String content,
+  ) async {
+    PMlog.d(_tag, '生成会话标题: sessionUuid=$sessionUuid');
+    final data = await _http.post<Map<String, dynamic>>(
+      ApiConstants.chatSessionTitle(sessionUuid),
+      data: {'content': content},
+    );
+    return ChatSessionModel.fromJson(data);
+  }
+
   /// 获取单个会话详情。
   Future<ChatSessionModel> getSession(String sessionUuid) async {
     PMlog.d(_tag, '拉取单会话: sessionUuid=$sessionUuid');
@@ -329,16 +342,6 @@ class ChatApiService {
                   );
                 } catch (_) {
                   yield const ChatPausedEvent();
-                }
-              case 'title_update':
-                try {
-                  final json = jsonDecode(data) as Map<String, dynamic>;
-                  final title = (json['title'] as String?)?.trim();
-                  if (title != null && title.isNotEmpty) {
-                    yield ChatTitleUpdateEvent(title);
-                  }
-                } catch (_) {
-                  PMlog.w(_tag, 'title_update 事件解析失败: $data');
                 }
               case 'error':
                 try {
