@@ -48,6 +48,7 @@ public interface AttachmentVisionMapper extends BaseMapper<AttachmentVisionModel
                AND status = 'DONE'
                AND is_deleted = FALSE
              ORDER BY created_at ASC
+             LIMIT 200
             """)
     List<AttachmentVisionModel> findDoneByNoteUuid(
             @Param("userId") long userId,
@@ -61,6 +62,7 @@ public interface AttachmentVisionMapper extends BaseMapper<AttachmentVisionModel
                AND asset_uuid = #{assetUuid}
                AND is_deleted = FALSE
              ORDER BY created_at ASC
+             LIMIT 200
             """)
     List<AttachmentVisionModel> findAllByAssetsUuid(
             @Param("userId") long userId,

@@ -19,6 +19,7 @@ public interface ChatSessionMapper extends BaseMapper<ChatSessionModel> {
                AND scope_note_uuid = #{noteUuid}
                AND is_deleted = FALSE
              ORDER BY updated_at DESC
+             LIMIT 100
             """)
     List<ChatSessionModel> findByNoteUuid(
             @Param("userId") long userId,
