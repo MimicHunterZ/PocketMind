@@ -260,6 +260,8 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 CREATE INDEX IF NOT EXISTS idx_messages_session_time  ON chat_messages(session_uuid, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_messages_user_uuid     ON chat_messages(user_id, uuid);
 CREATE INDEX IF NOT EXISTS idx_messages_parent        ON chat_messages(parent_uuid);
+-- 覆盖 findBySessionUuid 主查询路径：(user_id, session_uuid, is_deleted, created_at)
+CREATE INDEX IF NOT EXISTS idx_messages_user_session   ON chat_messages(user_id, session_uuid, is_deleted, created_at ASC);
 
 -- 兼容旧库：为已存在的 chat_messages 表添加新列（IF NOT EXISTS 保证幂等）
 ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS parent_uuid  UUID;
