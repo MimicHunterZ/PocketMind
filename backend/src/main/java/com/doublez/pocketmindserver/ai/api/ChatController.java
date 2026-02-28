@@ -8,6 +8,7 @@ import com.doublez.pocketmindserver.ai.api.dto.chat.CreateSessionRequest;
 import com.doublez.pocketmindserver.ai.api.dto.chat.EditMessageRequest;
 import com.doublez.pocketmindserver.ai.api.dto.chat.RateMessageRequest;
 import com.doublez.pocketmindserver.ai.api.dto.chat.SendMessageRequest;
+import com.doublez.pocketmindserver.ai.api.dto.chat.StopMessageRequest;
 import com.doublez.pocketmindserver.ai.api.dto.chat.UpdateAliasRequest;
 import com.doublez.pocketmindserver.ai.api.dto.chat.UpdateSessionRequest;
 import com.doublez.pocketmindserver.ai.application.AiChatService;
@@ -35,6 +36,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
@@ -166,8 +168,12 @@ public class ChatController {
     )
     public Flux<ServerSentEvent<String>> sendMessage(
             @PathVariable UUID sessionUuid,
+            @RequestHeader(name = "X-Request-Id", required = false) String requestId,
             @Valid @RequestBody SendMessageRequest request) {
         long userId = parseUserId();
+        String effectiveRequestId = requestId != null && !requestId.isBlank()
+            ? requestId
+            : UUID.randomUUID().toString();
 
         log.info("收到对话消息: userId={}, sessionUuid={}, contentLen={}",
                 userId, sessionUuid, request.content().length());
@@ -178,7 +184,8 @@ public class ChatController {
                 sessionUuid,
                 request.content(),
                 request.safeAttachmentUuids(),
-                request.parentUuid());
+            request.parentUuid(),
+            effectiveRequestId);
         Flux<ServerSentEvent<String>> titleFlux = sseEventSinkManager.listen(chatId)
             .timeout(Duration.ofSeconds(120))
             .onErrorResume(TimeoutException.class, ex -> {
@@ -218,10 +225,25 @@ public class ChatController {
     )
     public Flux<ServerSentEvent<String>> regenerateMessage(
             @PathVariable UUID sessionUuid,
+            @RequestHeader(name = "X-Request-Id", required = false) String requestId,
             @PathVariable UUID messageUuid) {
         long userId = parseUserId();
+        String effectiveRequestId = requestId != null && !requestId.isBlank()
+                ? requestId
+                : UUID.randomUUID().toString();
         log.info("重新生成消息: userId={}, sessionUuid={}, messageUuid={}", userId, sessionUuid, messageUuid);
-        return aiChatService.regenerateReply(userId, sessionUuid, messageUuid);
+        return aiChatService.regenerateReply(userId, sessionUuid, messageUuid, effectiveRequestId);
+    }
+
+    /**
+     * 停止指定 requestId 的流式回复。
+     */
+    @PostMapping("/{sessionUuid}/messages/stop")
+    public void stopMessage(
+            @PathVariable UUID sessionUuid,
+            @Valid @RequestBody StopMessageRequest request) {
+        long userId = parseUserId();
+        aiChatService.stopReply(userId, sessionUuid, request.requestId());
     }
 
     /**

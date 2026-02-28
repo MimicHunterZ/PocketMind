@@ -6,10 +6,7 @@ import org.springframework.stereotype.Component;
 import reactor.core.Scannable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,13 +19,13 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class SseEventSinkManager {
 
-    private final ObjectMapper objectMapper;
+    private final ChatSseEventFactory chatSseEventFactory;
 
     private final Map<String, Sinks.Many<ServerSentEvent<String>>> sinkMap =
             new ConcurrentHashMap<>();
 
-    public SseEventSinkManager(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    public SseEventSinkManager(ChatSseEventFactory chatSseEventFactory) {
+        this.chatSseEventFactory = chatSseEventFactory;
     }
 
     /**
@@ -66,21 +63,8 @@ public class SseEventSinkManager {
             return;
         }
 
-        String payload;
-        try {
-            Map<String, String> body = new HashMap<>();
-            body.put("title", title);
-            payload = objectMapper.writeValueAsString(body);
-        } catch (JsonProcessingException e) {
-            log.warn("标题控制帧序列化失败: chatId={}", chatId, e);
-            return;
-        }
-
         Sinks.EmitResult emitResult = sink.tryEmitNext(
-                ServerSentEvent.<String>builder()
-                        .event("title_update")
-                        .data(payload)
-                        .build()
+                chatSseEventFactory.titleUpdate(title)
         );
 
         if (emitResult.isFailure()) {

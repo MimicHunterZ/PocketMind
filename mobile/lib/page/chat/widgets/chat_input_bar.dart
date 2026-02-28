@@ -25,6 +25,7 @@ class ChatInputBar extends StatelessWidget {
   final bool isEditMode;
   final VoidCallback onToggleVoice;
   final VoidCallback onSend;
+  final VoidCallback onStop;
   final ChatBubbleColors colors;
   final ChatInputActions actions;
 
@@ -38,6 +39,7 @@ class ChatInputBar extends StatelessWidget {
     required this.isEditMode,
     required this.onToggleVoice,
     required this.onSend,
+    required this.onStop,
     required this.colors,
     required this.actions,
   });
@@ -88,7 +90,9 @@ class ChatInputBar extends StatelessWidget {
                 duration: const Duration(milliseconds: 180),
                 transitionBuilder: (child, anim) =>
                     ScaleTransition(scale: anim, child: child),
-                child: hasText && !isVoiceMode
+                child: isSending && !isVoiceMode
+                    ? _StopButton(key: const Key('stop'), onTap: onStop, cs: cs)
+                    : hasText && !isVoiceMode
                     ? _SendButton(
                         key: const Key('send'),
                         onTap: onSend,
@@ -252,6 +256,32 @@ class _SendButton extends StatelessWidget {
                     size: 20.sp,
                     color: cs.onTertiary,
                   ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StopButton extends StatelessWidget {
+  final VoidCallback onTap;
+  final ColorScheme cs;
+
+  const _StopButton({super.key, required this.onTap, required this.cs});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 40.w,
+      height: 40.w,
+      child: Material(
+        color: cs.tertiary,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Center(
+            child: Icon(Icons.stop_rounded, size: 18.sp, color: cs.onTertiary),
           ),
         ),
       ),

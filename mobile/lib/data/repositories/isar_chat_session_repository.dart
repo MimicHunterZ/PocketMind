@@ -64,6 +64,7 @@ class IsarChatSessionRepository {
             .findFirst();
         if (existing != null) {
           s.id = existing.id;
+          s.activeLeafUuid = existing.activeLeafUuid;
         }
         await _isar.chatSessions.put(s);
       }

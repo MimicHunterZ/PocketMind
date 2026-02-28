@@ -136,6 +136,7 @@ class ChatApiService {
     String content, {
     List<String> attachmentUuids = const [],
     String? parentUuid,
+    String? requestId,
     CancelToken? cancelToken,
   }) async* {
     PMlog.d(
@@ -159,6 +160,8 @@ class ChatApiService {
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'text/event-stream',
+            if (requestId != null && requestId.isNotEmpty)
+              'X-Request-Id': requestId,
           },
         ),
       );
@@ -190,6 +193,7 @@ class ChatApiService {
   Stream<ChatStreamEvent> streamRegenerate(
     String sessionUuid,
     String messageUuid, {
+    String? requestId,
     CancelToken? cancelToken,
   }) async* {
     PMlog.d(_tag, '重新生成(SSE): $messageUuid');
@@ -205,6 +209,8 @@ class ChatApiService {
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'text/event-stream',
+            if (requestId != null && requestId.isNotEmpty)
+              'X-Request-Id': requestId,
           },
         ),
       );
@@ -215,6 +221,15 @@ class ChatApiService {
     }
 
     yield* _parseSseStream(response.data!.stream, cancelToken);
+  }
+
+  /// 停止当前会话中指定 requestId 的流式回复。
+  Future<void> stopStream(String sessionUuid, String requestId) async {
+    PMlog.d(_tag, '停止流式回复: sessionUuid=$sessionUuid, requestId=$requestId');
+    await _http.post<void>(
+      ApiConstants.chatMessageStop(sessionUuid),
+      data: {'requestId': requestId},
+    );
   }
 
   /// 对消息评分（1=点赞, 0=取消, -1=点踩）。
@@ -298,9 +313,22 @@ class ChatApiService {
               case 'done':
                 try {
                   final json = jsonDecode(data) as Map<String, dynamic>;
-                  yield ChatDoneEvent(json['messageUuid'] as String);
+                  yield ChatDoneEvent(
+                    json['messageUuid'] as String,
+                    requestId: json['requestId'] as String?,
+                  );
                 } catch (_) {
                   PMlog.w(_tag, 'done 事件解析失败: $data');
+                }
+              case 'paused':
+                try {
+                  final json = jsonDecode(data) as Map<String, dynamic>;
+                  yield ChatPausedEvent(
+                    requestId: json['requestId'] as String?,
+                    messageUuid: json['messageUuid'] as String?,
+                  );
+                } catch (_) {
+                  yield const ChatPausedEvent();
                 }
               case 'title_update':
                 try {
@@ -325,6 +353,9 @@ class ChatApiService {
         }
       }
     } catch (e) {
+      if (cancelToken != null && cancelToken.isCancelled) {
+        return;
+      }
       PMlog.e(_tag, 'SSE 流读取异常: $e');
       yield ChatErrorEvent(e.toString());
     }

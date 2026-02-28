@@ -329,6 +329,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             isEditMode: _editingMessageUuid != null,
             onToggleVoice: () => setState(() => _isVoiceMode = !_isVoiceMode),
             onSend: _sendMessage,
+            onStop: () {
+              ref.read(chatSendProvider(widget.sessionUuid).notifier).stop();
+            },
             colors: colors,
             actions: ChatInputActions(
               onCamera: _onCameraTap,

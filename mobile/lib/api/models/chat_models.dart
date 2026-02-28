@@ -175,7 +175,15 @@ final class ChatDeltaEvent extends ChatStreamEvent {
 /// 回复完成（event: done），携带已落库的 ASSISTANT 消息 UUID
 final class ChatDoneEvent extends ChatStreamEvent {
   final String messageUuid;
-  const ChatDoneEvent(this.messageUuid);
+  final String? requestId;
+  const ChatDoneEvent(this.messageUuid, {this.requestId});
+}
+
+/// 暂停事件（event: paused）
+final class ChatPausedEvent extends ChatStreamEvent {
+  final String? requestId;
+  final String? messageUuid;
+  const ChatPausedEvent({this.requestId, this.messageUuid});
 }
 
 /// 标题更新事件（event: title_update）

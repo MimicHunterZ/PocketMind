@@ -13,9 +13,11 @@ import 'package:pocketmind/page/home/auth_page.dart';
 import 'package:pocketmind/page/settings/platform_accounts_page.dart';
 import 'package:pocketmind/page/main_layout.dart';
 import 'package:pocketmind/router/route_paths.dart';
+import 'package:pocketmind/util/global_network_alert.dart';
 
 /// 全局路由配置
 final appRouter = GoRouter(
+  navigatorKey: appNavigatorKey,
   initialLocation: RoutePaths.home,
   debugLogDiagnostics: true,
   routes: [

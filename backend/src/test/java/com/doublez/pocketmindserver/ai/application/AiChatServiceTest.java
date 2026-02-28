@@ -9,6 +9,7 @@ import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
 import com.doublez.pocketmindserver.shared.web.BusinessException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -39,8 +40,11 @@ class AiChatServiceTest {
     @Mock private ChatMessageRepository    chatMessageRepository;
     @Mock private NoteRepository           noteRepository;
     @Mock private AttachmentVisionMapper   attachmentVisionMapper;
+        @Mock private AiChatTitleService       aiChatTitleService;
 
     private AiChatService service;
+        private ChatStreamCancellationManager chatStreamCancellationManager;
+        private ChatSseEventFactory chatSseEventFactory;
 
     private static final long   USER_ID            = 100L;
     private static final UUID   SESSION_UUID       = UUID.randomUUID();
@@ -49,12 +53,17 @@ class AiChatServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        chatStreamCancellationManager = new ChatStreamCancellationManager();
+        chatSseEventFactory = new ChatSseEventFactory(new ObjectMapper());
         service = new AiChatService(
                 aiFailoverRouter,
                 chatSessionRepository,
                 chatMessageRepository,
                 noteRepository,
-                attachmentVisionMapper);
+                attachmentVisionMapper,
+                aiChatTitleService,
+                chatStreamCancellationManager,
+                chatSseEventFactory);
         injectResource("globalSystemTemplate",      "global system prompt");
         injectResource("noteSystemTemplate",        "note system prompt");
         injectResource("branchAliasSystemTemplate", "branch alias system prompt");
@@ -154,7 +163,7 @@ class AiChatServiceTest {
                     .thenReturn(Optional.empty());
 
             BusinessException ex = assertThrows(BusinessException.class, () ->
-                    service.regenerateReply(USER_ID, SESSION_UUID, USER_MSG_UUID).blockFirst());
+                    service.regenerateReply(USER_ID, SESSION_UUID, USER_MSG_UUID, "req-1").blockFirst());
 
             assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
         }
@@ -167,7 +176,7 @@ class AiChatServiceTest {
                     .thenReturn(Optional.empty());
 
             BusinessException ex = assertThrows(BusinessException.class, () ->
-                    service.regenerateReply(USER_ID, SESSION_UUID, USER_MSG_UUID).blockFirst());
+                    service.regenerateReply(USER_ID, SESSION_UUID, USER_MSG_UUID, "req-2").blockFirst());
 
             assertEquals(HttpStatus.NOT_FOUND, ex.getStatus());
         }
@@ -182,7 +191,7 @@ class AiChatServiceTest {
                     .thenReturn(Optional.of(orphan));
 
             BusinessException ex = assertThrows(BusinessException.class, () ->
-                    service.regenerateReply(USER_ID, SESSION_UUID, ASSISTANT_MSG_UUID).blockFirst());
+                    service.regenerateReply(USER_ID, SESSION_UUID, ASSISTANT_MSG_UUID, "req-3").blockFirst());
 
             assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
         }

@@ -115,6 +115,7 @@ class ChatService {
     String content, {
     List<String> attachmentUuids = const [],
     String? parentUuid,
+    String? requestId,
     CancelToken? cancelToken,
   }) {
     PMlog.d(_tag, '发送消息: sessionUuid=$sessionUuid');
@@ -123,6 +124,7 @@ class ChatService {
       content,
       attachmentUuids: attachmentUuids,
       parentUuid: parentUuid,
+      requestId: requestId,
       cancelToken: cancelToken,
     );
   }
@@ -149,14 +151,21 @@ class ChatService {
   Stream<ChatStreamEvent> streamRegenerate(
     String sessionUuid,
     String messageUuid, {
+    String? requestId,
     CancelToken? cancelToken,
   }) {
     PMlog.d(_tag, '重新生成: sessionUuid=$sessionUuid, messageUuid=$messageUuid');
     return _apiService.streamRegenerate(
       sessionUuid,
       messageUuid,
+      requestId: requestId,
       cancelToken: cancelToken,
     );
+  }
+
+  /// 停止当前 requestId 对应的流式回复。
+  Future<void> stopStream(String sessionUuid, String requestId) {
+    return _apiService.stopStream(sessionUuid, requestId);
   }
 
   /// 对消息评分（1=点赞, 0=取消, -1=点踩），同步到服务端并更新本地缓存。

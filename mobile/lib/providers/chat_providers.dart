@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:math';
+
+import 'package:dio/dio.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:pocketmind/api/chat_api_service.dart';
 import 'package:pocketmind/api/models/chat_models.dart';
@@ -113,8 +117,72 @@ sealed class ChatSendState with _$ChatSendState {
 class ChatSend extends _$ChatSend {
   static const String _tag = 'ChatSend';
 
+  CancelToken? _activeCancelToken;
+  String? _activeRequestId;
+
   @override
-  ChatSendState build(String sessionUuid) => const ChatSendState.idle();
+  ChatSendState build(String sessionUuid) {
+    ref.onDispose(() {
+      _activeCancelToken?.cancel('provider disposed');
+      _cleanupActiveRequest();
+    });
+    return const ChatSendState.idle();
+  }
+
+  String _newRequestId() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final b = bytes;
+    String hex(int start, int end) => b
+        .sublist(start, end)
+        .map((value) => value.toRadixString(16).padLeft(2, '0'))
+        .join();
+    return '${hex(0, 4)}-${hex(4, 6)}-${hex(6, 8)}-${hex(8, 10)}-${hex(10, 16)}';
+  }
+
+  void _startStreaming({required String pendingUserMessage}) {
+    _activeCancelToken?.cancel('replace request');
+    _activeCancelToken = CancelToken();
+    _activeRequestId = _newRequestId();
+    state = ChatSendState.streaming(
+      content: '',
+      pendingUserMessage: pendingUserMessage,
+    );
+  }
+
+  bool _matchRequest(String expectedRequestId, String? eventRequestId) {
+    if (eventRequestId == null || eventRequestId.isEmpty) {
+      return true;
+    }
+    return eventRequestId == expectedRequestId;
+  }
+
+  void _cleanupActiveRequest() {
+    _activeCancelToken = null;
+    _activeRequestId = null;
+  }
+
+  Future<void> _handleTerminalEvent({
+    required ChatService service,
+    required String requestId,
+    required String? eventRequestId,
+    required bool inBranch,
+    String? messageUuid,
+  }) async {
+    if (!_matchRequest(requestId, eventRequestId)) {
+      return;
+    }
+
+    if (inBranch && messageUuid != null) {
+      await service.syncMessages(sessionUuid, leafUuid: messageUuid);
+      await service.updateActiveLeaf(sessionUuid, messageUuid);
+    } else {
+      await service.syncMessages(sessionUuid);
+    }
+    state = const ChatSendState.idle();
+  }
 
   /// 进入聊天页面时调用，从服务端拉取历史消息同步到本地。
   Future<void> initSession() async {
@@ -149,10 +217,9 @@ class ChatSend extends _$ChatSend {
     bool showPendingBubble = true,
   }) async {
     if (state is ChatSendStreaming) return;
-    state = ChatSendState.streaming(
-      content: '',
-      pendingUserMessage: showPendingBubble ? content : '',
-    );
+    _startStreaming(pendingUserMessage: showPendingBubble ? content : '');
+    final requestId = _activeRequestId!;
+    final cancelToken = _activeCancelToken;
 
     final service = ref.read(chatServiceProvider);
     final buffer = StringBuffer();
@@ -168,6 +235,8 @@ class ChatSend extends _$ChatSend {
         content,
         attachmentUuids: attachmentUuids,
         parentUuid: parentUuid,
+        requestId: requestId,
+        cancelToken: cancelToken,
       )) {
         switch (event) {
           case ChatDeltaEvent(:final delta):
@@ -176,15 +245,28 @@ class ChatSend extends _$ChatSend {
               content: buffer.toString(),
               pendingUserMessage: showPendingBubble ? content : '',
             );
-          case ChatDoneEvent(:final messageUuid):
-            if (parentUuid != null) {
-              // 分支创建完成：同步新叶子链路，切换视图到新 ASSISTANT 消息
-              await service.syncMessages(sessionUuid, leafUuid: messageUuid);
-              await service.updateActiveLeaf(sessionUuid, messageUuid);
-            } else {
-              await service.syncMessages(sessionUuid);
-            }
-            state = const ChatSendState.idle();
+          case ChatDoneEvent(
+            :final messageUuid,
+            requestId: final eventRequestId,
+          ):
+            await _handleTerminalEvent(
+              service: service,
+              requestId: requestId,
+              eventRequestId: eventRequestId,
+              inBranch: parentUuid != null,
+              messageUuid: messageUuid,
+            );
+          case ChatPausedEvent(
+            requestId: final eventRequestId,
+            messageUuid: final pausedMessageUuid,
+          ):
+            await _handleTerminalEvent(
+              service: service,
+              requestId: requestId,
+              eventRequestId: eventRequestId,
+              inBranch: parentUuid != null,
+              messageUuid: pausedMessageUuid,
+            );
           case ChatTitleUpdateEvent(:final title):
             await service.updateSessionTitleLocal(sessionUuid, title);
           case ChatErrorEvent(:final message):
@@ -193,8 +275,18 @@ class ChatSend extends _$ChatSend {
         }
       }
     } catch (e) {
+      if (cancelToken?.isCancelled == true) {
+        if (state is ChatSendStreaming) {
+          state = const ChatSendState.idle();
+        }
+        return;
+      }
       PMlog.e(_tag, '发送消息异常: $e');
       state = ChatSendState.error(message: e.toString());
+    } finally {
+      if (_activeRequestId == requestId) {
+        _cleanupActiveRequest();
+      }
     }
   }
 
@@ -226,12 +318,16 @@ class ChatSend extends _$ChatSend {
     }
 
     // 对原 USER 消息直接调用重新生成（后端识别 USER UUID，不再创建新资源）
-    state = const ChatSendState.streaming(content: '', pendingUserMessage: '');
+    _startStreaming(pendingUserMessage: '');
+    final requestId = _activeRequestId!;
+    final cancelToken = _activeCancelToken;
     final buffer = StringBuffer();
     try {
       await for (final event in service.streamRegenerate(
         sessionUuid,
         messageUuid,
+        requestId: requestId,
+        cancelToken: cancelToken,
       )) {
         switch (event) {
           case ChatDeltaEvent(:final delta):
@@ -240,14 +336,28 @@ class ChatSend extends _$ChatSend {
               content: buffer.toString(),
               pendingUserMessage: '',
             );
-          case ChatDoneEvent(:final messageUuid):
-            if (wasInBranch) {
-              await service.syncMessages(sessionUuid, leafUuid: messageUuid);
-              await service.updateActiveLeaf(sessionUuid, messageUuid);
-            } else {
-              await service.syncMessages(sessionUuid);
-            }
-            state = const ChatSendState.idle();
+          case ChatDoneEvent(
+            :final messageUuid,
+            requestId: final eventRequestId,
+          ):
+            await _handleTerminalEvent(
+              service: service,
+              requestId: requestId,
+              eventRequestId: eventRequestId,
+              inBranch: wasInBranch,
+              messageUuid: messageUuid,
+            );
+          case ChatPausedEvent(
+            requestId: final eventRequestId,
+            messageUuid: final pausedMessageUuid,
+          ):
+            await _handleTerminalEvent(
+              service: service,
+              requestId: requestId,
+              eventRequestId: eventRequestId,
+              inBranch: wasInBranch,
+              messageUuid: pausedMessageUuid,
+            );
           case ChatTitleUpdateEvent(:final title):
             await service.updateSessionTitleLocal(sessionUuid, title);
           case ChatErrorEvent(:final message):
@@ -256,8 +366,18 @@ class ChatSend extends _$ChatSend {
         }
       }
     } catch (e) {
+      if (cancelToken?.isCancelled == true) {
+        if (state is ChatSendStreaming) {
+          state = const ChatSendState.idle();
+        }
+        return;
+      }
       PMlog.e(_tag, '编辑重发异常: $e');
       state = ChatSendState.error(message: e.toString());
+    } finally {
+      if (_activeRequestId == requestId) {
+        _cleanupActiveRequest();
+      }
     }
   }
 
@@ -284,7 +404,9 @@ class ChatSend extends _$ChatSend {
     // 本地立即删除旧 AI 消息，使气泡即刻从 UI 消失
     await messageRepo.softDeleteByUuids([assistantMessageUuid]);
 
-    state = const ChatSendState.streaming(content: '', pendingUserMessage: '');
+    _startStreaming(pendingUserMessage: '');
+    final requestId = _activeRequestId!;
+    final cancelToken = _activeCancelToken;
     final service = ref.read(chatServiceProvider);
     final buffer = StringBuffer();
 
@@ -292,6 +414,8 @@ class ChatSend extends _$ChatSend {
       await for (final event in service.streamRegenerate(
         sessionUuid,
         assistantMessageUuid,
+        requestId: requestId,
+        cancelToken: cancelToken,
       )) {
         switch (event) {
           case ChatDeltaEvent(:final delta):
@@ -300,15 +424,28 @@ class ChatSend extends _$ChatSend {
               content: buffer.toString(),
               pendingUserMessage: '',
             );
-          case ChatDoneEvent(:final messageUuid):
-            if (wasInBranch) {
-              // 分支模式：同步新叶子链路，再切换激活节点
-              await service.syncMessages(sessionUuid, leafUuid: messageUuid);
-              await service.updateActiveLeaf(sessionUuid, messageUuid);
-            } else {
-              await service.syncMessages(sessionUuid);
-            }
-            state = const ChatSendState.idle();
+          case ChatDoneEvent(
+            :final messageUuid,
+            requestId: final eventRequestId,
+          ):
+            await _handleTerminalEvent(
+              service: service,
+              requestId: requestId,
+              eventRequestId: eventRequestId,
+              inBranch: wasInBranch,
+              messageUuid: messageUuid,
+            );
+          case ChatPausedEvent(
+            requestId: final eventRequestId,
+            messageUuid: final pausedMessageUuid,
+          ):
+            await _handleTerminalEvent(
+              service: service,
+              requestId: requestId,
+              eventRequestId: eventRequestId,
+              inBranch: wasInBranch,
+              messageUuid: pausedMessageUuid,
+            );
           case ChatTitleUpdateEvent(:final title):
             await service.updateSessionTitleLocal(sessionUuid, title);
           case ChatErrorEvent(:final message):
@@ -317,8 +454,39 @@ class ChatSend extends _$ChatSend {
         }
       }
     } catch (e) {
+      if (cancelToken?.isCancelled == true) {
+        if (state is ChatSendStreaming) {
+          state = const ChatSendState.idle();
+        }
+        return;
+      }
       PMlog.e(_tag, '重新生成异常: $e');
       state = ChatSendState.error(message: e.toString());
+    } finally {
+      if (_activeRequestId == requestId) {
+        _cleanupActiveRequest();
+      }
+    }
+  }
+
+  /// 暂停当前流式回复。
+  Future<void> stop() async {
+    if (state is! ChatSendStreaming) return;
+    final requestId = _activeRequestId;
+    if (requestId == null || requestId.isEmpty) {
+      state = const ChatSendState.idle();
+      _cleanupActiveRequest();
+      return;
+    }
+
+    await _notifyStop(requestId);
+  }
+
+  Future<void> _notifyStop(String requestId) async {
+    try {
+      await ref.read(chatServiceProvider).stopStream(sessionUuid, requestId);
+    } catch (e) {
+      PMlog.w(_tag, '通知服务端暂停失败: $e');
     }
   }
 

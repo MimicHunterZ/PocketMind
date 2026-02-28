@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * AI 对话流式应用服务。
@@ -50,6 +51,8 @@ public class AiChatService {
     private final NoteRepository noteRepository;
     private final AttachmentVisionMapper attachmentVisionMapper;
     private final AiChatTitleService aiChatTitleService;
+    private final ChatStreamCancellationManager chatStreamCancellationManager;
+    private final ChatSseEventFactory chatSseEventFactory;
 
     @Value("classpath:prompts/chat/global_system.md")
     private Resource globalSystemTemplate;
@@ -69,13 +72,17 @@ public class AiChatService {
             ChatMessageRepository chatMessageRepository,
             NoteRepository noteRepository,
             AttachmentVisionMapper attachmentVisionMapper,
-            AiChatTitleService aiChatTitleService) {
+            AiChatTitleService aiChatTitleService,
+            ChatStreamCancellationManager chatStreamCancellationManager,
+            ChatSseEventFactory chatSseEventFactory) {
         this.aiFailoverRouter = aiFailoverRouter;
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.noteRepository = noteRepository;
         this.attachmentVisionMapper = attachmentVisionMapper;
         this.aiChatTitleService = aiChatTitleService;
+        this.chatStreamCancellationManager = chatStreamCancellationManager;
+        this.chatSseEventFactory = chatSseEventFactory;
     }
 
     
@@ -154,8 +161,9 @@ public class AiChatService {
                                                       UUID sessionUuid,
                                                       String userPrompt,
                                                       List<UUID> attachmentUuids,
-                                                      UUID parentUuid) {
-        // 1. 校验 session 归属（同步，在 MVC 线程执行）
+                                                      UUID parentUuid,
+                                                      String requestId) {
+        // 1. 校验 session 归属
         ChatSessionEntity session = chatSessionRepository.findByUuidAndUserId(sessionUuid, userId)
                 .orElseThrow(() -> new BusinessException(
                         ApiCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, "sessionUuid=" + sessionUuid));
@@ -197,7 +205,7 @@ public class AiChatService {
 
         // 7. 流式调用 AI
         return buildAndStream(userId, sessionUuid, userMsgUuid,
-            userPrompt, systemText, historyMessages, isFork, shouldGenerateSessionTitle);
+            userPrompt, systemText, historyMessages, isFork, shouldGenerateSessionTitle, requestId);
     }
 
     /**
@@ -207,7 +215,7 @@ public class AiChatService {
                                                       UUID sessionUuid,
                                                       String userPrompt,
                                                       List<UUID> attachmentUuids) {
-        return streamReply(userId, sessionUuid, userPrompt, attachmentUuids, null);
+        return streamReply(userId, sessionUuid, userPrompt, attachmentUuids, null, UUID.randomUUID().toString());
     }
 
     
@@ -249,7 +257,8 @@ public class AiChatService {
      */
     public Flux<ServerSentEvent<String>> regenerateReply(long userId,
                                                           UUID sessionUuid,
-                                                          UUID messageUuid) {
+                                                          UUID messageUuid,
+                                                          String requestId) {
         ChatSessionEntity session = chatSessionRepository.findByUuidAndUserId(sessionUuid, userId)
                 .orElseThrow(() -> new BusinessException(
                         ApiCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, "sessionUuid=" + sessionUuid));
@@ -289,7 +298,21 @@ public class AiChatService {
         List<Message> historyMessages = toSpringAiMessages(history);
 
         return buildAndStream(userId, sessionUuid, userMsg.getUuid(),
-            userMsg.getContent(), systemText, historyMessages, false, false);
+            userMsg.getContent(), systemText, historyMessages, false, false, requestId);
+    }
+
+    /**
+     * 停止指定 requestId 的流式回复。
+     */
+    public void stopReply(long userId, UUID sessionUuid, String requestId) {
+        validateAndGetSession(sessionUuid, userId);
+        String streamKey = chatStreamCancellationManager.buildKey(userId, sessionUuid, requestId);
+        boolean cancelled = chatStreamCancellationManager.cancel(streamKey, "user_stop");
+        if (cancelled) {
+            log.info("停止流式回复: userId={}, sessionUuid={}, requestId={}", userId, sessionUuid, requestId);
+        } else {
+            log.info("停止流式回复请求未命中活动流: userId={}, sessionUuid={}, requestId={}", userId, sessionUuid, requestId);
+        }
     }
 
     
@@ -363,7 +386,6 @@ public class AiChatService {
 
     /**
      * 流式调用 AI 并落库 ASSISTANT 消息的核心逻辑。
-     * 由 streamReply 和 regenerateReply 共用。
      */
     private Flux<ServerSentEvent<String>> buildAndStream(long userId,
                                                           UUID sessionUuid,
@@ -372,9 +394,63 @@ public class AiChatService {
                                                           String systemText,
                                                           List<Message> historyMessages,
                                                           boolean isFork,
-                                                          boolean shouldGenerateSessionTitle) {
+                                                          boolean shouldGenerateSessionTitle,
+                                                          String requestId) {
+        String effectiveRequestId = (requestId == null || requestId.isBlank())
+                ? UUID.randomUUID().toString()
+                : requestId;
+        String streamKey = chatStreamCancellationManager.buildKey(userId, sessionUuid, effectiveRequestId);
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        Mono<Void> cancelSignal = chatStreamCancellationManager.listenCancel(streamKey)
+                .doOnNext(reason -> {
+                    cancelled.set(true);
+                    log.info("检测到流式回复取消信号: userId={}, sessionUuid={}, requestId={}, reason={}",
+                            userId, sessionUuid, effectiveRequestId, reason);
+                })
+                .then();
+
         StringBuilder accumulator = new StringBuilder();
-        Flux<String> contentFlux = aiFailoverRouter.executeChatStream(
+        Flux<String> contentFlux = buildContentFlux(systemText, historyMessages, userPrompt);
+
+        Mono<ServerSentEvent<String>> terminalEvent = Mono.fromCallable(() -> {
+            if (cancelled.get()) {
+                return handlePausedTerminal(userId, sessionUuid, userMsgUuid, accumulator, effectiveRequestId);
+            }
+            return handleDoneTerminal(
+                    userId,
+                    sessionUuid,
+                    userMsgUuid,
+                    userPrompt,
+                    historyMessages,
+                    isFork,
+                    shouldGenerateSessionTitle,
+                    accumulator,
+                    effectiveRequestId
+            );
+        }).subscribeOn(Schedulers.boundedElastic());
+
+        return contentFlux
+                .takeUntilOther(cancelSignal)
+                .map(delta -> {
+                    accumulator.append(delta);
+                    return chatSseEventFactory.delta(delta);
+                })
+                .concatWith(terminalEvent)
+                .onErrorResume(e -> {
+                    if (cancelled.get()) {
+                        return Flux.just(chatSseEventFactory.paused(effectiveRequestId, null));
+                    }
+                    log.error("AI 流式回复异常: userId={}, sessionUuid={}", userId, sessionUuid, e);
+                    String safeMsg = e.getMessage() != null ? e.getMessage() : "AI 服务异常";
+                    return Flux.just(chatSseEventFactory.error(safeMsg));
+                })
+                .doFinally(signalType -> chatStreamCancellationManager.cleanup(streamKey));
+    }
+
+    private Flux<String> buildContentFlux(String systemText,
+                                          List<Message> historyMessages,
+                                          String userPrompt) {
+        return aiFailoverRouter.executeChatStream(
                 "streamReply",
                 client -> client.prompt()
                         .system(systemText)
@@ -383,57 +459,65 @@ public class AiChatService {
                         .stream()
                         .content()
         );
+    }
 
-        return contentFlux
-                .map(delta -> {
-                    accumulator.append(delta);
-                    return ServerSentEvent.<String>builder()
-                            .event("delta")
-                            .data(delta)
-                            .build();
-                })
-                .concatWith(
-                        Mono.<ServerSentEvent<String>>fromCallable(() -> {
-                            String fullContent = accumulator.toString();
-                            UUID assistantMsgUuid = UUID.randomUUID();
-                            ChatMessageEntity assistantMsg = ChatMessageEntity.create(
-                                    assistantMsgUuid, userId, sessionUuid,
-                                    userMsgUuid, ChatRole.ASSISTANT,
-                                    fullContent, List.of());
-                            chatMessageRepository.save(assistantMsg);
+    private ServerSentEvent<String> handlePausedTerminal(long userId,
+                                                          UUID sessionUuid,
+                                                          UUID userMsgUuid,
+                                                          StringBuilder accumulator,
+                                                          String requestId) {
+        String partialContent = accumulator.toString();
+        UUID pausedMessageUuid = null;
+        if (!partialContent.isBlank()) {
+            pausedMessageUuid = persistAssistant(userId, sessionUuid, userMsgUuid, partialContent);
+            log.info("AI 流式回复暂停并保存部分内容: userId={}, sessionUuid={}, assistantMsgUuid={}",
+                    userId, sessionUuid, pausedMessageUuid);
+        } else {
+            log.info("AI 流式回复暂停（无可保存增量）: userId={}, sessionUuid={}", userId, sessionUuid);
+        }
+        return chatSseEventFactory.paused(requestId, pausedMessageUuid);
+    }
 
-                            log.info("AI 流式回复完成: userId={}, sessionUuid={}, assistantMsgUuid={}",
-                                    userId, sessionUuid, assistantMsgUuid);
+    private ServerSentEvent<String> handleDoneTerminal(long userId,
+                                                        UUID sessionUuid,
+                                                        UUID userMsgUuid,
+                                                        String userPrompt,
+                                                        List<Message> historyMessages,
+                                                        boolean isFork,
+                                                        boolean shouldGenerateSessionTitle,
+                                                        StringBuilder accumulator,
+                                                        String requestId) {
+        String fullContent = accumulator.toString();
+        UUID assistantMsgUuid = persistAssistant(userId, sessionUuid, userMsgUuid, fullContent);
 
-                            if (shouldGenerateSessionTitle) {
-                                aiChatTitleService.generateAndPublishTitleAsync(
-                                        userId,
-                                        sessionUuid,
-                                        userPrompt
-                                );
-                            }
+        log.info("AI 流式回复完成: userId={}, sessionUuid={}, assistantMsgUuid={}",
+                userId, sessionUuid, assistantMsgUuid);
 
-                            // 若产生了分叉，异步生成 branchAlias
-                            if (isFork) {
-                                generateBranchAliasAsync(userId, assistantMsgUuid, userMsgUuid, historyMessages, userPrompt);
-                            }
+        if (shouldGenerateSessionTitle) {
+            aiChatTitleService.generateAndPublishTitleAsync(userId, sessionUuid, userPrompt);
+        }
+        if (isFork) {
+            generateBranchAliasAsync(userId, assistantMsgUuid, userMsgUuid, historyMessages, userPrompt);
+        }
 
-                            return ServerSentEvent.<String>builder()
-                                    .event("done")
-                                    .data("{\"messageUuid\":\"" + assistantMsgUuid + "\"}")
-                                    .build();
-                        }).subscribeOn(Schedulers.boundedElastic())
-                )
-                .onErrorResume(e -> {
-                    log.error("AI 流式回复异常: userId={}, sessionUuid={}", userId, sessionUuid, e);
-                    String safeMsg = e.getMessage() != null
-                            ? e.getMessage().replace("\"", "'")
-                            : "AI 服务异常";
-                    return Flux.just(ServerSentEvent.<String>builder()
-                            .event("error")
-                            .data("{\"message\":\"" + safeMsg + "\"}")
-                            .build());
-                });
+        return chatSseEventFactory.done(requestId, assistantMsgUuid);
+    }
+
+    private UUID persistAssistant(long userId,
+                                  UUID sessionUuid,
+                                  UUID userMsgUuid,
+                                  String content) {
+        UUID assistantMsgUuid = UUID.randomUUID();
+        ChatMessageEntity assistantMsg = ChatMessageEntity.create(
+                assistantMsgUuid,
+                userId,
+                sessionUuid,
+                userMsgUuid,
+                ChatRole.ASSISTANT,
+                content,
+                List.of());
+        chatMessageRepository.save(assistantMsg);
+        return assistantMsgUuid;
     }
 
     /**
