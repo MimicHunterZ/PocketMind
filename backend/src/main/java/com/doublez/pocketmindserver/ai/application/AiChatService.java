@@ -25,6 +25,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -217,6 +218,7 @@ public class AiChatService {
      * 使用两次 SQL 完成：updateContent（含隐式 USER 角色校验）、softDeleteAssistantChildren。
      * 调用方（Controller）收到请求后，应随即触发一次 streamReply 以重新生成 AI 回复。
      */
+    @Transactional(rollbackFor = Exception.class)
     public void editUserMessage(long userId, UUID messageUuid, String newContent) {
         // 校验：仅允许编辑当前分支末尾的 USER 消息，防止孤立下游对话链
         List<ChatMessageEntity> assistantChildren =
