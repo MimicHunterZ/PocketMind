@@ -50,6 +50,16 @@ public class ChatSseEventFactory {
         return event("error", Map.of("message", message));
     }
 
+    /**
+     * 构建带 requestId 的错误事件，便于前端关联请求上下文。
+     */
+    public ServerSentEvent<String> error(String requestId, String message) {
+        return event("error", Map.of(
+                "requestId", requestId,
+                "message", message
+        ));
+    }
+
     public ServerSentEvent<String> event(String eventName, Map<String, Object> payload) {
         return ServerSentEvent.<String>builder()
                 .event(eventName)

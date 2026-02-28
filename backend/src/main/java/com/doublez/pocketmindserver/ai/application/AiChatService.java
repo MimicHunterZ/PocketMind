@@ -422,7 +422,7 @@ public class AiChatService {
                     }
                     log.error("AI 流式回复异常: userId={}, sessionUuid={}", userId, sessionUuid, e);
                     String safeMsg = e.getMessage() != null ? e.getMessage() : "AI 服务异常";
-                    return Flux.just(chatSseEventFactory.error(safeMsg));
+                    return Flux.just(chatSseEventFactory.error(effectiveRequestId, safeMsg));
                 })
                 .doFinally(signalType -> chatStreamCancellationManager.cleanup(streamKey));
     }
