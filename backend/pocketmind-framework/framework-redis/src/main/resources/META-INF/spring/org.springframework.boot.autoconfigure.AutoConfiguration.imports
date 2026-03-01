@@ -1,0 +1,3 @@
+com.doublez.pocketmind.framework.redis.config.PocketmindRedisConfig
+com.doublez.pocketmind.framework.redis.config.RedisServiceAutoConfiguration
+com.doublez.pocketmind.framework.redis.config.RedissonLockAutoConfiguration

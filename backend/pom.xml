@@ -14,6 +14,7 @@
     <modules>
         <module>pocketmind-common</module>
         <module>pocketmind-server</module>
+        <module>pocketmind-framework</module>
     </modules>
 
     <properties>
