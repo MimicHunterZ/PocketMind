@@ -1,9 +1,9 @@
 package com.doublez.pocketmindserver.mq;
 
+import com.doublez.pocketmind.framework.rabbitmq.core.RabbitMessageProducer;
 import com.doublez.pocketmindserver.mq.event.VisionJobMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -19,7 +19,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class VisionMessagePublisher {
 
-    private final RabbitTemplate rabbitTemplate;
+    private final RabbitMessageProducer rabbitMessageProducer;
 
     /**
      * 投递图片识别任务。
@@ -29,7 +29,7 @@ public class VisionMessagePublisher {
      */
     public void publishVisionTask(UUID attachmentUuid, long userId) {
         VisionJobMessage message = new VisionJobMessage(attachmentUuid, userId);
-        rabbitTemplate.convertAndSend(
+        rabbitMessageProducer.send(
                 VisionMqConstants.VISION_EXCHANGE,
                 VisionMqConstants.VISION_ROUTING_KEY,
                 message

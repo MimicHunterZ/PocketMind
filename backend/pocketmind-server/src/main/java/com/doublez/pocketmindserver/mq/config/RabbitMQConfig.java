@@ -6,7 +6,6 @@ import com.doublez.pocketmindserver.mq.VisionMqConstants;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
@@ -86,21 +85,11 @@ public class RabbitMQConfig {
 
     // 公共基础设施
 
-    @Bean
-    public MessageConverter messageConverter() {
-        return new JacksonJsonMessageConverter();
-    }
-
-    @Bean
-    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
-        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
-        rabbitTemplate.setMessageConverter(messageConverter());
-        return rabbitTemplate;
-    }
-
     // Crawler Recoverer + ContainerFactory (@Primary)
     @Bean
-    public RepublishMessageRecoverer crawlerRepublishRecoverer(RabbitTemplate rabbitTemplate) {
+    public RepublishMessageRecoverer crawlerRepublishRecoverer(
+            @Qualifier("pocketmindRabbitTemplate") RabbitTemplate rabbitTemplate
+    ) {
         return new RepublishMessageRecoverer(
                 rabbitTemplate,
                 CrawlerMqConstants.CRAWLER_DLQ_EXCHANGE,
@@ -116,7 +105,7 @@ public class RabbitMQConfig {
     @Primary
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
             ConnectionFactory connectionFactory,
-            MessageConverter messageConverter,
+            @Qualifier("pocketmindRabbitMessageConverter") MessageConverter messageConverter,
             @Qualifier("crawlerRepublishRecoverer") RepublishMessageRecoverer crawlerRepublishRecoverer
     ) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
@@ -135,7 +124,9 @@ public class RabbitMQConfig {
 
     // Vision Recoverer + ContainerFactory
     @Bean
-    public RepublishMessageRecoverer visionRepublishRecoverer(RabbitTemplate rabbitTemplate) {
+    public RepublishMessageRecoverer visionRepublishRecoverer(
+            @Qualifier("pocketmindRabbitTemplate") RabbitTemplate rabbitTemplate
+    ) {
         return new RepublishMessageRecoverer(
                 rabbitTemplate,
                 VisionMqConstants.VISION_DLQ_EXCHANGE,
@@ -154,7 +145,7 @@ public class RabbitMQConfig {
     @Bean(VisionMqConstants.VISION_CONTAINER_FACTORY)
     public SimpleRabbitListenerContainerFactory visionContainerFactory(
             ConnectionFactory connectionFactory,
-            MessageConverter messageConverter,
+            @Qualifier("pocketmindRabbitMessageConverter") MessageConverter messageConverter,
             @Qualifier("visionRepublishRecoverer") RepublishMessageRecoverer visionRepublishRecoverer
     ) {
         // 虚拟线程执行器：每个消息独占一个轻量级虚拟线程

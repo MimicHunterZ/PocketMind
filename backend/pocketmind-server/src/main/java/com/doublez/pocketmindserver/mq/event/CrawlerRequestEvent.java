@@ -1,6 +1,5 @@
 package com.doublez.pocketmindserver.mq.event;
 
-import java.io.Serializable;
 import java.util.UUID;
 
 public record CrawlerRequestEvent(
@@ -8,4 +7,4 @@ public record CrawlerRequestEvent(
         String url,
         String userId,
         String userQuestion
-) implements Serializable {}
+) {}
