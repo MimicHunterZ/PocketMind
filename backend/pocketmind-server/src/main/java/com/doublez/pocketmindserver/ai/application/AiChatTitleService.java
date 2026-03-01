@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * 鑱婂ぉ鏍囬鐢熸垚鏈嶅姟銆?
+ * 聊天标题生成服务。
  */
 @Slf4j
 @Service
@@ -42,7 +42,7 @@ public class AiChatTitleService {
     }
 
     /**
-     * 鍚屾鐢熸垚骞舵洿鏂颁細璇濇爣棰樸€?
+        * 同步生成并更新会话标题。
      */
     public String generateAndUpdateTitle(long userId,
                                          UUID sessionUuid,
@@ -54,27 +54,27 @@ public class AiChatTitleService {
                         "sessionUuid=" + sessionUuid
                 ));
 
-                String title;
-                try {
-                        title = generateTitle(userPrompt);
-                } catch (Exception e) {
-                        log.warn("浼氳瘽鏍囬鐢熸垚澶辫触: userId={}, sessionUuid={}, error={}", userId, sessionUuid, e.getMessage());
-                        throw new BusinessException(
-                                        ApiCode.INTERNAL_ERROR,
-                                        HttpStatus.INTERNAL_SERVER_ERROR,
-                                        "鏍囬鐢熸垚澶辫触"
-                        );
-                }
+        String title;
+        try {
+            title = generateTitle(userPrompt);
+        } catch (Exception e) {
+            log.warn("会话标题生成失败: userId={}, sessionUuid={}, error={}", userId, sessionUuid, e.getMessage());
+            throw new BusinessException(
+                    ApiCode.INTERNAL_ERROR,
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "标题生成失败"
+            );
+        }
         if (title == null || title.isBlank()) {
             throw new BusinessException(
                     ApiCode.REQ_VALIDATION,
                     HttpStatus.UNPROCESSABLE_ENTITY,
-                                        "标题生成失败，content 无有效语义"
+                    "标题生成失败，content 无有效语义"
             );
         }
 
         chatSessionRepository.updateTitleByUuidAndUserId(sessionUuid, userId, title);
-        log.info("浼氳瘽鏍囬鐢熸垚瀹屾垚: userId={}, sessionUuid={}, oldTitle={}, newTitle={}",
+        log.info("会话标题生成完成: userId={}, sessionUuid={}, oldTitle={}, newTitle={}",
                 userId, sessionUuid, session.getTitle(), title);
         return title;
     }

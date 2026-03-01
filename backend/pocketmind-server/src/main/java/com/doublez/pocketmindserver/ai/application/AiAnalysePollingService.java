@@ -30,7 +30,7 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 
 /**
- * AI 鍒嗘瀽锛堣疆璇㈡ā寮忥級搴旂敤鏈嶅姟銆?
+ * AI 分析（轮询模式）应用服务。
  */
 @Slf4j
 @Service
@@ -70,14 +70,14 @@ public class AiAnalysePollingService {
     }
 
     /**
-     * 绗竴闃舵锛氬彈鐞嗚姹傦紙鍐欏簱 + 蹇矾寰勮Е鍙?AI / 鎱㈣矾寰勬姇閫掓姄鍙?MQ锛夈€?
-     * 骞傜瓑璁捐锛氱瑪璁板凡瀛樺湪鏃舵墽琛?update锛屼笉瀛樺湪鏃舵墽琛?insert锛涢伩鍏嶉噸澶嶆彁浜よ繑鍥?500銆?
+        * 第一阶段：受理请求（写库 + 快路径触发 AI / 慢路径投递抓取 MQ）。
+        * 幂等设计：笔记已存在时执行 update，不存在时执行 insert，避免重复提交返回 500。
      */
     public void accept(String userIdStr, AiAnalyseAcceptRequest request) {
         Objects.requireNonNull(request, "request");
         long userId = parseUserId(userIdStr);
 
-        // 骞傜瓑锛氬厛鏌ヨ锛屽瓨鍦ㄥ垯鏇存柊锛屼笉瀛樺湪鎵嶆柊寤?
+        // 幂等：先查询，存在则更新，不存在才新建
         Optional<NoteEntity> existingOpt = noteRepository.findByUuidAndUserId(request.uuid(), userId);
         NoteEntity note;
         if (existingOpt.isPresent()) {
@@ -88,7 +88,7 @@ public class AiAnalysePollingService {
                 note.completeFetch(request.previewTitle(), request.previewDescription(), request.previewContent());
             }
             noteRepository.update(note);
-            log.info("绗旇宸插瓨鍦紝鎵ц update: uuid={}", request.uuid());
+            log.info("笔记已存在，执行 update: uuid={}", request.uuid());
         } else {
             note = NoteEntity.create(request.uuid(), userId);
             note.attachSourceUrl(request.url());
@@ -116,17 +116,17 @@ public class AiAnalysePollingService {
             return;
         }
 
-        // 鎱㈣矾寰勶細鍙?MQ 鎶撳彇
+        // 慢路径：走 MQ 抓取
         crawlerProducer.sendCrawlerRequest(new CrawlerRequestEvent(
-            request.uuid(),
-            request.url(),
-            userIdStr,
-            request.userQuestion()
+                request.uuid(),
+                request.url(),
+                userIdStr,
+                request.userQuestion()
         ));
     }
 
     /**
-     * 绗簩/涓夐樁娈碉細鎶撳彇琛ュ叏鍚庢垨蹇矾寰勮Е鍙戠殑 AI 澶勭悊銆?
+        * 第二/三阶段：抓取补全后或快路径触发的 AI 处理。
      */
     public void process(String userIdStr,
                         UUID noteUuid,
@@ -166,7 +166,7 @@ public class AiAnalysePollingService {
 
         Prompt prompt;
         try {
-            // 浣跨敤 HashMap 闃叉 value 涓嚭鐜?null 瀵艰嚧搴旂敤宕╂簝
+            // 使用 HashMap 防止 value 中出现 null 导致应用崩溃
             Map<String, Object> variables = new java.util.HashMap<>();
             variables.put("url", note.getSourceUrl());
             variables.put("title", safe(title));
@@ -174,16 +174,16 @@ public class AiAnalysePollingService {
             variables.put("content", content);
             variables.put("question", safe(userQuestion));
 
-            // format: BeanOutputConverter 鐢熸垚鐨勭粨鏋勫寲杈撳嚭鏍煎紡璇存槑锛堢敤浜庢彁绀烘ā鍨嬭緭鍑?JSON锛?
+            // format: BeanOutputConverter 生成的结构化输出格式说明（用于提示模型输出 JSON）
             String format = new BeanOutputConverter<>(AiAnalysePollingResult.class).getFormat();
             variables.put("format", format);
 
             var outputConverter = new BeanOutputConverter<>(AiAnalysePollingResult.class);
             String jsonSchema = outputConverter.getJsonSchema();
-                OpenAiChatOptions options = OpenAiChatOptions.builder()
-                        .responseFormat(new ResponseFormat(ResponseFormat.Type.JSON_OBJECT,jsonSchema))
-                        .build();
-                prompt = PromptBuilder.build(systemTemplate, pollingPrompt, variables, options);
+            OpenAiChatOptions options = OpenAiChatOptions.builder()
+                .responseFormat(new ResponseFormat(ResponseFormat.Type.JSON_OBJECT, jsonSchema))
+                .build();
+            prompt = PromptBuilder.build(systemTemplate, pollingPrompt, variables, options);
         } catch (Exception e) {
             log.error("Failed to build prompt for note {}, url={}", noteUuid, note.getSourceUrl(), e);
             note.failFetch();
@@ -191,7 +191,7 @@ public class AiAnalysePollingService {
             return;
         }
 
-        //todo 杩欓噷 mcp 搴曞眰渚濊禆 json瑙ｆ瀽锛岃繖閲岀殑渚濊禆鏈夐棶棰?
+        // todo: 这里 mcp 底层依赖 json 解析，这里的依赖仍有问题待排查
 //        StructuredOutputValidationAdvisor validationAdvisor = StructuredOutputValidationAdvisor.builder()
 //                .outputType(AiAnalysePollingResult.class)
 //                .maxRepeatAttempts(Math.max(0, maxRepeatAttempts))
@@ -200,7 +200,7 @@ public class AiAnalysePollingService {
 
         AiAnalysePollingResult result;
 
-        // 鏈夐棶棰樻椂鎵嶅垱寤轰細璇濆苟鍚敤 tool 钀藉簱
+        // 有问题时才创建会话并启用 tool 落库
         AiAnalyseChatSessionService.ChatInit chatInit = null;
         if (userQuestion != null && !userQuestion.isBlank()) {
             chatInit = chatSessionService.initSessionWithUserMessage(
@@ -223,22 +223,22 @@ public class AiAnalysePollingService {
             if (chatInit != null) {
                 ChatPersistenceContextHolder.clear();
             }
-            // todo 澶辫触閲嶈瘯
+            // todo 失败重试
             log.warn("AI analyse failed, skip write: noteUuid={}, url={}, err={}",
                     noteUuid, note.getSourceUrl(), e.getClass().getSimpleName());
             return;
         }
 
-        // 鏇存柊绗旇鎽樿
+        // 更新笔记摘要
         if (result.summary() != null && !result.summary().isBlank()) {
             note.updateSummary(result.summary());
             noteRepository.update(note);
         }
 
-        // 鍐欏叆 AI 鏍囩
+        // 写入 AI 标签
         writeNoteTags(userId, note.getUuid(), result.tags());
 
-        // 钀藉簱瀵硅瘽锛坅ssistant reply锛?
+        // 落库对话（assistant reply）
         if (chatInit != null) {
             UUID parentUuid = ChatPersistenceContextHolder.getParentUuid();
             chatSessionService.saveAssistantReply(chatInit.sessionUuid(), userId, parentUuid, result.answer());
@@ -247,7 +247,7 @@ public class AiAnalysePollingService {
     }
 
     /**
-     * 灏?AI 鐢熸垚鐨勬爣绛惧啓鍏ユ暟鎹簱锛堝箓绛夛級銆?
+     * 将 AI 生成的标签写入数据库（幂等）。
      */
     private void writeNoteTags(long userId, UUID noteUuid, List<String> tags) {
         if (tags == null || tags.isEmpty()) {
@@ -261,7 +261,7 @@ public class AiAnalysePollingService {
                 var tagEntity = tagRepository.findOrCreate(userId, tagName.trim());
                 noteTagRelationMapper.insert(noteUuid, tagEntity.getId());
             } catch (Exception e) {
-                // 鏍囩鍐欏叆澶辫触涓嶅奖鍝嶄富娴佺▼
+                // 标签写入失败不影响主流程
                 log.warn("tag write failed, noteUuid={}, tag={}", noteUuid, tagName, e);
             }
         }
@@ -286,7 +286,7 @@ public class AiAnalysePollingService {
         try {
             return Long.parseLong(userId);
         } catch (NumberFormatException e) {
-            throw new BusinessException(ApiCode.AUTH_UNAUTHORIZED, HttpStatus.UNAUTHORIZED, "闈炴硶 userId");
+            throw new BusinessException(ApiCode.AUTH_UNAUTHORIZED, HttpStatus.UNAUTHORIZED, "非法 userId");
         }
     }
 

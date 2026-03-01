@@ -13,10 +13,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 /**
- * assets 鍐呭鎻愬彇缁撴灉杞鎺ュ彛銆?
+ * assets 内容提取结果轮询接口。
  *
- * 鍥剧墖涓婁紶鍚庯紝瑙嗚鍒嗘瀽锛圴isionWorker锛夊紓姝ュ啓鍏?asset_extractions 琛ㄣ€?
- * 瀹㈡埛绔€氳繃姝ゆ帴鍙ｈ疆璇?
+ * 图片上传后，视觉分析（VisionWorker）异步写入 asset_extractions 表。
+ * 客户端通过此接口轮询结果。
  */
 @Slf4j
 @RestController
@@ -28,10 +28,10 @@ public class AssetExtractionController {
 
 
     /**
-     * 鏌ヨ鎸囧畾绗旇鐨?AI 鎻愬彇缁撴灉锛堟墍鏈夌姸鎬侊級銆?
+        * 查询指定资产的 AI 提取结果（所有状态）。
      *
      * @param assetsUuid UUID
-     * @return 鎻愬彇鍐呭鍒楄〃
+        * @return 提取内容
      */
     @GetMapping("/{assetsUuid}")
     public AssetExtractionsResponse getExtractions(
@@ -46,7 +46,7 @@ public class AssetExtractionController {
         try {
             return Long.parseLong(userId);
         } catch (NumberFormatException e) {
-            throw new BusinessException(ApiCode.AUTH_UNAUTHORIZED, HttpStatus.UNAUTHORIZED, "闈炴硶 userId");
+            throw new BusinessException(ApiCode.AUTH_UNAUTHORIZED, HttpStatus.UNAUTHORIZED, "非法 userId");
         }
     }
 }

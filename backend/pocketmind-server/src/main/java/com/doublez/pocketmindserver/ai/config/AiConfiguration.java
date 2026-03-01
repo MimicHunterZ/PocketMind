@@ -41,8 +41,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * AI 妯″潡閰嶇疆
- * 閰嶇疆 ChatClient Bean 鐢ㄤ簬 AI 鏈嶅姟
+ * AI 模块配置
+ * 配置 ChatClient Bean 用于 AI 服务
  */
 @Configuration
 public class AiConfiguration {
@@ -56,7 +56,7 @@ public class AiConfiguration {
     }
 
     /**
-     * 鍚姩鏈熸牎楠岋細vision 鐨勯檷绾ч摼璺繀椤绘垚瀵归厤缃€?
+        * 启动期校验：vision 的降级链路必须成对配置。
      */
     @Bean
     public SmartInitializingSingleton aiProvidersStartupValidator(AiProvidersProperties providers) {
@@ -76,7 +76,7 @@ public class AiConfiguration {
             throw new BusinessException(
                     ApiCode.INTERNAL_ERROR,
                     HttpStatus.INTERNAL_SERVER_ERROR,
-                    "蹇呴』閰嶇疆 " + AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX + "." + AiProviderRouteKeys.CHAT_PRIMARY
+                    "必须配置 " + AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX + "." + AiProviderRouteKeys.CHAT_PRIMARY
             );
         }
 
@@ -86,16 +86,16 @@ public class AiConfiguration {
         boolean hasChatSecondary = StringUtils.hasText(chatSecondary);
         boolean hasChatFallback = StringUtils.hasText(chatFallback);
 
-        // chat 閾捐矾锛氬厑璁稿彧閰?secondary锛堜富 -> 鍓級锛屼笉寮哄埗瑕佹眰 fallback銆?
+        // chat 链路：允许只配置 secondary（主 -> 次），不强制要求 fallback。
         if (!hasChatSecondary && hasChatFallback) {
             throw new BusinessException(
                     ApiCode.INTERNAL_ERROR,
                     HttpStatus.INTERNAL_SERVER_ERROR,
-                    "chat-fallback 涓嶈兘鍗曠嫭閰嶇疆锛氳鍚屾椂閰嶇疆 chat-secondary锛屾垨浠呴厤缃?chat-secondary"
+                "chat-fallback 不能单独配置：请同时配置 chat-secondary，或仅配置 chat-secondary"
             );
         }
 
-        // 鑻ラ厤缃簡閾捐矾锛屽垯纭繚 config 鍚堟硶銆?
+        // 若配置了链路，则确保 config 合法。
         if (hasChatSecondary) {
             providers.resolveConfig(AiClientId.CHAT_SECONDARY);
             if (hasChatFallback) {
@@ -114,7 +114,7 @@ public class AiConfiguration {
             throw new BusinessException(
                     ApiCode.INTERNAL_ERROR,
                     HttpStatus.INTERNAL_SERVER_ERROR,
-                    "蹇呴』閰嶇疆 " + AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX + "." + AiProviderRouteKeys.VISION_PRIMARY
+                    "必须配置 " + AiProviderRouteKeys.PROVIDERS_ROUTES_PREFIX + "." + AiProviderRouteKeys.VISION_PRIMARY
             );
         }
 
@@ -124,16 +124,16 @@ public class AiConfiguration {
         boolean hasVisionSecondary = StringUtils.hasText(visionSecondary);
         boolean hasVisionFallback = StringUtils.hasText(visionFallback);
 
-        // 瑙嗚閾捐矾锛氬厑璁稿彧閰?secondary锛堜富 -> 鍓級锛屼笉寮哄埗瑕佹眰 fallback銆?
+        // vision 链路：允许只配置 secondary（主 -> 次），不强制要求 fallback。
         if (!hasVisionSecondary && hasVisionFallback) {
             throw new BusinessException(
                     ApiCode.INTERNAL_ERROR,
                     HttpStatus.INTERNAL_SERVER_ERROR,
-                    AiProviderRouteKeys.VISION_FALLBACK + " 涓嶈兘鍗曠嫭閰嶇疆锛氳鍚屾椂閰嶇疆 " + AiProviderRouteKeys.VISION_SECONDARY + "锛屾垨浠呴厤缃?" + AiProviderRouteKeys.VISION_SECONDARY
+                AiProviderRouteKeys.VISION_FALLBACK + " 不能单独配置：请同时配置 " + AiProviderRouteKeys.VISION_SECONDARY + "，或仅配置 " + AiProviderRouteKeys.VISION_SECONDARY
             );
         }
 
-        // 鑻ラ厤缃簡閾捐矾锛屽垯纭繚 providerKey 瀛樺湪涓?config 鍚堟硶銆?
+        // 若配置了链路，则确保 providerKey 存在且 config 合法。
         if (hasVisionSecondary) {
             providers.resolveConfig(AiClientId.VISION_SECONDARY);
             if (hasVisionFallback) {
@@ -231,14 +231,14 @@ public class AiConfiguration {
                                            RetryTemplate retryTemplate) {
         Objects.requireNonNull(config, "config");
 
-        // 浣跨敤闃诲鍨?requestFactory 鏄惧紡鎺у埗瓒呮椂锛岄伩鍏?Reactor Netty 榛樿瓒呮椂瀵艰嚧 ReadTimeout銆?
+        // 使用阻塞 requestFactory 显式控制超时，避免 Reactor Netty 默认超时导致 ReadTimeout。
         SimpleClientHttpRequestFactory baseFactory = new SimpleClientHttpRequestFactory();
         baseFactory.setConnectTimeout(httpClientProperties.connectTimeoutMs());
         baseFactory.setReadTimeout(httpClientProperties.readTimeoutMs());
         RestClient.Builder restClientBuilder = RestClient.builder()
             .requestFactory(new BufferingClientHttpRequestFactory(baseFactory));
 
-        // Langfuse HTTP body 鎹曡幏锛堜富椤圭洰鐙珛寮€鍏筹紝涓嶅奖鍝?demo锛夈€?
+        // Langfuse HTTP body 捕获（主项目独立开关，不影响 demo）。
         if (observabilityProperties != null
             && observabilityProperties.langfuse() != null
             && observabilityProperties.langfuse().enabled()
@@ -268,7 +268,7 @@ public class AiConfiguration {
         );
     }
 
-    // region ChatClient锛堝瑙掕壊锛?
+    // region ChatClient（多角色）
 
     @Bean(AiBeanNames.CHAT_PRIMARY_CLIENT)
     public ChatClient primaryChatClient(@Qualifier(AiBeanNames.CHAT_PRIMARY_MODEL) OpenAiChatModel primaryChatModel,
@@ -375,24 +375,24 @@ public class AiConfiguration {
 
         List<ToolCallback> selectedToolCallbacks = filterToolCallbacksForClient(clientId, toolCallbacks);
 
-        // 1) Langfuse 灞曠ず閫傞厤锛堜笟鍔′晶鐙珛寮€鍏筹紝绂佹浣跨敤 demo 閰嶇疆锛夈€?
+        // 1) Langfuse 展示适配（业务侧独立开关，禁止使用 demo 配置）。
         if (observabilityProperties.langfuse().enabled()) {
             builder.defaultAdvisors(new LangfuseChatObservationAdvisor(aiJsonMapper));
         }
 
-        // 2) 宸ュ叿璋冪敤锛氶粯璁?advisor锛夛紝浠ュ強鍙€夌殑 tool-result 鍓灊銆?
-        //    娉ㄦ剰锛氬彧鏈夊湪瀛樺湪 tool callback 鏃舵墠鎸傝浇 tool advisor锛岄伩鍏嶆棤宸ュ叿鍦烘櫙寮曞叆棰濆澶嶆潅搴︺€?
+        // 2) 工具调用：默认 tool advisor，以及可选的 tool-result 剪枝。
+        //    注意：只有在存在 tool callback 时才挂载 tool advisor，避免无工具场景引入额外复杂度。
         if (!selectedToolCallbacks.isEmpty()) {
             ToolCallAdvisor toolCallAdvisor = buildToolCallAdvisor(providers, toolResultContextEngineeringProperties, modelName);
             builder.defaultAdvisors(toolCallAdvisor);
         }
 
-        // 3) ChatClient 璋冭瘯鏃ュ織銆?
+        // 3) ChatClient 调试日志。
         if (observabilityProperties.chat().simpleLoggerEnabled()) {
             builder.defaultAdvisors(new SimpleLoggerAdvisor());
         }
 
-        // 4) 榛樿宸ュ叿鍥炶皟锛氬鏋滀笟鍔′晶娉ㄥ唽浜?ToolCallback锛屽垯榛樿鍚敤锛堝苟鎸夊紑鍏冲仛瑙傛祴鍖呰锛夈€?
+        // 4) 默认工具回调：如果业务侧注册 ToolCallback，则默认启用（并按开关做观测包装）。
         if (!selectedToolCallbacks.isEmpty()) {
             builder.defaultToolCallbacks(wrapToolCallbacks(selectedToolCallbacks, observabilityProperties, modelName));
         }
@@ -408,8 +408,8 @@ public class AiConfiguration {
             return List.of();
         }
 
-        // 瑙嗚涓嶆彁渚涘伐鍏凤紱瀵硅瘽鎻愪緵 Skills/FileSystem/Shell 涓夌被宸ュ叿銆?
-        // 褰撳墠宸ョ▼宸ュ叿鏉ユ簮锛圓iToolsConfiguration锛夊氨鏄繖涓夌被锛屽洜姝ゅ璇濅晶鐩存帴鍚敤鍏ㄩ儴 ToolCallback 鍗冲彲銆?
+        // 视觉链路不提供工具；对话链路提供 Skills/FileSystem/Shell 三类工具。
+        // 当前工程工具来源（AiToolsConfiguration）就是这三类，因此对话侧直接启用全部 ToolCallback 即可。
         if (clientId.isVision()) {
             return List.of();
         }
@@ -417,7 +417,7 @@ public class AiConfiguration {
             return toolCallbacks;
         }
 
-        // 鍏朵粬绫诲瀷榛樿涓嶅惎鐢ㄥ伐鍏凤紙濡?image/audio锛夈€?
+        // 其他类型默认不启用工具（如 image/audio）。
         return List.of();
     }
 
@@ -434,7 +434,7 @@ public class AiConfiguration {
                 }
             }
 
-            // 寮虹害鏉燂細寮€鍚壀鏋濇椂锛屽繀椤讳负褰撳墠妯″瀷鏄惧紡閰嶇疆涓婁笅鏂囩獥鍙ｃ€?
+            // 强约束：启用剪枝时，必须为当前模型显式配置上下文窗口。
             if (!hasExplicitWindowTokensForModel(windowTokens, modelName)) {
                 throw new BusinessException(ApiCode.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
                     "已开启 pocketmind.context-engineering.tool-result.enabled=true，但未为当前模型配置 window-tokens，model="

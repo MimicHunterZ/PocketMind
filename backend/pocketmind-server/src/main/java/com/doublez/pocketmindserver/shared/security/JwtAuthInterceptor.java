@@ -27,7 +27,7 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
 
         String auth = request.getHeader(AUTH_HEADER);
         if (auth == null || !auth.startsWith(BEARER_PREFIX)) {
-            throw new UnauthorizedException("缂哄皯 Authorization Bearer Token");
+            throw new UnauthorizedException("缺少 Authorization Bearer Token");
         }
 
         String token = auth.substring(BEARER_PREFIX.length()).trim();

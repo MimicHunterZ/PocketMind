@@ -46,15 +46,15 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 鑱婂ぉ浼氳瘽 & 娑堟伅鎺ュ彛銆?
+ * 聊天会话与消息接口。
  *
  * <pre>
- * POST   /api/ai/sessions                            鍒涘缓浼氳瘽
- * GET    /api/ai/sessions[?noteUuid=&page=&size=]    鍒楀嚭浼氳瘽
- * GET    /api/ai/sessions/{uuid}/messages            鍒楀嚭娑堟伅
- * POST   /api/ai/sessions/{uuid}/messages            鍙戦€佹秷鎭紙SSE 娴佸紡杩斿洖锛?
- * PATCH  /api/ai/sessions/{uuid}                     閲嶅懡鍚嶄細璇?
- * DELETE /api/ai/sessions/{uuid}                     杞垹闄や細璇?
+ * POST   /api/ai/sessions                            创建会话
+ * GET    /api/ai/sessions[?noteUuid=&page=&size=]    列出会话
+ * GET    /api/ai/sessions/{uuid}/messages            列出消息
+ * POST   /api/ai/sessions/{uuid}/messages            发送消息（SSE 流式返回）
+ * PATCH  /api/ai/sessions/{uuid}                     重命名会话
+ * DELETE /api/ai/sessions/{uuid}                     软删除会话
  * </pre>
  */
 @Slf4j
@@ -68,10 +68,10 @@ public class ChatController {
     private final AiChatTitleService aiChatTitleService;
     private final ObjectMapper objectMapper;
 
-    // 浼氳瘽绠＄悊
+    // 会话管理
 
     /**
-     * 鍒涘缓浼氳瘽锛堝叏灞€瀵硅瘽鎴栧叧鑱旀煇绡囩瑪璁帮級銆?
+     * 创建会话（全局对话或关联某篇笔记）。
      */
     @PostMapping
     public ResponseEntity<ChatSessionResponse> createSession(
@@ -83,11 +83,11 @@ public class ChatController {
     }
 
     /**
-     * 鍒楀嚭褰撳墠鐢ㄦ埛鐨勪細璇濓紝鍙寜绗旇杩囨护銆?
+     * 列出当前用户的会话，可按笔记过滤。
      *
-     * @param noteUuid 鍏宠仈绗旇 UUID锛堝彲閫夛級
-     * @param page     椤电爜锛堜粠 0 寮€濮嬶紝榛樿 0锛?
-     * @param size     姣忛〉鏉℃暟锛堥粯璁?50锛?
+     * @param noteUuid 关联笔记 UUID（可选）
+     * @param page     页码（从 0 开始，默认 0）
+     * @param size     每页条数（默认 50）
      */
     @GetMapping
     public List<ChatSessionResponse> listSessions(
@@ -100,7 +100,7 @@ public class ChatController {
     }
 
     /**
-     * 鑾峰彇鍗曚釜浼氳瘽璇︽儏銆?
+     * 获取单个会话详情。
      */
     @GetMapping("/{sessionUuid}")
     public ChatSessionResponse getSession(@PathVariable UUID sessionUuid) {
@@ -109,7 +109,7 @@ public class ChatController {
     }
 
     /**
-     * 閲嶅懡鍚嶄細璇濇爣棰樸€?
+     * 重命名会话标题。
      */
     @PatchMapping("/{sessionUuid}")
     public void renameSession(
@@ -120,7 +120,7 @@ public class ChatController {
     }
 
     /**
-     * 杞垹闄や細璇濄€?
+     * 软删除会话。
      */
     @DeleteMapping("/{sessionUuid}")
     public void deleteSession(@PathVariable UUID sessionUuid) {
@@ -128,11 +128,11 @@ public class ChatController {
         aiChatService.deleteSession(userId, sessionUuid);
     }
 
-    // 娑堟伅绠＄悊
+    // 消息管理
 
     /**
-     * 鍒楀嚭浼氳瘽涓嬬殑鎵€鏈夋秷鎭紙鎸夋椂闂存搴忥紝鏈€澶?500 鏉★級銆?
-     * 鑻ヤ紶鍏?leafUuid锛屽垯杩斿洖浠庡彾鑺傜偣鍒伴摼澶寸殑瀹屾暣鍒嗘敮娑堟伅閾撅紙鐢ㄤ簬鍒嗘敮妯″紡锛夈€?
+     * 列出会话下的所有消息（按时间正序，最多 500 条）。
+     * 若传入 leafUuid，则返回从叶节点到链头的完整分支消息链（用于分支模式）。
      */
     @GetMapping("/{sessionUuid}/messages")
     public List<ChatMessageResponse> listMessages(
@@ -144,18 +144,18 @@ public class ChatController {
     }
 
     /**
-     * 鍙戦€佺敤鎴锋秷鎭苟娴佸紡鎺ユ敹 AI 鍥炲锛圫SE锛夈€?
+      * 发送用户消息并流式接收 AI 回复（SSE）。
      *
-     * <p>SSE 浜嬩欢鏍煎紡锛?
+      * <p>SSE 事件格式：</p>
      * <pre>
      *   event: delta
-     *   data: <鏂囧瓧鐗囨>
-    *
+      *   data: <文本片段>
+      *
      *   event: done
-    *   data: {"messageUuid":"<uuid>"}
+      *   data: {"messageUuid":"<uuid>"}
      *
      *   event: error
-     *   data: {"message":"<閿欒淇℃伅>"}
+      *   data: {"message":"<错误信息>"}
      * </pre>
      */
     @PostMapping(
@@ -171,7 +171,7 @@ public class ChatController {
             ? requestId
             : UUID.randomUUID().toString();
 
-        log.info("鏀跺埌瀵硅瘽娑堟伅: userId={}, sessionUuid={}, contentLen={}",
+        log.info("收到对话消息: userId={}, sessionUuid={}, contentLen={}",
                 userId, sessionUuid, request.content().length());
 
         Flux<ServerSentEvent<String>> tokenFlux = aiChatService.streamReply(
@@ -179,13 +179,13 @@ public class ChatController {
                 sessionUuid,
                 request.content(),
                 request.safeAttachmentUuids(),
-            request.parentUuid(),
-            effectiveRequestId);
+                request.parentUuid(),
+                effectiveRequestId);
         return tokenFlux;
     }
 
     /**
-     * 鍗曠嫭鐢熸垚骞舵洿鏂颁細璇濇爣棰樸€?
+     * 单独生成并更新会话标题。
      */
     @PostMapping("/{sessionUuid}/title")
     public ChatSessionResponse generateSessionTitle(
@@ -197,7 +197,7 @@ public class ChatController {
     }
 
     /**
-     * 缂栬緫 USER 娑堟伅鍐呭锛堝悓鏃跺垹闄ょ揣闅忓叾鍚庣殑 ASSISTANT 娑堟伅锛岀瓑寰呭鎴风瑙﹀彂閲嶆柊鐢熸垚锛夈€?
+     * 编辑 USER 消息内容（同时删除紧随其后的 ASSISTANT 消息，等待客户端触发重新生成）。
      */
     @PatchMapping("/{sessionUuid}/messages/{messageUuid}")
     public void editMessage(
@@ -206,16 +206,16 @@ public class ChatController {
             @Valid @RequestBody EditMessageRequest request) {
         long userId = parseUserId();
         aiChatService.editUserMessage(userId, messageUuid, request.content());
-        log.info("缂栬緫娑堟伅: userId={}, messageUuid={}", userId, messageUuid);
+        log.info("编辑消息: userId={}, messageUuid={}", userId, messageUuid);
     }
 
     /**
-     * 閲嶆柊鐢熸垚鎸囧畾娑堟伅鐨?AI 鍥炲锛圫SE 娴佸紡锛夈€?
+      * 重新生成指定消息的 AI 回复（SSE 流式）。
      *
-     * <p>鏀寔涓ょ璋冪敤鏂瑰紡锛?
+      * <p>支持两种调用方式：</p>
      * <ul>
-     *   <li>ASSISTANT UUID锛氭爣鍑嗛噸鏂扮敓鎴愶紝杞垹闄ゆ棫鍥炲鍚庨噸鏂拌皟鐢?AI銆?/li>
-     *   <li>USER UUID锛氱户缁敓鎴愶紝閫傜敤浜?editAndResend 鍦烘櫙锛圓SSISTANT 宸茶 editMessage 娓呴櫎锛夈€?/li>
+      *   <li>ASSISTANT UUID：标准重新生成，软删除旧回复后重新调用 AI。</li>
+      *   <li>USER UUID：继续生成，适用于 editAndResend 场景（ASSISTANT 已被 editMessage 清除）。</li>
      * </ul>
      */
     @PostMapping(
@@ -230,12 +230,12 @@ public class ChatController {
         String effectiveRequestId = requestId != null && !requestId.isBlank()
                 ? requestId
                 : UUID.randomUUID().toString();
-        log.info("閲嶆柊鐢熸垚娑堟伅: userId={}, sessionUuid={}, messageUuid={}", userId, sessionUuid, messageUuid);
+        log.info("重新生成消息: userId={}, sessionUuid={}, messageUuid={}", userId, sessionUuid, messageUuid);
         return aiChatService.regenerateReply(userId, sessionUuid, messageUuid, effectiveRequestId);
     }
 
     /**
-     * 鍋滄鎸囧畾 requestId 鐨勬祦寮忓洖澶嶃€?
+     * 停止指定 requestId 的流式回复。
      */
     @PostMapping("/{sessionUuid}/messages/stop")
     public void stopMessage(
@@ -246,7 +246,7 @@ public class ChatController {
     }
 
     /**
-     * 瀵规秷鎭瘎鍒嗭紙鐐硅禐/鐐硅俯/鍙栨秷锛夈€?
+     * 对消息评分（点赞/点踩/取消）。
      */
     @PostMapping("/{sessionUuid}/messages/{messageUuid}/rating")
     public void rateMessage(
@@ -258,7 +258,7 @@ public class ChatController {
     }
 
     /**
-     * 鏇存柊鍒嗘敮鍒悕锛堢敤鎴锋墜鍔ㄧ紪杈戯紝鏈€澶?10 瀛楃锛夈€?
+     * 更新分支别名（用户手动编辑，最多 10 字符）。
      */
     @PatchMapping("/{sessionUuid}/messages/{messageUuid}/alias")
     public void updateAlias(
@@ -267,11 +267,11 @@ public class ChatController {
             @Valid @RequestBody UpdateAliasRequest request) {
         long userId = parseUserId();
         aiChatService.updateBranchAlias(userId, messageUuid, request.alias());
-        log.info("鏇存柊鍒嗘敮鍒悕: userId={}, messageUuid={}", userId, messageUuid);
+        log.info("更新分支别名: userId={}, messageUuid={}", userId, messageUuid);
     }
 
     /**
-     * 鑾峰彇浼氳瘽鐨勬墍鏈夊垎鏀憳瑕佸垪琛ㄣ€?
+     * 获取会话的所有分支摘要列表。
      */
     @GetMapping("/{sessionUuid}/branches")
     public List<ChatBranchSummaryResponse> getBranches(@PathVariable UUID sessionUuid) {
@@ -279,7 +279,7 @@ public class ChatController {
         return aiChatService.getBranches(userId, sessionUuid);
     }
 
-    // 绉佹湁杞崲 & 宸ュ叿鏂规硶
+    // 私有转换与工具方法
 
     private ChatSessionResponse toSessionResponse(ChatSessionEntity s) {
         return new ChatSessionResponse(
@@ -305,8 +305,8 @@ public class ChatController {
     }
 
     /**
-     * 瑙ｆ瀽宸ュ叿璋冪敤鍏冩暟鎹€?
-     * TOOL_CALL 鍜?TOOL_RESULT 绫诲瀷鐨勬秷鎭?content 涓?JSON锛岃В鏋愪负缁撴瀯鍖栨暟鎹緵瀹㈡埛绔覆鏌?UI銆?
+     * 解析工具调用元数据。
+     * TOOL_CALL / TOOL_RESULT 类型的消息 content 为 JSON，解析为结构化数据供客户端渲染 UI。
      */
     private ToolCallData parseToolCallData(ChatMessageEntity m) {
         String type = m.getMessageType();
@@ -323,14 +323,14 @@ public class ChatController {
             } else {
                 // TOOL_RESULT
                 String result = node.path("result").asText(null);
-                // 瓒呴暱缁撴灉鎴柇锛堥槻姝㈣繃澶х殑宸ュ叿杩斿洖鍊煎崰鐢ㄨ繃澶氬甫瀹斤級
+                // 超长结果截断（防止过大的工具返回值占用过多带宽）
                 if (result != null && result.length() > 500) {
                     result = result.substring(0, 500) + "...(truncated)";
                 }
                 return new ToolCallData(toolCallId, toolName, null, result);
             }
         } catch (Exception e) {
-            log.warn("瑙ｆ瀽 ToolCallData 澶辫触: messageUuid={}, error={}", m.getUuid(), e.getMessage());
+            log.warn("解析 ToolCallData 失败: messageUuid={}, error={}", m.getUuid(), e.getMessage());
             return null;
         }
     }

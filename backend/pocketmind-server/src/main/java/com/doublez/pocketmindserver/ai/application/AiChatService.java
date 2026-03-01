@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * AI 瀵硅瘽娴佸紡搴旂敤鏈嶅姟銆?
- * 璐熻矗锛氱粍瑁呬笂涓嬫枃锛堝巻鍙叉秷鎭?+ 绗旇鎽樿 + 鍥剧墖鎻忚堪锛夆啋 娴佸紡璋冪敤 AI 鈫?鎸佷箙鍖栨秷鎭€?
+ * 负责：组装上下文（历史消?+ 笔记摘要 + 图片描述）→ 流式调用 AI ?持久化消息?
  */
 @Slf4j
 @Service
@@ -84,11 +84,11 @@ public class AiChatService {
     }
 
     
-    // 浼氳瘽绠＄悊
+    // 会话管理
     
 
     /**
-     * 鍒涘缓浼氳瘽锛堝叏灞€瀵硅瘽鎴栧叧鑱旀煇绡囩瑪璁帮級銆?
+     * 创建会话（全屢对话或关联某篇笔记）?
      */
     public ChatSessionEntity createSession(long userId, UUID noteUuid, String title) {
         UUID sessionUuid = UUID.randomUUID();
@@ -96,12 +96,12 @@ public class AiChatService {
         ChatSessionEntity session = ChatSessionEntity.create(
             sessionUuid, userId, noteUuid, finalTitle);
         chatSessionRepository.save(session);
-        log.info("鍒涘缓浼氳瘽: userId={}, sessionUuid={}, noteUuid={}", userId, sessionUuid, noteUuid);
+        log.info("创建会话: userId={}, sessionUuid={}, noteUuid={}", userId, sessionUuid, noteUuid);
         return session;
     }
 
     /**
-     * 鍒楀嚭褰撳墠鐢ㄦ埛鐨勪細璇濆垪琛紝鍙寜绗旇杩囨护銆?
+     * 列出当前用户的会话列表，可按笔记过滤?
      */
     public List<ChatSessionEntity> listSessions(long userId, UUID noteUuid, PageQuery pageQuery) {
         return noteUuid != null
@@ -110,34 +110,34 @@ public class AiChatService {
     }
 
     /**
-     * 鏌ヨ鍗曚釜浼氳瘽璇︽儏銆?
+     * 查询单个会话详情?
      */
     public ChatSessionEntity getSession(long userId, UUID sessionUuid) {
         return validateAndGetSession(sessionUuid, userId);
     }
 
     /**
-     * 閲嶅懡鍚嶄細璇濇爣棰樸€?
+     * 重命名会话标题?
      */
     public void renameSession(long userId, UUID sessionUuid, String title) {
         ChatSessionEntity session = validateAndGetSession(sessionUuid, userId);
         session.updateTitle(title != null ? title : "");
         chatSessionRepository.update(session);
-        log.info("閲嶅懡鍚嶄細璇? userId={}, sessionUuid={}, title={}", userId, sessionUuid, title);
+        log.info("重命名会? userId={}, sessionUuid={}, title={}", userId, sessionUuid, title);
     }
 
     /**
-     * 杞垹闄や細璇濄€?
+     * 软删除会话?
      */
     public void deleteSession(long userId, UUID sessionUuid) {
         validateAndGetSession(sessionUuid, userId);
         chatSessionRepository.deleteByUuidAndUserId(sessionUuid, userId);
-        log.info("鍒犻櫎浼氳瘽: userId={}, sessionUuid={}", userId, sessionUuid);
+        log.info("删除会话: userId={}, sessionUuid={}", userId, sessionUuid);
     }
 
     /**
-     * 鍒楀嚭浼氳瘽涓嬬殑娑堟伅鍒楄〃銆?
-     * 鑻ヤ紶鍏?leafUuid锛屽垯杩斿洖浠庡彾鑺傜偣鍒伴摼澶寸殑瀹屾暣鍒嗘敮娑堟伅閾撅紙鐢ㄤ簬鍒嗘敮妯″紡锛夈€?
+     * 列出会话下的消息列表?
+     * 若传?leafUuid，则返回从叶节点到链头的完整分支消息链（用于分支模式）?
      */
     public List<ChatMessageEntity> listMessages(long userId, UUID sessionUuid, UUID leafUuid) {
         validateAndGetSession(sessionUuid, userId);
@@ -148,13 +148,13 @@ public class AiChatService {
     }
 
     
-    // 娴佸紡鍥炲锛堝叆鍙ｏ級
+    // 流式回复（入口）
     
 
     /**
-     * 鎺ユ敹鐢ㄦ埛娑堟伅锛屾祦寮忚繑鍥?AI 鍥炵瓟銆?
-     * @param parentUuid 鍙€夈€傞潪 null 鏃朵粠璇ヨ妭鐐瑰垱寤烘柊鍒嗘敮锛堥摼寮忔秷鎭巻鍙蹭粠姝よ妭鐐规函婧愶級銆?
-     *                   null 鏃剁嚎鎬ц拷鍔犲埌褰撳墠浼氳瘽鏈熬銆?
+     * 接收用户消息，流式返?AI 回答?
+     * @param parentUuid 可非 null 时从该节点创建新分支（链式消息历史从此节点溯源）?
+     *                   null 时线性追加到当前会话末尾?
      */
     public Flux<ServerSentEvent<String>> streamReply(long userId,
                                                       UUID sessionUuid,
@@ -162,45 +162,45 @@ public class AiChatService {
                                                       List<UUID> attachmentUuids,
                                                       UUID parentUuid,
                                                       String requestId) {
-        // 1. 鏍￠獙 session 褰掑睘
+        // 1. 校验 session 归属
         ChatSessionEntity session = validateAndGetSession(sessionUuid, userId);
 
-        // 2. 鍔犺浇鍘嗗彶娑堟伅
+        // 2. 加载历史消息
         final List<ChatMessageEntity> history;
         final UUID effectiveParentUuid;
         if (parentUuid != null) {
-            // 鍒嗘敮妯″紡锛氫粠鎸囧畾鑺傜偣鍚戜笂閫掑綊鑾峰彇瀹屾暣鍘嗗彶閾?
+            // 分支模式：从指定节点向上递归获取完整历史?
             history = chatMessageRepository.findChain(parentUuid, userId);
             effectiveParentUuid = parentUuid;
         } else {
-            // 绾挎€фā寮忥細鍙栦細璇濆叏閮ㄦ秷鎭紙鏈€澶?200 鏉★級
+            // 线模式：取会话全部消息（朢?200 条）
             history = chatMessageRepository.findBySessionUuid(userId, sessionUuid, new PageQuery(200, 0));
             effectiveParentUuid = history.isEmpty() ? null : history.get(history.size() - 1).getUuid();
         }
 
-        // 3. 鏋勫缓 system prompt锛堝惈绗旇涓婁笅鏂?+ 鍥剧墖璇嗗埆鍐呭锛?
+        // 3. 构建 system prompt（含笔记上下?+ 图片识别内容?
         String systemText = buildSystemPrompt(userId, session);
 
-        // 4. 鎸佷箙鍖栫敤鎴锋秷鎭紙鍚屾钀藉簱锛?
+        // 4. 持久化用户消息（同步落库?
         UUID userMsgUuid = UUID.randomUUID();
         ChatMessageEntity userMsg = ChatMessageEntity.create(
                 userMsgUuid, userId, sessionUuid, effectiveParentUuid,
                 ChatRole.USER, userPrompt, attachmentUuids);
         chatMessageRepository.save(userMsg);
 
-        // 5. 妫€娴嬪垎鍙夛細鑻?parentUuid 闈炵┖锛屽垯鏈鏄樉寮忓垎宀旀搷浣?
+        // 5. 棢测分叉：?parentUuid 非空，则本次是显式分岔操?
         final boolean isFork = (parentUuid != null);
 
-        // 6. 鏋勫缓 Spring AI 鍘嗗彶娑堟伅鍒楄〃
+        // 6. 构建 Spring AI 历史消息列表
         List<Message> historyMessages = toSpringAiMessages(history);
 
-        // 7. 娴佸紡璋冪敤 AI
+        // 7. 流式调用 AI
         return buildAndStream(userId, sessionUuid, userMsgUuid,
             userPrompt, systemText, historyMessages, isFork, requestId);
     }
 
     /**
-     * streamReply 鐨勬棤 parentUuid 閲嶈浇锛堜繚鎸佸悜鍚庡吋瀹癸級銆?
+     * streamReply 的无 parentUuid 重载（保持向后兼容）?
      */
     public Flux<ServerSentEvent<String>> streamReply(long userId,
                                                       UUID sessionUuid,
@@ -214,13 +214,13 @@ public class AiChatService {
     
 
     /**
-     * 缂栬緫 USER 娑堟伅骞跺垹闄ょ揣闅忓叾鍚庣殑 ASSISTANT 娑堟伅銆?
+     * 编辑 USER 消息并删除紧随其后的 ASSISTANT 消息?
      * 浣跨敤涓ゆ SQL 瀹屾垚锛歶pdateContent锛堝惈闅愬紡 USER 瑙掕壊鏍￠獙锛夈€乻oftDeleteAssistantChildren銆?
-     * 璋冪敤鏂癸紙Controller锛夋敹鍒拌姹傚悗锛屽簲闅忓嵆瑙﹀彂涓€娆?streamReply 浠ラ噸鏂扮敓鎴?AI 鍥炲銆?
+     * 调用方（Controller）收到请求后，应随即触发丢?streamReply 以重新生?AI 回复?
      */
     @Transactional(rollbackFor = Exception.class)
     public void editUserMessage(long userId, UUID messageUuid, String newContent) {
-        // 鏍￠獙锛氫粎鍏佽缂栬緫褰撳墠鍒嗘敮鏈熬鐨?USER 娑堟伅锛岄槻姝㈠绔嬩笅娓稿璇濋摼
+        // 校验：仅允许编辑当前分支末尾?USER 消息，防止孤立下游对话链
         List<ChatMessageEntity> assistantChildren =
                 chatMessageRepository.findChildrenByParentUuid(messageUuid, userId);
         for (ChatMessageEntity assistant : assistantChildren) {
@@ -228,23 +228,23 @@ public class AiChatService {
                     chatMessageRepository.findChildrenByParentUuid(assistant.getUuid(), userId);
             if (!userGrandchildren.isEmpty()) {
                 throw new BusinessException(ApiCode.REQ_VALIDATION, HttpStatus.UNPROCESSABLE_ENTITY,
-                        "浠呭厑璁哥紪杈戝綋鍓嶅垎鏀湯灏剧殑鐢ㄦ埛娑堟伅锛岃鍏堝垏鎹㈠埌鐩爣鍒嗘敮");
+                        "仅允许编辑当前分支末尾的用户消息，请先切换到目标分支");
             }
         }
         // updateContent 鐨?WHERE role = 'USER' 璧峰埌闅愬紡瑙掕壊鏍￠獙浣滅敤
         chatMessageRepository.updateContent(messageUuid, userId, newContent);
-        // 鍗曟 SQL 娓呯悊璇?USER 娑堟伅鐨勬墍鏈?ASSISTANT 瀛愭秷鎭?
+        // 单次 SQL 清理?USER 消息的所?ASSISTANT 子消?
         chatMessageRepository.softDeleteAssistantChildren(messageUuid, userId);
-        log.info("缂栬緫鐢ㄦ埛娑堟伅: userId={}, messageUuid={}", userId, messageUuid);
+        log.info("编辑用户消息: userId={}, messageUuid={}", userId, messageUuid);
     }
 
     /**
-     * 閲嶆柊鐢熸垚 AI 鍥炲锛圫SE 娴佸紡锛夈€傜粺涓€鍏ュ彛锛屾寜娑堟伅瑙掕壊鍒嗘淳锛?
+     * 重新生成 AI 回复（SSE 流式）统丢入口，按消息角色分派?
      * <ul>
-     *   <li>浼犲叆 USER UUID锛坋ditAndResend 鍦烘櫙锛夛細ASSISTANT 宸茬敱 editUserMessage 娓呴櫎锛?
-     *       鐩存帴澶嶇敤璇?USER 娑堟伅娴佸紡鐢熸垚鏂?ASSISTANT 鍥炲銆?/li>
-     *   <li>浼犲叆 ASSISTANT UUID锛堟爣鍑嗛噸鏂扮敓鎴愶級锛氬厛杞垹闄ょ洰鏍?ASSISTANT锛?
-     *       鍐嶄互鍏剁埗 USER 娑堟伅閲嶆柊璋冪敤 AI銆?/li>
+     *   <li>传入 USER UUID（editAndResend 场景）：ASSISTANT 已由 editUserMessage 清除?
+     *       直接复用?USER 消息流式生成?ASSISTANT 回复?/li>
+     *   <li>传入 ASSISTANT UUID（标准重新生成）：先软删除目?ASSISTANT?
+     *       再以其父 USER 消息重新调用 AI?/li>
      * </ul>
      */
     public Flux<ServerSentEvent<String>> regenerateReply(long userId,
@@ -259,15 +259,15 @@ public class AiChatService {
 
         final ChatMessageEntity userMsg;
         if (msg.getRole() == ChatRole.USER) {
-            // editAndResend 鍦烘櫙锛欰SSISTANT 宸茬敱 editUserMessage 杞垹闄わ紝鐩存帴澶嶇敤璇?USER 娑堟伅
+            // editAndResend 场景：ASSISTANT 已由 editUserMessage 软删除，直接复用?USER 消息
             userMsg = msg;
-            log.info("editAndResend 缁х画鐢熸垚: userId={}, sessionUuid={}, userMsgUuid={}", userId, sessionUuid, messageUuid);
+            log.info("editAndResend 继续生成: userId={}, sessionUuid={}, userMsgUuid={}", userId, sessionUuid, messageUuid);
         } else if (msg.getRole() == ChatRole.ASSISTANT) {
-            // 鏍囧噯閲嶆柊鐢熸垚锛氳蒋鍒犻櫎鏃?ASSISTANT锛屾壘鍒扮埗 USER
+            // 标准重新生成：软删除?ASSISTANT，找到父 USER
             UUID userMsgUuid = msg.getParentUuid();
             if (userMsgUuid == null) {
                 throw new BusinessException(ApiCode.REQ_VALIDATION, HttpStatus.BAD_REQUEST,
-                        "ASSISTANT 娑堟伅娌℃湁鍏宠仈鐨?USER 娑堟伅");
+                        "ASSISTANT 消息没有关联?USER 消息");
             }
             chatMessageRepository.softDeleteByUuids(List.of(messageUuid), userId);
             userMsg = chatMessageRepository.findByUuidAndUserId(userMsgUuid, userId)
@@ -276,10 +276,10 @@ public class AiChatService {
             log.info("閲嶆柊鐢熸垚 AI 鍥炲: userId={}, sessionUuid={}, userMsgUuid={}", userId, sessionUuid, userMsgUuid);
         } else {
             throw new BusinessException(ApiCode.REQ_VALIDATION, HttpStatus.BAD_REQUEST,
-                    "浠呮敮鎸佸 USER 鎴?ASSISTANT 娑堟伅鎿嶄綔");
+                    "仅支持对 USER ?ASSISTANT 消息操作");
         }
 
-        // 閲嶅缓鍘嗗彶锛氫粠鐢ㄦ埛娑堟伅鐨勭埗鑺傜偣鍚戜笂婧簮锛屼笉鍚垰鍒犵殑 ASSISTANT
+        // 重建历史：从用户消息的父节点向上溯源，不含刚删的 ASSISTANT
         List<ChatMessageEntity> history = userMsg.getParentUuid() != null
                 ? chatMessageRepository.findChain(userMsg.getParentUuid(), userId)
                 : List.of();
@@ -301,28 +301,28 @@ public class AiChatService {
         if (cancelled) {
             log.info("鍋滄娴佸紡鍥炲: userId={}, sessionUuid={}, requestId={}", userId, sessionUuid, requestId);
         } else {
-            log.info("鍋滄娴佸紡鍥炲璇锋眰鏈懡涓椿鍔ㄦ祦: userId={}, sessionUuid={}, requestId={}", userId, sessionUuid, requestId);
+            log.info("停止流式回复请求未命中活动流: userId={}, sessionUuid={}, requestId={}", userId, sessionUuid, requestId);
         }
     }
 
     
-    // 璇勫垎
+    // 评分
     
 
     /**
-     * 瀵规秷鎭瘎鍒嗭紙鐐硅禐/鐐硅俯/鍙栨秷锛夈€?
-     * @param rating 1=鐐硅禐锛?=鍙栨秷锛?1=鐐硅俯
+     * 对消息评分（点赞/点踩/取消）?
+     * @param rating 1=点赞?=取消?1=点踩
      */
     public void rateMessage(long userId, UUID messageUuid, int rating) {
         chatMessageRepository.findByUuidAndUserId(messageUuid, userId)
                 .orElseThrow(() -> new BusinessException(
                         ApiCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, "messageUuid=" + messageUuid));
         chatMessageRepository.updateRating(messageUuid, userId, rating);
-        log.info("娑堟伅璇勫垎: userId={}, messageUuid={}, rating={}", userId, messageUuid, rating);
+        log.info("消息评分: userId={}, messageUuid={}, rating={}", userId, messageUuid, rating);
     }
 
     /**
-     * 鏇存柊鍒嗘敮鍒悕锛堢敤鎴锋墜鍔ㄧ紪杈戯級銆?
+     * 更新分支别名（用户手动编辑）?
      * 闀垮害闄愬埗鐢辫皟鐢ㄦ柟锛圕ontroller @Valid锛夋牎楠屻€?
      */
     public void updateBranchAlias(long userId, UUID messageUuid, String alias) {
@@ -330,28 +330,28 @@ public class AiChatService {
                 .orElseThrow(() -> new BusinessException(
                         ApiCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, "messageUuid=" + messageUuid));
         chatMessageRepository.updateBranchAlias(messageUuid, userId, alias.trim());
-        log.info("鏇存柊鍒嗘敮鍒悕: userId={}, messageUuid={}, alias={}", userId, messageUuid, alias);
+        log.info("更新分支别名: userId={}, messageUuid={}, alias={}", userId, messageUuid, alias);
     }
 
     
-    // 鍒嗘敮绠＄悊
+    // 分支管理
     
 
     /**
-     * 鑾峰彇褰撳墠浼氳瘽鐨勫叏閮ㄥ垎鏀憳瑕併€?
-     * 绛栫暐锛氭壘鍒版墍鏈?鏈夊涓瓙鑺傜偣鐨勭埗鑺傜偣"锛堝垎鍙夌偣锛夛紝瀵规瘡涓垎鍙夌偣鐨勫瓙鑺傜偣
-     * 鍒嗗埆娌块摼杩芥函鍒版渶鏂扮殑鍙惰妭鐐癸紝鎻愬彇鏈€鍚庝竴杞?USER+ASSISTANT 鍐呭銆?
-     * 鍓嶇閫氳繃 leafUuid 鍙傛暟璇锋眰瀹屾暣閾炬秷鎭€?
+     * 获取当前会话的全部分支摘要?
+     * 策略：找到所?有多个子节点的父节点"（分叉点），对每个分叉点的子节点
+     * 分别沿链追溯到最新的叶节点，提取朢后一?USER+ASSISTANT 内容?
+     * 前端通过 leafUuid 参数请求完整链消息?
      */
     public List<ChatBranchSummaryResponse> getBranches(long userId, UUID sessionUuid) {
-        // 鍔犺浇浼氳瘽鍏ㄩ噺娑堟伅锛堢敤浜庡垎鏋愬垎鍙夌粨鏋勶級
+        // 加载会话全量消息（用于分析分叉结构）
         List<ChatMessageEntity> allMessages = chatMessageRepository.findBySessionUuid(
                 userId, sessionUuid, PageQuery.unbounded(1000));
         if (allMessages.isEmpty()) return List.of();
 
         List<ChatMessageEntity> leaves = findLeafMessages(allMessages);
 
-        // 鑻ュ彧鏈変竴涓彾鑺傜偣锛屽垯娌℃湁鍒嗘敮
+        // 若只有一个叶节点，则没有分支
         if (leaves.size() <= 1) return List.of();
 
         // 涓烘瘡涓彾鑺傜偣鐢熸垚鎽樿
@@ -363,11 +363,11 @@ public class AiChatService {
     }
 
     
-    // 绉佹湁鏍稿績鏂规硶
+    // 私有核心方法
     
 
     /**
-     * 娴佸紡璋冪敤 AI 骞惰惤搴?ASSISTANT 娑堟伅鐨勬牳蹇冮€昏緫銆?
+     * 流式调用 AI 并落?ASSISTANT 消息的核心辑?
      */
     private Flux<ServerSentEvent<String>> buildAndStream(long userId,
                                                           UUID sessionUuid,
@@ -385,7 +385,7 @@ public class AiChatService {
         Mono<Void> cancelSignal = chatStreamCancellationManager.listenCancel(streamKey)
                 .doOnNext(reason -> {
                     cancelled.set(true);
-                    log.info("妫€娴嬪埌娴佸紡鍥炲鍙栨秷淇″彿: userId={}, sessionUuid={}, requestId={}, reason={}",
+                    log.info("棢测到流式回复取消信号: userId={}, sessionUuid={}, requestId={}, reason={}",
                             userId, sessionUuid, effectiveRequestId, reason);
                 })
                 .then();
@@ -421,7 +421,7 @@ public class AiChatService {
                         return Flux.just(chatSseEventFactory.paused(effectiveRequestId, null));
                     }
                     log.error("AI 娴佸紡鍥炲寮傚父: userId={}, sessionUuid={}", userId, sessionUuid, e);
-                    String safeMsg = e.getMessage() != null ? e.getMessage() : "AI 鏈嶅姟寮傚父";
+                    String safeMsg = e.getMessage() != null ? e.getMessage() : "AI 服务异常";
                     return Flux.just(chatSseEventFactory.error(effectiveRequestId, safeMsg));
                 })
                 .doFinally(signalType -> chatStreamCancellationManager.cleanup(streamKey));
@@ -450,10 +450,10 @@ public class AiChatService {
         UUID pausedMessageUuid = null;
         if (!partialContent.isBlank()) {
             pausedMessageUuid = persistAssistant(userId, sessionUuid, userMsgUuid, partialContent);
-            log.info("AI 娴佸紡鍥炲鏆傚仠骞朵繚瀛橀儴鍒嗗唴瀹? userId={}, sessionUuid={}, assistantMsgUuid={}",
+            log.info("AI 流式回复暂停并保存部分内? userId={}, sessionUuid={}, assistantMsgUuid={}",
                     userId, sessionUuid, pausedMessageUuid);
         } else {
-            log.info("AI 娴佸紡鍥炲鏆傚仠锛堟棤鍙繚瀛樺閲忥級: userId={}, sessionUuid={}", userId, sessionUuid);
+            log.info("AI 流式回复暂停（无可保存增量）: userId={}, sessionUuid={}", userId, sessionUuid);
         }
         return chatSseEventFactory.paused(requestId, pausedMessageUuid);
     }
@@ -497,8 +497,8 @@ public class AiChatService {
     }
 
     /**
-     * 寮傛鐢熸垚鍒嗘敮鍒悕骞跺啓鍏ユ暟鎹簱銆?
-     * 浣跨敤寤変环鐨勪竴娆℃€?LLM 璋冪敤锛屼紶鍏?1-2 杞璇濅笂涓嬫枃銆?
+     * 异步生成分支别名并写入数据库?
+     * 使用廉价的一次?LLM 调用，传?1-2 轮对话上下文?
      */
     private void generateBranchAliasAsync(long userId,
                                            UUID assistantMsgUuid,
@@ -507,7 +507,7 @@ public class AiChatService {
                                            String userPrompt) {
         Schedulers.boundedElastic().schedule(() -> {
             try {
-                // 鍙栨渶杩?1 杞殑涓婁笅鏂囷細姝ゅ墠鍘嗗彶鏈熬 AI 鍥炲锛堝鏈夛級
+                // 取最?1 轮的上下文：此前历史末尾 AI 回复（如有）
                 String contextPrefix = "";
                 if (!historyMessages.isEmpty()) {
                     Message last = historyMessages.get(historyMessages.size() - 1);
@@ -531,17 +531,17 @@ public class AiChatService {
                     if (alias.length() > 10) alias = alias.substring(0, 10);
                     if (!alias.isBlank()) {
                         chatMessageRepository.updateBranchAlias(assistantMsgUuid, userId, alias);
-                        log.info("鍒嗘敮鍒悕鐢熸垚: userId={}, messageUuid={}, alias={}", userId, assistantMsgUuid, alias);
+                        log.info("分支别名生成: userId={}, messageUuid={}, alias={}", userId, assistantMsgUuid, alias);
                     }
                 }
             } catch (Exception e) {
-                log.warn("鍒嗘敮鍒悕鐢熸垚澶辫触锛堥潤榛樺拷鐣ワ級: userId={}, messageUuid={}, error={}", userId, assistantMsgUuid, e.getMessage());
+                log.warn("分支别名生成失败（静默忽略）: userId={}, messageUuid={}, error={}", userId, assistantMsgUuid, e.getMessage());
             }
         });
     }
 
     /**
-     * 涓哄崟涓彾鑺傜偣鏋勫缓鍒嗘敮鎽樿銆?
+     * 为单个叶节点构建分支摘要?
      */
     private ChatBranchSummaryResponse buildBranchSummary(ChatMessageEntity leaf,
                                                           List<ChatMessageEntity> allMessages) {
@@ -556,7 +556,7 @@ public class AiChatService {
             msgMap.put(m.getUuid(), m);
         }
 
-        // 鍚戜笂閬嶅巻閾撅紝鎵炬渶杩戠殑 ASSISTANT 鍜?USER
+        // 向上遍历链，找最近的 ASSISTANT ?USER
         while (cursor != null) {
             ChatMessageEntity current = msgMap.get(cursor);
             if (current == null) break;
@@ -585,10 +585,10 @@ public class AiChatService {
     }
 
     /**
-     * 鑾峰彇浼氳瘽涓婚摼娑堟伅銆?
+     * 获取会话主链消息?
      *
-     * 瑙勫垯锛氬綋鏈寚瀹?leafUuid 鏃讹紝鍙栤€滄渶鍚庡垱寤虹殑鍙跺瓙鑺傜偣鈥濅綔涓哄綋鍓嶄富閾惧彾瀛愶紝
-     * 骞惰繑鍥炶鍙跺瓙鐨勫畬鏁撮摼璺紝閬垮厤鎶婂鍒嗘敮鍏ㄩ噺娣峰湪涓€璧疯繑鍥炵粰鍓嶇銆?
+     * 规则：当未指?leafUuid 时，取最后创建的叶子节点”作为当前主链叶子，
+     * 并返回该叶子的完整链路，避免把多分支全量混在丢起返回给前端?
      */
     private List<ChatMessageEntity> listMainlineMessages(long userId, UUID sessionUuid) {
         List<ChatMessageEntity> allMessages = chatMessageRepository.findBySessionUuid(
@@ -624,7 +624,7 @@ public class AiChatService {
     }
 
     /**
-     * 鏍￠獙浼氳瘽褰掑睘鏉冿紝涓嶉€氳繃鍒欐姏鍑?404 寮傚父銆?
+     * 校验会话归属权，不过则抛?404 异常?
      */
     private ChatSessionEntity validateAndGetSession(UUID sessionUuid, long userId) {
         return chatSessionRepository.findByUuidAndUserId(sessionUuid, userId)
@@ -633,12 +633,12 @@ public class AiChatService {
     }
 
     
-    // 绉佹湁杈呭姪鏂规硶
+    // 私有辅助方法
     
 
     /**
      * 鏋勫缓 system prompt銆?
-     * 鏈夌瑪璁颁笂涓嬫枃鏃舵覆鏌?prompts/chat/note_system.md锛屽惁鍒欏姞杞?prompts/chat/global_system.md銆?
+     * 有笔记上下文时渲?prompts/chat/note_system.md，否则加?prompts/chat/global_system.md?
      */
     private String buildSystemPrompt(long userId, ChatSessionEntity session) {
         try {
@@ -654,7 +654,7 @@ public class AiChatService {
                 return globalSystemTemplate.getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
             }
 
-            // 缁勮 noteContext 娈佃惤
+            // 组装 noteContext 段落
             StringBuilder noteContext = new StringBuilder();
 
             if (hasText(note.getTitle())) {
@@ -664,15 +664,15 @@ public class AiChatService {
                 noteContext.append("**鎽樿**:\n").append(note.getSummary()).append("\n\n");
             }
 
-            // 浼樺厛浣跨敤鐢ㄦ埛鎵嬪啓鍐呭锛屽叾娆′娇鐢ㄧ埇鍙栧唴瀹?
+            // 优先使用用户手写内容，其次使用爬取内?
             String bodyContent = hasText(note.getContent())
                     ? note.getContent()
                     : note.getPreviewContent();
             if (hasText(bodyContent)) {
-                noteContext.append("**姝ｆ枃**:\n").append(bodyContent).append("\n\n");
+                noteContext.append("**正文**:\n").append(bodyContent).append("\n\n");
             }
 
-            // 鍥剧墖璇嗗埆缁撴灉锛坰tatus=DONE锛?
+            // 图片识别结果（status=DONE?
             List<AttachmentVisionEntity> visions = attachmentVisionRepository
                     .findDoneByNoteUuid(userId, session.getScopeNoteUuid());
             List<String> imageTexts = visions.stream()
@@ -681,7 +681,7 @@ public class AiChatService {
                     .filter(c -> !c.isBlank())
                     .toList();
             if (!imageTexts.isEmpty()) {
-                noteContext.append("**鍥剧墖璇嗗埆鍐呭**:\n");
+                noteContext.append("**图片识别内容**:\n");
                 for (String t : imageTexts) {
                     noteContext.append("- ").append(t).append("\n");
                 }
@@ -699,8 +699,8 @@ public class AiChatService {
     }
 
     /**
-     * 灏嗛鍩熸秷鎭垪琛ㄨ浆鎹负 Spring AI Message 瀵硅薄鍒楄〃銆?
-     * 浠呰浆鎹?TEXT 绫诲瀷鐨?USER/ASSISTANT 娑堟伅锛岃烦杩囧伐鍏疯皟鐢ㄦ秷鎭€?
+     * 将领域消息列表转换为 Spring AI Message 对象列表?
+     * 仅转?TEXT 类型?USER/ASSISTANT 消息，跳过工具调用消息?
      */
     private List<Message> toSpringAiMessages(List<ChatMessageEntity> entities) {
         return entities.stream()

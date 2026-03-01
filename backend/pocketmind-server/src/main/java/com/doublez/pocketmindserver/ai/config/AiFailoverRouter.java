@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.function.Function;
 
 /**
- * ChatClient 涓?>鍓?>鍏滃簳 鑷姩闄嶇骇璺敱鍣ㄣ€?
+ * ChatClient 主/次/兜底自动降级路由器。
  */
 @Slf4j
 @Component
@@ -47,19 +47,19 @@ public class AiFailoverRouter {
     }
 
     /**
-     * 鏂囨湰/閫氱敤瀵硅瘽锛歱rimary -> secondary -> fallback锛堝悓姝?闈炴祦寮忓満鏅級銆?
+        * 文本/通用对话：primary -> secondary -> fallback（同步、非流式场景）。
      */
     public <T> T executeChat(String purpose, Function<ChatClient, T> call) {
         return execute(purpose, buildChatClientChain(), call);
     }
 
     /**
-     * 鏂囨湰瀵硅瘽锛堝搷搴斿紡娴佺増鏈級锛歱rimary -> secondary -> fallback銆?
+        * 文本对话（响应式流版本）：primary -> secondary -> fallback。
      * <p>
-     * 涓庡悓姝ョ増鏈殑鍖哄埆锛歿@link ChatClient} 鐨?stream() 杩斿洖鎯版€?{@link Flux}锛?
-     * 鍦ㄨ闃呬箣鍓嶄笉浼氬彂璧风綉缁滆姹傦紝鍥犳鍚屾 try/catch 鏃犳硶鎹曡幏娴佸唴閿欒銆?
-     * 姝ゆ柟娉曚娇鐢?Reactor 鐨?{@code onErrorResume} 杩涜閾惧紡闄嶇骇锛?
-     * 浠呭綋璁㈤槄鏃剁湡姝ｅ嚭閿欙紝鎵嶈Е鍙戜笅涓€涓鎴风閲嶈瘯銆?
+        * 与同步版本不同，{@link ChatClient} 的 stream() 返回惰性 {@link Flux}。
+        * 在订阅前不会发起网络请求，因此同步 try/catch 无法捕获流内错误。
+        * 此方法使用 Reactor 的 {@code onErrorResume} 进行链式降级，
+        * 仅在订阅阶段真实出错时才切换到下一个客户端。
      * </p>
      */
     public Flux<String> executeChatStream(String purpose, Function<ChatClient, Flux<String>> call) {
@@ -69,7 +69,7 @@ public class AiFailoverRouter {
             final int tier = i;
             final ChatClient next = clients.get(i);
             chain = chain.onErrorResume(e -> {
-                log.warn("AI 娴佸紡璋冪敤澶辫触锛岄檷绾ц嚦绗?{} 灞?- purpose: {}, error: {}",
+                log.warn("AI 流式调用失败，降级到第 {} 层，purpose={}, error={}",
                         tier, purpose, e.getClass().getSimpleName());
                 return call.apply(next);
             });
@@ -77,7 +77,7 @@ public class AiFailoverRouter {
         return chain;
     }
 
-    /** 鎸夐厤缃瀯寤?chat 闄嶇骇閾撅紙primary -> secondary? -> fallback?锛夈€?*/
+    /** 按配置构建 chat 降级链（primary -> secondary -> fallback）。 */
     private List<ChatClient> buildChatClientChain() {
         List<ChatClient> list = new java.util.ArrayList<>();
         list.add(chatPrimaryChatClient);
@@ -89,7 +89,7 @@ public class AiFailoverRouter {
     }
 
     /**
-     * 瑙嗚鐞嗚В锛歷ision-primary -> vision-secondary -> vision-fallback锛坴ision-fallback 鍙€夛級銆?
+     * 视觉理解：vision-primary -> vision-secondary -> vision-fallback（fallback 可选）。
      */
     public <T> T executeVision(String purpose, Function<ChatClient, T> call) {
         ChatClient visionSecondary = visionSecondaryChatClientProvider == null ? null : visionSecondaryChatClientProvider.getIfAvailable();
@@ -101,7 +101,7 @@ public class AiFailoverRouter {
             return execute(purpose, List.of(visionPrimaryChatClient, visionSecondary), call);
         }
 
-        // 鏈厤缃?vision-secondary 鏃朵笉鍋氶檷绾э紙閬垮厤闅愬紡钀藉埌 chat 閾捐矾锛夈€?
+        // 未配置 vision-secondary 时不降级，避免隐式落到 chat 链路。
         return execute(purpose, List.of(visionPrimaryChatClient), call);
     }
 
@@ -114,7 +114,7 @@ public class AiFailoverRouter {
                 return call.apply(client);
             } catch (RuntimeException e) {
                 last = e;
-                log.warn("AI 璋冪敤澶辫触锛屽噯澶囬檷绾?- purpose: {}, tier: {}, error: {}",
+                log.warn("AI 调用失败，准备降级，purpose={}, tier={}, error={}",
                         purpose, tier, e.getClass().getSimpleName());
             }
         }
@@ -123,13 +123,13 @@ public class AiFailoverRouter {
             BusinessException ex = new BusinessException(
                     ApiCode.AI_RESPONSE_ERROR,
                     HttpStatus.INTERNAL_SERVER_ERROR,
-                    "AI 璋冪敤澶辫触锛歱urpose=" + purpose + ", lastError=" + last.getClass().getSimpleName()
+                    "AI 调用失败：purpose=" + purpose + ", lastError=" + last.getClass().getSimpleName()
             );
             ex.initCause(last);
             throw ex;
         }
         throw new BusinessException(ApiCode.AI_RESPONSE_ERROR, HttpStatus.INTERNAL_SERVER_ERROR,
-                "AI 璋冪敤澶辫触锛氭湭鎵惧埌鍙敤鐨?ChatClient - purpose=" + purpose);
+            "AI 调用失败：未找到可用 ChatClient，purpose=" + purpose);
     }
 }
 

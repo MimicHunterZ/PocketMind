@@ -15,7 +15,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * AssetRepository 鐨?MyBatis-Plus 瀹炵幇銆?
+ * AssetRepository 的 MyBatis-Plus 实现。
  */
 @Repository
 public class AssetDBRepository implements AssetRepository {
