@@ -1,0 +1,2 @@
+com.doublez.pocketmind.framework.rabbitmq.config.PocketmindRabbitConfig
+com.doublez.pocketmind.framework.rabbitmq.config.RabbitProducerAutoConfiguration

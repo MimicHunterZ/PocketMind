@@ -11,31 +11,14 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>framework-redis</artifactId>
-    <name>framework-redis</name>
-    <description>PocketMind Redis 基础设施模块</description>
+    <artifactId>framework-rabbitmq</artifactId>
+    <name>framework-rabbitmq</name>
+    <description>PocketMind RabbitMQ 基础设施模块</description>
 
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-redis</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-aop</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.aspectj</groupId>
-            <artifactId>aspectjweaver</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.redisson</groupId>
-            <artifactId>redisson</artifactId>
-            <version>3.40.0</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-pool2</artifactId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
         </dependency>
         <dependency>
             <groupId>tools.jackson.core</groupId>
@@ -61,7 +44,7 @@
                 <version>3.5.0</version>
                 <executions>
                     <execution>
-                        <id>enforce-framework-redis-boundary</id>
+                        <id>enforce-framework-rabbitmq-boundary</id>
                         <goals>
                             <goal>enforce</goal>
                         </goals>

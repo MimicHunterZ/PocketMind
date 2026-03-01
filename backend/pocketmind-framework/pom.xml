@@ -18,5 +18,6 @@
 
     <modules>
         <module>framework-redis</module>
+        <module>framework-rabbitmq</module>
     </modules>
 </project>
