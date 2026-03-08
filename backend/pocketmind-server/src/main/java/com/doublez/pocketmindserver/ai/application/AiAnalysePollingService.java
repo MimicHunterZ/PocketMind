@@ -10,6 +10,7 @@ import com.doublez.pocketmindserver.note.domain.tag.TagRepository;
 import com.doublez.pocketmindserver.note.infra.persistence.note.NoteTagRelationMapper;
 import com.doublez.pocketmindserver.mq.CrawlerProducer;
 import com.doublez.pocketmindserver.mq.event.CrawlerRequestEvent;
+import com.doublez.pocketmindserver.resource.application.NoteResourceSyncService;
 import com.doublez.pocketmindserver.shared.util.PromptBuilder;
 import com.doublez.pocketmind.common.web.ApiCode;
 import com.doublez.pocketmind.common.web.BusinessException;
@@ -44,6 +45,7 @@ public class AiAnalysePollingService {
     private final TagRepository tagRepository;
     private final NoteTagRelationMapper noteTagRelationMapper;
     private final TaskExecutor taskExecutor;
+    private final NoteResourceSyncService noteResourceSyncService;
 
     @Value("classpath:prompts/analyse/system_prompt.md")
     private Resource systemTemplate;
@@ -58,7 +60,8 @@ public class AiAnalysePollingService {
                                    AiAnalyseChatSessionService chatSessionService,
                                    TagRepository tagRepository,
                                    NoteTagRelationMapper noteTagRelationMapper,
-                                   @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor) {
+                                   @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
+                                   NoteResourceSyncService noteResourceSyncService) {
         this.noteRepository = noteRepository;
         this.crawlerProducer = crawlerProducer;
         this.jinaReaderClient = jinaReaderClient;
@@ -67,6 +70,7 @@ public class AiAnalysePollingService {
         this.tagRepository = tagRepository;
         this.noteTagRelationMapper = noteTagRelationMapper;
         this.taskExecutor = taskExecutor;
+        this.noteResourceSyncService = noteResourceSyncService;
     }
 
     /**
@@ -88,6 +92,7 @@ public class AiAnalysePollingService {
                 note.completeFetch(request.previewTitle(), request.previewDescription(), request.previewContent());
             }
             noteRepository.update(note);
+            noteResourceSyncService.syncProjectedResources(note);
             log.info("笔记已存在，执行 update: uuid={}", request.uuid());
         } else {
             note = NoteEntity.create(request.uuid(), userId);
@@ -105,6 +110,7 @@ public class AiAnalysePollingService {
                 note.pendingForFetch();
             }
             noteRepository.save(note);
+            noteResourceSyncService.syncProjectedResources(note);
         }
 
         if (request.hasPreviewContent()) {
@@ -152,6 +158,7 @@ public class AiAnalysePollingService {
                     content = pickFirstNonBlank(content, resp.data().content());
                     note.completeFetch(title, description, content);
                     noteRepository.update(note);
+                    noteResourceSyncService.syncProjectedResources(note);
                 }
             } catch (Exception e) {
                 log.warn("fetch content failed, uuid={}, url={}", noteUuid, note.getSourceUrl(), e);
@@ -161,6 +168,7 @@ public class AiAnalysePollingService {
         if (content == null || content.isBlank()) {
             note.failFetch();
             noteRepository.update(note);
+            noteResourceSyncService.syncProjectedResources(note);
             return;
         }
 
@@ -188,6 +196,7 @@ public class AiAnalysePollingService {
             log.error("Failed to build prompt for note {}, url={}", noteUuid, note.getSourceUrl(), e);
             note.failFetch();
             noteRepository.update(note);
+            noteResourceSyncService.syncProjectedResources(note);
             return;
         }
 
@@ -233,6 +242,7 @@ public class AiAnalysePollingService {
         if (result.summary() != null && !result.summary().isBlank()) {
             note.updateSummary(result.summary());
             noteRepository.update(note);
+            noteResourceSyncService.syncProjectedResources(note);
         }
 
         // 写入 AI 标签

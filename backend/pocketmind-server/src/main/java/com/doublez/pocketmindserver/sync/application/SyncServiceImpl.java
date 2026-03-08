@@ -4,6 +4,7 @@ import com.doublez.pocketmindserver.note.domain.category.CategoryEntity;
 import com.doublez.pocketmindserver.note.domain.category.CategoryRepository;
 import com.doublez.pocketmindserver.note.domain.note.NoteEntity;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
+import com.doublez.pocketmindserver.resource.application.NoteResourceSyncService;
 import com.doublez.pocketmindserver.sync.api.dto.SyncChangeItem;
 import com.doublez.pocketmindserver.sync.api.dto.SyncMutationDto;
 import com.doublez.pocketmindserver.sync.api.dto.SyncPullResponse;
@@ -46,6 +47,7 @@ public class SyncServiceImpl implements SyncService {
     private final TransactionTemplate transactionTemplate;
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
+    private final NoteResourceSyncService noteResourceSyncService;
 
     // ─── Pull ────────────────────────────────────────────────────────────────
 
@@ -141,6 +143,9 @@ public class SyncServiceImpl implements SyncService {
         // 注意：不能调用 noteRepository.update(note) —— @TableLogic 可能导致 is_deleted
         // 被 MyBatis-Plus 从 UPDATE SET 中排除。这里必须使用显式 SQL 软删除。
         noteRepository.softDeleteByUuidAndUserId(entityUuid, userId, mutation.updatedAt());
+        note.softDelete();
+        note.overrideUpdatedAtForSync(mutation.updatedAt());
+        noteResourceSyncService.softDeleteByNote(note);
 
         long sv = changeLogRepository.insert(
                 userId, "note", entityUuid, "delete",
@@ -159,6 +164,7 @@ public class SyncServiceImpl implements SyncService {
         boolean urlChanged = applyPayloadToNote(note, mutation.payload());
         note.overrideUpdatedAtForSync(mutation.updatedAt());
         noteRepository.save(note);
+        noteResourceSyncService.syncProjectedResources(note);
 
         // Tags 必须在 noteRepository.save() 之后写入，否则 persistTagRelations() 会清除本次写入
         List<String> clientTagsCreate = extractTagNames(mutation.payload());
@@ -193,6 +199,7 @@ public class SyncServiceImpl implements SyncService {
             boolean urlChanged = applyPayloadToNote(serverNote, mutation.payload());
             serverNote.overrideUpdatedAtForSync(mutation.updatedAt());
             noteRepository.update(serverNote);
+            noteResourceSyncService.syncProjectedResources(serverNote);
 
             // Tags 必须在 noteRepository.update() 之后写入，否则 persistTagRelations() 会清除本次写入
             List<String> clientTagsUpdate = extractTagNames(mutation.payload());
@@ -325,6 +332,7 @@ public class SyncServiceImpl implements SyncService {
             }
 
             NoteEntity note = opt.get();
+            noteResourceSyncService.syncProjectedResources(note);
             List<String> tagNames = noteRepository.findTagNamesByUuid(noteUuid, userId);
             String payloadJson = toJson(buildNotePayloadMap(note, tagNames));
 

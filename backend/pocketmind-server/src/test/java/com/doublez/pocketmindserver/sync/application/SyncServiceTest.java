@@ -4,6 +4,7 @@ import com.doublez.pocketmindserver.note.domain.category.CategoryEntity;
 import com.doublez.pocketmindserver.note.domain.category.CategoryRepository;
 import com.doublez.pocketmindserver.note.domain.note.NoteEntity;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
+import com.doublez.pocketmindserver.resource.application.NoteResourceSyncService;
 import com.doublez.pocketmindserver.sync.api.dto.SyncMutationDto;
 import com.doublez.pocketmindserver.sync.api.dto.SyncPullResponse;
 import com.doublez.pocketmindserver.sync.api.dto.SyncPushRequest;
@@ -49,6 +50,7 @@ class SyncServiceTest {
     @Mock private SyncChangeLogRepository changeLogRepository;
     @Mock private TransactionTemplate transactionTemplate;
     @Mock private ApplicationEventPublisher eventPublisher;
+    @Mock private NoteResourceSyncService noteResourceSyncService;
 
     private SyncServiceImpl service;
 
@@ -64,7 +66,8 @@ class SyncServiceTest {
                 changeLogRepository,
                 transactionTemplate,
                 eventPublisher,
-                new ObjectMapper()
+                new ObjectMapper(),
+                noteResourceSyncService
         );
         // 让 TransactionTemplate 直接执行回调，模拟事务内行为
         lenient().doAnswer(inv -> {
