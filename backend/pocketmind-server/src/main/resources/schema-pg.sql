@@ -228,7 +228,103 @@ CREATE INDEX IF NOT EXISTS idx_sessions_user_uuid     ON chat_sessions(user_id, 
 CREATE INDEX IF NOT EXISTS idx_sessions_scope_note    ON chat_sessions(user_id, scope_note_uuid);
 
 -- ============================================================
--- 8. chat_messages
+-- 8. context_catalog（上下文统一目录索引）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS context_catalog (
+    id               BIGSERIAL    PRIMARY KEY,
+    uuid             UUID         NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    user_id          BIGINT,
+    context_type     VARCHAR(20)  NOT NULL,
+    sub_type         VARCHAR(50),
+    uri              TEXT         NOT NULL UNIQUE,
+    parent_uri       TEXT,
+    name             TEXT,
+    description      TEXT,
+    layer            VARCHAR(20)  NOT NULL DEFAULT 'L2_DETAIL',
+    status           VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
+    is_leaf          BOOLEAN      NOT NULL DEFAULT TRUE,
+    active_count     BIGINT       NOT NULL DEFAULT 0,
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at       BIGINT       NOT NULL DEFAULT 0,
+    is_deleted       BOOLEAN      NOT NULL DEFAULT FALSE
+);
+
+CREATE INDEX IF NOT EXISTS idx_context_catalog_user_type ON context_catalog(user_id, context_type, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_context_catalog_parent    ON context_catalog(parent_uri);
+
+-- ============================================================
+-- 9. context_ref（业务对象与上下文对象关联）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS context_ref (
+    id               BIGSERIAL    PRIMARY KEY,
+    uuid             UUID         NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    user_id          BIGINT       NOT NULL,
+    context_uri      TEXT         NOT NULL,
+    biz_type         VARCHAR(30)  NOT NULL,
+    biz_id           TEXT,
+    note_uuid        UUID,
+    session_uuid     UUID,
+    message_uuid     UUID,
+    asset_uuid       UUID,
+    source_url       TEXT,
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at       BIGINT       NOT NULL DEFAULT 0,
+    is_deleted       BOOLEAN      NOT NULL DEFAULT FALSE
+);
+
+CREATE INDEX IF NOT EXISTS idx_context_ref_user_biz     ON context_ref(user_id, biz_type, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_context_ref_note_uuid    ON context_ref(note_uuid);
+CREATE INDEX IF NOT EXISTS idx_context_ref_session_uuid ON context_ref(session_uuid);
+CREATE INDEX IF NOT EXISTS idx_context_ref_asset_uuid   ON context_ref(asset_uuid);
+
+-- ============================================================
+-- 10. resource_records（AI 可读资源记录）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS resource_records (
+    id               BIGSERIAL    PRIMARY KEY,
+    uuid             UUID         NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    user_id          BIGINT       NOT NULL,
+    source_type      VARCHAR(30)  NOT NULL,
+    root_uri         TEXT         NOT NULL,
+    title            TEXT,
+    content          TEXT,
+    source_url       TEXT,
+    note_uuid        UUID,
+    session_uuid     UUID,
+    asset_uuid       UUID,
+    status           VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at       BIGINT       NOT NULL DEFAULT 0,
+    is_deleted       BOOLEAN      NOT NULL DEFAULT FALSE
+);
+
+CREATE INDEX IF NOT EXISTS idx_resource_records_user_source ON resource_records(user_id, source_type, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_resource_records_note_uuid   ON resource_records(note_uuid);
+CREATE INDEX IF NOT EXISTS idx_resource_records_session     ON resource_records(session_uuid);
+CREATE INDEX IF NOT EXISTS idx_resource_records_asset       ON resource_records(asset_uuid);
+
+-- ============================================================
+-- 11. memory_records（用户长期记忆记录）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS memory_records (
+    id               BIGSERIAL    PRIMARY KEY,
+    uuid             UUID         NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    user_id          BIGINT       NOT NULL,
+    memory_type      VARCHAR(30)  NOT NULL,
+    root_uri         TEXT         NOT NULL,
+    title            TEXT,
+    content          TEXT,
+    source_context_uri TEXT,
+    status           VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at       BIGINT       NOT NULL DEFAULT 0,
+    is_deleted       BOOLEAN      NOT NULL DEFAULT FALSE
+);
+
+CREATE INDEX IF NOT EXISTS idx_memory_records_user_type ON memory_records(user_id, memory_type, updated_at DESC);
+
+-- ============================================================
+-- 12. chat_messages
 -- ============================================================
 CREATE TABLE IF NOT EXISTS chat_messages (
     id               BIGSERIAL   PRIMARY KEY,
