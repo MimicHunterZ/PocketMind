@@ -2,9 +2,9 @@ package com.doublez.pocketmindserver.demo;
 
 import org.springaicommunity.agent.tools.FileSystemTools;
 import org.springaicommunity.agent.tools.ShellTools;
-import org.springaicommunity.agent.tools.SkillsTool;
 import com.doublez.pocketmindserver.ai.config.AiProvidersProperties;
 import com.doublez.pocketmindserver.ai.config.AiClientId;
+import com.doublez.pocketmindserver.ai.tool.skill.MultiTenantSkillsToolFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.ai.chat.client.ChatClient;
@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Skill Demo 全局配置
@@ -40,6 +41,12 @@ import java.util.Map;
 @Configuration
 @ConditionalOnProperty(prefix = "pocketmind.demo", name = "enabled", havingValue = "true")
 public class SkillDemoConfiguration {
+
+    private final MultiTenantSkillsToolFactory multiTenantSkillsToolFactory;
+
+    public SkillDemoConfiguration(MultiTenantSkillsToolFactory multiTenantSkillsToolFactory) {
+        this.multiTenantSkillsToolFactory = multiTenantSkillsToolFactory;
+    }
 
     @Value("${pocketmind.observability.tool.log-full-payload:false}")
     private boolean logFullPayload;
@@ -65,6 +72,15 @@ public class SkillDemoConfiguration {
     // 默认用 ../.claude/skills：本项目通常从 backend 目录启动 Spring Boot。
     @Value("${pocketmind.demo.skills-path:../.claude/skills}")
     private String skillsPath;
+
+    @Value("${pocketmind.demo.tenant-skills-base-path:../.claude/tenants}")
+    private String tenantSkillsBasePath;
+
+    @Value("${pocketmind.demo.tenant-key:demo}")
+    private String tenantKey;
+
+    @Value("${pocketmind.demo.agent-key:claude}")
+    private String agentKey;
 
     @Value("${pocketmind.demo.http.buffering-enabled:true}")
     private boolean bufferingEnabled;
@@ -225,13 +241,20 @@ public class SkillDemoConfiguration {
     }
 
     private ToolCallback[] observedToolCallbacks(String modelName) {
-        ToolCallback[] skillCallbacks = resolveToolCallbacks(SkillsTool.builder()
-                .addSkillsDirectory(skillsPath)
-                .build());
+        Optional<ToolCallback> skillCallback = multiTenantSkillsToolFactory.build(skillsPath, tenantSkillsBasePath, tenantKey, agentKey);
+        ToolCallback[] skillCallbacks = skillCallback.map(this::resolveToolCallbacks).orElseGet(() -> new ToolCallback[0]);
         ToolCallback[] fileCallbacks = resolveToolCallbacks(FileSystemTools.builder().build());
         ToolCallback[] shellCallbacks = resolveToolCallbacks(ShellTools.builder().build());
 
         List<ToolCallback> allCallbacks = new ArrayList<>();
+        if (skillCallback.isEmpty()) {
+            org.slf4j.LoggerFactory.getLogger(SkillDemoConfiguration.class)
+                .info("[skill-demo] demo 未注入 tenant skill: tenantKey={}, agentKey={}, skillsPath={}, tenantSkillsBasePath={}",
+                    tenantKey, agentKey, skillsPath, tenantSkillsBasePath);
+        } else {
+            org.slf4j.LoggerFactory.getLogger(SkillDemoConfiguration.class)
+                .info("[skill-demo] demo 已注入 tenant skill: tenantKey={}, agentKey={}", tenantKey, agentKey);
+        }
         allCallbacks.addAll(Arrays.asList(skillCallbacks));
         allCallbacks.addAll(Arrays.asList(fileCallbacks));
         allCallbacks.addAll(Arrays.asList(shellCallbacks));

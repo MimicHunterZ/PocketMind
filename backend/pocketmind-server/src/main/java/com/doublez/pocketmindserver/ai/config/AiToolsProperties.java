@@ -18,12 +18,26 @@ public record AiToolsProperties(
          *
          * 说明：默认从 backend 目录启动时，仓库根目录的 .claude/skills 在 ../.claude/skills。
          */
-        String skillsPath
+        String skillsPath,
+
+        /**
+         * 多租户 skills 根目录。
+         *
+         * <p>目录规范：</p>
+         * <ul>
+         *     <li>{tenantKey}/skills/** /SKILL.md</li>
+         *     <li>{tenantKey}/agents/{agentKey}/skills/** /SKILL.md</li>
+         * </ul>
+         */
+        String tenantSkillsBasePath
 ) {
 
     public AiToolsProperties {
         if (skillsPath == null || skillsPath.isBlank()) {
             skillsPath = "../.claude/skills";
+        }
+        if (tenantSkillsBasePath == null || tenantSkillsBasePath.isBlank()) {
+            tenantSkillsBasePath = "../.claude/tenants";
         }
     }
 }

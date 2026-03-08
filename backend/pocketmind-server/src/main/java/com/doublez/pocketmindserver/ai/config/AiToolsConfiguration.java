@@ -2,7 +2,6 @@ package com.doublez.pocketmindserver.ai.config;
 
 import org.springaicommunity.agent.tools.FileSystemTools;
 import org.springaicommunity.agent.tools.ShellTools;
-import org.springaicommunity.agent.tools.SkillsTool;
 import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -12,6 +11,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,6 +27,8 @@ import java.util.List;
 @ConditionalOnProperty(prefix = "pocketmind.ai.tools", name = "enabled", havingValue = "true")
 public class AiToolsConfiguration {
 
+    private static final Logger log = LoggerFactory.getLogger(AiToolsConfiguration.class);
+
     @Bean
     public static BeanFactoryPostProcessor aiToolCallbackRegistrar(AiToolsProperties props) {
         return beanFactory -> {
@@ -34,9 +37,8 @@ public class AiToolsConfiguration {
             }
 
             List<ToolCallback> allCallbacks = new ArrayList<>();
-            allCallbacks.addAll(Arrays.asList(resolveToolCallbacks(
-                    SkillsTool.builder().addSkillsDirectory(props.skillsPath()).build()
-            )));
+            log.info("[skill] 静态 SkillsTool 注册已关闭，改为请求级多租户注入: sharedSkillsPath={}, tenantSkillsBasePath={}",
+                props.skillsPath(), props.tenantSkillsBasePath());
             allCallbacks.addAll(Arrays.asList(resolveToolCallbacks(FileSystemTools.builder().build())));
             allCallbacks.addAll(Arrays.asList(resolveToolCallbacks(ShellTools.builder().build())));
 
