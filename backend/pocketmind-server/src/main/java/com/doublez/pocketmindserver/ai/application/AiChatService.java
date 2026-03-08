@@ -1,86 +1,55 @@
 package com.doublez.pocketmindserver.ai.application;
 
-import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
+import com.doublez.pocketmindserver.ai.application.context.ContextAssembler;
+import com.doublez.pocketmindserver.ai.application.stream.SseReplyService;
 import com.doublez.pocketmindserver.ai.api.dto.chat.ChatBranchSummaryResponse;
-import com.doublez.pocketmindserver.attachment.domain.vision.AttachmentVisionEntity;
-import com.doublez.pocketmindserver.attachment.domain.vision.AttachmentVisionRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
-import com.doublez.pocketmindserver.note.domain.note.NoteEntity;
-import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
+import com.doublez.pocketmindserver.resource.application.ChatTranscriptResourceSyncService;
 import com.doublez.pocketmindserver.shared.domain.PageQuery;
-import com.doublez.pocketmindserver.shared.util.PromptBuilder;
 import com.doublez.pocketmind.common.web.ApiCode;
 import com.doublez.pocketmind.common.web.BusinessException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
-
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * AI 瀵硅瘽娴佸紡搴旂敤鏈嶅姟銆?
- * 负责：组装上下文（历史消?+ 笔记摘要 + 图片描述）→ 流式调用 AI ?持久化消息?
+ * AI 对话服务层?
+ * 负责：组装上下文（历史消?+ 笔记摘要 + 图片描述）→ 流式调用 AI 持久化消息
  */
 @Slf4j
 @Service
 public class AiChatService {
 
-    private final AiFailoverRouter aiFailoverRouter;
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
-    private final NoteRepository noteRepository;
-    private final AttachmentVisionRepository attachmentVisionRepository;
-    private final ChatStreamCancellationManager chatStreamCancellationManager;
-    private final ChatSseEventFactory chatSseEventFactory;
-
-    @Value("classpath:prompts/chat/global_system.md")
-    private Resource globalSystemTemplate;
-
-    @Value("classpath:prompts/chat/note_system.md")
-    private Resource noteSystemTemplate;
-
-    @Value("classpath:prompts/chat/branch_alias_system.md")
-    private Resource branchAliasSystemTemplate;
-
-    @Value("classpath:prompts/chat/branch_alias_user.md")
-    private Resource branchAliasUserTemplate;
+    private final ContextAssembler contextAssembler;
+    private final SseReplyService sseReplyService;
+    private final ChatTranscriptResourceSyncService chatTranscriptResourceSyncService;
 
     public AiChatService(
-            AiFailoverRouter aiFailoverRouter,
             ChatSessionRepository chatSessionRepository,
             ChatMessageRepository chatMessageRepository,
-            NoteRepository noteRepository,
-            AttachmentVisionRepository attachmentVisionRepository,
-            ChatStreamCancellationManager chatStreamCancellationManager,
-            ChatSseEventFactory chatSseEventFactory) {
-        this.aiFailoverRouter = aiFailoverRouter;
+            ContextAssembler contextAssembler,
+            SseReplyService sseReplyService,
+            ChatTranscriptResourceSyncService chatTranscriptResourceSyncService) {
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
-        this.noteRepository = noteRepository;
-        this.attachmentVisionRepository = attachmentVisionRepository;
-        this.chatStreamCancellationManager = chatStreamCancellationManager;
-        this.chatSseEventFactory = chatSseEventFactory;
+        this.contextAssembler = contextAssembler;
+        this.sseReplyService = sseReplyService;
+        this.chatTranscriptResourceSyncService = chatTranscriptResourceSyncService;
     }
 
     
@@ -96,6 +65,7 @@ public class AiChatService {
         ChatSessionEntity session = ChatSessionEntity.create(
             sessionUuid, userId, noteUuid, finalTitle);
         chatSessionRepository.save(session);
+        chatTranscriptResourceSyncService.syncSessionTranscript(userId, sessionUuid);
         log.info("创建会话: userId={}, sessionUuid={}, noteUuid={}", userId, sessionUuid, noteUuid);
         return session;
     }
@@ -132,6 +102,7 @@ public class AiChatService {
     public void deleteSession(long userId, UUID sessionUuid) {
         validateAndGetSession(sessionUuid, userId);
         chatSessionRepository.deleteByUuidAndUserId(sessionUuid, userId);
+        chatTranscriptResourceSyncService.softDeleteBySession(userId, sessionUuid);
         log.info("删除会话: userId={}, sessionUuid={}", userId, sessionUuid);
     }
 
@@ -179,7 +150,7 @@ public class AiChatService {
         }
 
         // 3. 构建 system prompt（含笔记上下?+ 图片识别内容?
-        String systemText = buildSystemPrompt(userId, session);
+        String systemText = contextAssembler.buildSystemPrompt(userId, session, userPrompt);
 
         // 4. 持久化用户消息（同步落库?
         UUID userMsgUuid = UUID.randomUUID();
@@ -187,6 +158,7 @@ public class AiChatService {
                 userMsgUuid, userId, sessionUuid, effectiveParentUuid,
                 ChatRole.USER, userPrompt, attachmentUuids);
         chatMessageRepository.save(userMsg);
+        chatTranscriptResourceSyncService.syncSessionTranscript(userId, sessionUuid);
 
         // 5. 棢测分叉：?parentUuid 非空，则本次是显式分岔操?
         final boolean isFork = (parentUuid != null);
@@ -195,7 +167,7 @@ public class AiChatService {
         List<Message> historyMessages = toSpringAiMessages(history);
 
         // 7. 流式调用 AI
-        return buildAndStream(userId, sessionUuid, userMsgUuid,
+        return sseReplyService.streamReply(userId, sessionUuid, userMsgUuid,
             userPrompt, systemText, historyMessages, isFork, requestId);
     }
 
@@ -235,6 +207,10 @@ public class AiChatService {
         chatMessageRepository.updateContent(messageUuid, userId, newContent);
         // 单次 SQL 清理?USER 消息的所?ASSISTANT 子消?
         chatMessageRepository.softDeleteAssistantChildren(messageUuid, userId);
+        ChatMessageEntity edited = chatMessageRepository.findByUuidAndUserId(messageUuid, userId).orElse(null);
+        if (edited != null) {
+            chatTranscriptResourceSyncService.syncSessionTranscript(userId, edited.getSessionUuid());
+        }
         log.info("编辑用户消息: userId={}, messageUuid={}", userId, messageUuid);
     }
 
@@ -270,6 +246,7 @@ public class AiChatService {
                         "ASSISTANT 消息没有关联?USER 消息");
             }
             chatMessageRepository.softDeleteByUuids(List.of(messageUuid), userId);
+                chatTranscriptResourceSyncService.syncSessionTranscript(userId, sessionUuid);
             userMsg = chatMessageRepository.findByUuidAndUserId(userMsgUuid, userId)
                     .orElseThrow(() -> new BusinessException(
                             ApiCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, "userMsgUuid=" + userMsgUuid));
@@ -284,10 +261,10 @@ public class AiChatService {
                 ? chatMessageRepository.findChain(userMsg.getParentUuid(), userId)
                 : List.of();
 
-        String systemText = buildSystemPrompt(userId, session);
+        String systemText = contextAssembler.buildSystemPrompt(userId, session, userMsg.getContent());
         List<Message> historyMessages = toSpringAiMessages(history);
 
-        return buildAndStream(userId, sessionUuid, userMsg.getUuid(),
+        return sseReplyService.streamReply(userId, sessionUuid, userMsg.getUuid(),
             userMsg.getContent(), systemText, historyMessages, false, requestId);
     }
 
@@ -296,13 +273,7 @@ public class AiChatService {
      */
     public void stopReply(long userId, UUID sessionUuid, String requestId) {
         validateAndGetSession(sessionUuid, userId);
-        String streamKey = chatStreamCancellationManager.buildKey(userId, sessionUuid, requestId);
-        boolean cancelled = chatStreamCancellationManager.cancel(streamKey, "user_stop");
-        if (cancelled) {
-            log.info("鍋滄娴佸紡鍥炲: userId={}, sessionUuid={}, requestId={}", userId, sessionUuid, requestId);
-        } else {
-            log.info("停止流式回复请求未命中活动流: userId={}, sessionUuid={}, requestId={}", userId, sessionUuid, requestId);
-        }
+        sseReplyService.stopReply(userId, sessionUuid, requestId);
     }
 
     
@@ -365,180 +336,6 @@ public class AiChatService {
     
     // 私有核心方法
     
-
-    /**
-     * 流式调用 AI 并落?ASSISTANT 消息的核心辑?
-     */
-    private Flux<ServerSentEvent<String>> buildAndStream(long userId,
-                                                          UUID sessionUuid,
-                                                          UUID userMsgUuid,
-                                                          String userPrompt,
-                                                          String systemText,
-                                                          List<Message> historyMessages,
-                                                          boolean isFork,
-                                                          String requestId) {
-        String effectiveRequestId = (requestId == null || requestId.isBlank())
-                ? UUID.randomUUID().toString()
-                : requestId;
-        String streamKey = chatStreamCancellationManager.buildKey(userId, sessionUuid, effectiveRequestId);
-        AtomicBoolean cancelled = new AtomicBoolean(false);
-        Mono<Void> cancelSignal = chatStreamCancellationManager.listenCancel(streamKey)
-                .doOnNext(reason -> {
-                    cancelled.set(true);
-                    log.info("棢测到流式回复取消信号: userId={}, sessionUuid={}, requestId={}, reason={}",
-                            userId, sessionUuid, effectiveRequestId, reason);
-                })
-                .then();
-
-        StringBuilder accumulator = new StringBuilder();
-        Flux<String> contentFlux = buildContentFlux(systemText, historyMessages, userPrompt);
-
-        Mono<ServerSentEvent<String>> terminalEvent = Mono.fromCallable(() -> {
-            if (cancelled.get()) {
-                return handlePausedTerminal(userId, sessionUuid, userMsgUuid, accumulator, effectiveRequestId);
-            }
-            return handleDoneTerminal(
-                    userId,
-                    sessionUuid,
-                    userMsgUuid,
-                    userPrompt,
-                    historyMessages,
-                    isFork,
-                    accumulator,
-                    effectiveRequestId
-            );
-        }).subscribeOn(Schedulers.boundedElastic());
-
-        return contentFlux
-                .takeUntilOther(cancelSignal)
-                .map(delta -> {
-                    accumulator.append(delta);
-                    return chatSseEventFactory.delta(delta);
-                })
-                .concatWith(terminalEvent)
-                .onErrorResume(e -> {
-                    if (cancelled.get()) {
-                        return Flux.just(chatSseEventFactory.paused(effectiveRequestId, null));
-                    }
-                    log.error("AI 娴佸紡鍥炲寮傚父: userId={}, sessionUuid={}", userId, sessionUuid, e);
-                    String safeMsg = e.getMessage() != null ? e.getMessage() : "AI 服务异常";
-                    return Flux.just(chatSseEventFactory.error(effectiveRequestId, safeMsg));
-                })
-                .doFinally(signalType -> chatStreamCancellationManager.cleanup(streamKey));
-    }
-
-    private Flux<String> buildContentFlux(String systemText,
-                                          List<Message> historyMessages,
-                                          String userPrompt) {
-        return aiFailoverRouter.executeChatStream(
-                "streamReply",
-                client -> client.prompt()
-                        .system(systemText)
-                        .messages(historyMessages.toArray(new Message[0]))
-                        .user(userPrompt)
-                        .stream()
-                        .content()
-        );
-    }
-
-    private ServerSentEvent<String> handlePausedTerminal(long userId,
-                                                          UUID sessionUuid,
-                                                          UUID userMsgUuid,
-                                                          StringBuilder accumulator,
-                                                          String requestId) {
-        String partialContent = accumulator.toString();
-        UUID pausedMessageUuid = null;
-        if (!partialContent.isBlank()) {
-            pausedMessageUuid = persistAssistant(userId, sessionUuid, userMsgUuid, partialContent);
-            log.info("AI 流式回复暂停并保存部分内? userId={}, sessionUuid={}, assistantMsgUuid={}",
-                    userId, sessionUuid, pausedMessageUuid);
-        } else {
-            log.info("AI 流式回复暂停（无可保存增量）: userId={}, sessionUuid={}", userId, sessionUuid);
-        }
-        return chatSseEventFactory.paused(requestId, pausedMessageUuid);
-    }
-
-    private ServerSentEvent<String> handleDoneTerminal(long userId,
-                                                        UUID sessionUuid,
-                                                        UUID userMsgUuid,
-                                                        String userPrompt,
-                                                        List<Message> historyMessages,
-                                                        boolean isFork,
-                                                        StringBuilder accumulator,
-                                                        String requestId) {
-        String fullContent = accumulator.toString();
-        UUID assistantMsgUuid = persistAssistant(userId, sessionUuid, userMsgUuid, fullContent);
-
-        log.info("AI 娴佸紡鍥炲瀹屾垚: userId={}, sessionUuid={}, assistantMsgUuid={}",
-                userId, sessionUuid, assistantMsgUuid);
-
-        if (isFork) {
-            generateBranchAliasAsync(userId, assistantMsgUuid, userMsgUuid, historyMessages, userPrompt);
-        }
-
-        return chatSseEventFactory.done(requestId, assistantMsgUuid);
-    }
-
-    private UUID persistAssistant(long userId,
-                                  UUID sessionUuid,
-                                  UUID userMsgUuid,
-                                  String content) {
-        UUID assistantMsgUuid = UUID.randomUUID();
-        ChatMessageEntity assistantMsg = ChatMessageEntity.create(
-                assistantMsgUuid,
-                userId,
-                sessionUuid,
-                userMsgUuid,
-                ChatRole.ASSISTANT,
-                content,
-                List.of());
-        chatMessageRepository.save(assistantMsg);
-        return assistantMsgUuid;
-    }
-
-    /**
-     * 异步生成分支别名并写入数据库?
-     * 使用廉价的一次?LLM 调用，传?1-2 轮对话上下文?
-     */
-    private void generateBranchAliasAsync(long userId,
-                                           UUID assistantMsgUuid,
-                                           UUID userMsgUuid,
-                                           List<Message> historyMessages,
-                                           String userPrompt) {
-        Schedulers.boundedElastic().schedule(() -> {
-            try {
-                // 取最?1 轮的上下文：此前历史末尾 AI 回复（如有）
-                String contextPrefix = "";
-                if (!historyMessages.isEmpty()) {
-                    Message last = historyMessages.get(historyMessages.size() - 1);
-                    String lastText = last.getText();
-                    contextPrefix = "上文：" + lastText.substring(0, Math.min(lastText.length(), 200)) + "\n";
-                }
-                String truncatedPrompt = userPrompt.substring(0, Math.min(userPrompt.length(), 200));
-
-                Prompt prompt = PromptBuilder.build(
-                        branchAliasSystemTemplate,
-                        branchAliasUserTemplate,
-                        Map.of("contextPrefix", contextPrefix, "userMessage", truncatedPrompt)
-                );
-                String alias = aiFailoverRouter.executeChat(
-                        "branchAlias",
-                        client -> client.prompt(prompt).call().content()
-                );
-                if (alias != null) {
-                    // 鎴彇鍓?8 瀛楋紝鍘婚櫎绌虹櫧/鏍囩偣
-                    alias = alias.replaceAll("[\\p{P}\\s]", "");
-                    if (alias.length() > 10) alias = alias.substring(0, 10);
-                    if (!alias.isBlank()) {
-                        chatMessageRepository.updateBranchAlias(assistantMsgUuid, userId, alias);
-                        log.info("分支别名生成: userId={}, messageUuid={}, alias={}", userId, assistantMsgUuid, alias);
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("分支别名生成失败（静默忽略）: userId={}, messageUuid={}, error={}", userId, assistantMsgUuid, e.getMessage());
-            }
-        });
-    }
 
     /**
      * 为单个叶节点构建分支摘要?
@@ -637,68 +434,6 @@ public class AiChatService {
     
 
     /**
-     * 鏋勫缓 system prompt銆?
-     * 有笔记上下文时渲?prompts/chat/note_system.md，否则加?prompts/chat/global_system.md?
-     */
-    private String buildSystemPrompt(long userId, ChatSessionEntity session) {
-        try {
-            if (session.getScopeNoteUuid() == null) {
-                return globalSystemTemplate.getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
-            }
-
-            NoteEntity note = noteRepository
-                    .findByUuidAndUserId(session.getScopeNoteUuid(), userId)
-                    .orElse(null);
-
-            if (note == null) {
-                return globalSystemTemplate.getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
-            }
-
-            // 组装 noteContext 段落
-            StringBuilder noteContext = new StringBuilder();
-
-            if (hasText(note.getTitle())) {
-                noteContext.append("**鏍囬**: ").append(note.getTitle()).append("\n\n");
-            }
-            if (hasText(note.getSummary())) {
-                noteContext.append("**鎽樿**:\n").append(note.getSummary()).append("\n\n");
-            }
-
-            // 优先使用用户手写内容，其次使用爬取内?
-            String bodyContent = hasText(note.getContent())
-                    ? note.getContent()
-                    : note.getPreviewContent();
-            if (hasText(bodyContent)) {
-                noteContext.append("**正文**:\n").append(bodyContent).append("\n\n");
-            }
-
-            // 图片识别结果（status=DONE?
-            List<AttachmentVisionEntity> visions = attachmentVisionRepository
-                    .findDoneByNoteUuid(userId, session.getScopeNoteUuid());
-            List<String> imageTexts = visions.stream()
-                    .map(AttachmentVisionEntity::getContent)
-                    .filter(Objects::nonNull)
-                    .filter(c -> !c.isBlank())
-                    .toList();
-            if (!imageTexts.isEmpty()) {
-                noteContext.append("**图片识别内容**:\n");
-                for (String t : imageTexts) {
-                    noteContext.append("- ").append(t).append("\n");
-                }
-                noteContext.append("\n");
-            }
-
-            return PromptBuilder.render(
-                    noteSystemTemplate,
-                    Map.of("noteContext", noteContext.toString())
-            );
-
-        } catch (IOException e) {
-            throw new UncheckedIOException("加载对话系统提示词模板失败", e);
-        }
-    }
-
-    /**
      * 将领域消息列表转换为 Spring AI Message 对象列表?
      * 仅转?TEXT 类型?USER/ASSISTANT 消息，跳过工具调用消息?
      */
@@ -716,8 +451,5 @@ public class AiChatService {
                 .toList();
     }
 
-    private boolean hasText(String s) {
-        return s != null && !s.isBlank();
-    }
 }
 

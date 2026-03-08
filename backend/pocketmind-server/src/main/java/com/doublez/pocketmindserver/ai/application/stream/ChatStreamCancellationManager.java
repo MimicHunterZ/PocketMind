@@ -1,4 +1,4 @@
-package com.doublez.pocketmindserver.ai.application;
+package com.doublez.pocketmindserver.ai.application.stream;
 
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Mono;
@@ -18,25 +18,14 @@ public class ChatStreamCancellationManager {
 
     private final Map<String, Sinks.One<String>> cancelSinkMap = new ConcurrentHashMap<>();
 
-    /**
-     * 构建流取消键。
-     */
     public String buildKey(long userId, UUID sessionUuid, String requestId) {
         return userId + ":" + sessionUuid + ":" + requestId;
     }
 
-    /**
-     * 监听取消信号（懒注册）。
-     */
     public Mono<String> listenCancel(String streamKey) {
         return cancelSinkMap.computeIfAbsent(streamKey, key -> Sinks.one()).asMono();
     }
 
-    /**
-     * 发出取消信号。
-     *
-     * @return true 表示找到并成功通知（或已终止）；false 表示找不到对应流
-     */
     public boolean cancel(String streamKey, String reason) {
         Sinks.One<String> sink = cancelSinkMap.get(streamKey);
         if (sink == null) {
@@ -46,9 +35,6 @@ public class ChatStreamCancellationManager {
         return result == Sinks.EmitResult.OK || result == Sinks.EmitResult.FAIL_TERMINATED;
     }
 
-    /**
-     * 清理取消信号资源。
-     */
     public void cleanup(String streamKey) {
         cancelSinkMap.remove(streamKey);
     }

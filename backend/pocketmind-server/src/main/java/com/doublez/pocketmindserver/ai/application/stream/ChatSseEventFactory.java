@@ -1,4 +1,4 @@
-package com.doublez.pocketmindserver.ai.application;
+package com.doublez.pocketmindserver.ai.application.stream;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -50,9 +50,6 @@ public class ChatSseEventFactory {
         return event("error", Map.of("message", message));
     }
 
-    /**
-     * 构建带 requestId 的错误事件，便于前端关联请求上下文。
-     */
     public ServerSentEvent<String> error(String requestId, String message) {
         return event("error", Map.of(
                 "requestId", requestId,

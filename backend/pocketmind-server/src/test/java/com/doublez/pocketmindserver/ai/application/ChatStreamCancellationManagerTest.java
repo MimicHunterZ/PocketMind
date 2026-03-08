@@ -1,5 +1,6 @@
 package com.doublez.pocketmindserver.ai.application;
 
+import com.doublez.pocketmindserver.ai.application.stream.ChatStreamCancellationManager;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;

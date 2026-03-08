@@ -1,13 +1,24 @@
 package com.doublez.pocketmindserver.ai.application;
 
+import com.doublez.pocketmindserver.ai.application.context.ContextAssembler;
+import com.doublez.pocketmindserver.ai.application.memory.MemoryQueryServiceImpl;
+import com.doublez.pocketmindserver.ai.application.stream.ChatSseEventFactory;
+import com.doublez.pocketmindserver.ai.application.stream.ChatStreamCancellationManager;
+import com.doublez.pocketmindserver.ai.application.stream.SseReplyService;
 import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
+import com.doublez.pocketmindserver.ai.tool.skill.TenantSkillToolResolver;
 import com.doublez.pocketmindserver.attachment.domain.vision.AttachmentVisionRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
+import com.doublez.pocketmindserver.context.domain.ContextUri;
+import com.doublez.pocketmindserver.memory.application.MemoryContextService;
+import com.doublez.pocketmindserver.memory.domain.MemoryType;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
+import com.doublez.pocketmindserver.resource.application.ChatTranscriptResourceSyncService;
+import com.doublez.pocketmindserver.resource.domain.ResourceRecordRepository;
 import com.doublez.pocketmindserver.shared.domain.PageQuery;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,10 +53,15 @@ class AiChatServicePauseTest {
     private ChatMessageRepository chatMessageRepository;
     private NoteRepository noteRepository;
     private AttachmentVisionRepository attachmentVisionRepository;
+    private ResourceRecordRepository resourceRecordRepository;
+    private ChatTranscriptResourceSyncService chatTranscriptResourceSyncService;
     private ChatStreamCancellationManager chatStreamCancellationManager;
     private ObjectMapper objectMapper;
     private ChatSseEventFactory chatSseEventFactory;
     private AiChatService aiChatService;
+    private TenantSkillToolResolver tenantSkillToolResolver;
+    private ContextAssembler contextAssembler;
+    private SseReplyService sseReplyService;
 
     @BeforeEach
     void setUp() {
@@ -54,24 +70,102 @@ class AiChatServicePauseTest {
         chatMessageRepository = mock(ChatMessageRepository.class);
         noteRepository = mock(NoteRepository.class);
         attachmentVisionRepository = mock(AttachmentVisionRepository.class);
+        resourceRecordRepository = mock(ResourceRecordRepository.class);
+        chatTranscriptResourceSyncService = mock(ChatTranscriptResourceSyncService.class);
+        tenantSkillToolResolver = mock(TenantSkillToolResolver.class);
         chatStreamCancellationManager = new ChatStreamCancellationManager();
         objectMapper = new ObjectMapper();
         chatSseEventFactory = new ChatSseEventFactory(objectMapper);
-
-        aiChatService = new AiChatService(
-                aiFailoverRouter,
-                chatSessionRepository,
-                chatMessageRepository,
+        contextAssembler = new ContextAssembler(
                 noteRepository,
                 attachmentVisionRepository,
+                resourceRecordRepository,
+                new MemoryQueryServiceImpl(new MemoryContextService() {
+                    @Override
+                    public ContextUri userMemoryRoot(long userId) {
+                        return ContextUri.userMemoriesRoot(userId);
+                    }
+
+                    @Override
+                    public ContextUri userMemoryByType(long userId, MemoryType memoryType) {
+                        return ContextUri.userMemoriesRoot(userId).child(memoryType.name().toLowerCase());
+                    }
+                })
+        );
+        sseReplyService = new SseReplyService(
+                aiFailoverRouter,
+                chatMessageRepository,
                 chatStreamCancellationManager,
-                chatSseEventFactory
+                chatSseEventFactory,
+            tenantSkillToolResolver,
+            chatTranscriptResourceSyncService
+        );
+
+        when(tenantSkillToolResolver.resolveForUser(anyLong(), anyString()))
+            .thenReturn(new TenantSkillToolResolver.ResolvedTenantSkillTool(
+                "user-1",
+                "claude",
+                null,
+                Map.of("tenantKey", "user-1", "agentKey", "claude")
+            ));
+
+        aiChatService = new AiChatService(
+                chatSessionRepository,
+                chatMessageRepository,
+            contextAssembler,
+            sseReplyService,
+            chatTranscriptResourceSyncService
         );
 
         ReflectionTestUtils.setField(
-                aiChatService,
+            contextAssembler,
                 "globalSystemTemplate",
                 new ByteArrayResource("system".getBytes(StandardCharsets.UTF_8))
+        );
+        ReflectionTestUtils.setField(
+            contextAssembler,
+            "noteSystemTemplate",
+            new ByteArrayResource("<noteContext>".getBytes(StandardCharsets.UTF_8))
+        );
+        ReflectionTestUtils.setField(
+            contextAssembler,
+            "systemWithExtraSectionTemplate",
+            new ByteArrayResource("<systemText>\n\n<extraSection>".getBytes(StandardCharsets.UTF_8))
+        );
+        ReflectionTestUtils.setField(
+            contextAssembler,
+            "noteContextTemplate",
+            new ByteArrayResource("<noteTextSection><webClipSection><ocrSection><memorySection>".getBytes(StandardCharsets.UTF_8))
+        );
+        ReflectionTestUtils.setField(
+            contextAssembler,
+            "noteTextSectionTemplate",
+            new ByteArrayResource("<title>\n<content>".getBytes(StandardCharsets.UTF_8))
+        );
+        ReflectionTestUtils.setField(
+            contextAssembler,
+            "webClipSectionTemplate",
+            new ByteArrayResource("<title>\n<sourceUrl>\n<content>".getBytes(StandardCharsets.UTF_8))
+        );
+        ReflectionTestUtils.setField(
+            contextAssembler,
+            "ocrSectionTemplate",
+            new ByteArrayResource("<imageTexts>".getBytes(StandardCharsets.UTF_8))
+        );
+        ReflectionTestUtils.setField(
+            contextAssembler,
+            "memorySectionTemplate",
+            new ByteArrayResource("<memoryContext>".getBytes(StandardCharsets.UTF_8))
+        );
+        ReflectionTestUtils.setField(
+            sseReplyService,
+            "branchAliasSystemTemplate",
+            new ByteArrayResource("system".getBytes(StandardCharsets.UTF_8))
+        );
+        ReflectionTestUtils.setField(
+            sseReplyService,
+            "branchAliasUserTemplate",
+            new ByteArrayResource("<contextPrefix><userMessage>".getBytes(StandardCharsets.UTF_8))
         );
     }
 

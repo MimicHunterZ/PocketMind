@@ -1,6 +1,12 @@
 package com.doublez.pocketmindserver.ai.application;
 
+import com.doublez.pocketmindserver.ai.application.context.ContextAssembler;
+import com.doublez.pocketmindserver.ai.application.memory.MemoryQueryServiceImpl;
+import com.doublez.pocketmindserver.ai.application.stream.ChatSseEventFactory;
+import com.doublez.pocketmindserver.ai.application.stream.ChatStreamCancellationManager;
+import com.doublez.pocketmindserver.ai.application.stream.SseReplyService;
 import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
+import com.doublez.pocketmindserver.ai.tool.skill.TenantSkillToolResolver;
 import com.doublez.pocketmindserver.attachment.domain.vision.AttachmentVisionRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
@@ -8,6 +14,7 @@ import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
+import com.doublez.pocketmindserver.resource.application.ChatTranscriptResourceSyncService;
 import com.doublez.pocketmind.common.web.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,11 +46,16 @@ class AiChatServiceTest {
     @Mock private ChatSessionRepository    chatSessionRepository;
     @Mock private ChatMessageRepository    chatMessageRepository;
     @Mock private NoteRepository           noteRepository;
+        @Mock private ChatTranscriptResourceSyncService chatTranscriptResourceSyncService;
+        @Mock private com.doublez.pocketmindserver.resource.domain.ResourceRecordRepository resourceRecordRepository;
     @Mock private AttachmentVisionRepository attachmentVisionRepository;
+        @Mock private TenantSkillToolResolver tenantSkillToolResolver;
 
     private AiChatService service;
         private ChatStreamCancellationManager chatStreamCancellationManager;
         private ChatSseEventFactory chatSseEventFactory;
+                private ContextAssembler contextAssembler;
+                private SseReplyService sseReplyService;
 
     private static final long   USER_ID            = 100L;
     private static final UUID   SESSION_UUID       = UUID.randomUUID();
@@ -54,24 +66,61 @@ class AiChatServiceTest {
     void setUp() throws Exception {
         chatStreamCancellationManager = new ChatStreamCancellationManager();
         chatSseEventFactory = new ChatSseEventFactory(new ObjectMapper());
-        service = new AiChatService(
-                aiFailoverRouter,
-                chatSessionRepository,
-                chatMessageRepository,
+        contextAssembler = new ContextAssembler(
                 noteRepository,
                 attachmentVisionRepository,
+                resourceRecordRepository,
+                new MemoryQueryServiceImpl(new com.doublez.pocketmindserver.memory.application.MemoryContextService() {
+                    @Override
+                    public com.doublez.pocketmindserver.context.domain.ContextUri userMemoryRoot(long userId) {
+                        return com.doublez.pocketmindserver.context.domain.ContextUri.userMemoriesRoot(userId);
+                    }
+
+                    @Override
+                    public com.doublez.pocketmindserver.context.domain.ContextUri userMemoryByType(long userId,
+                                                                                                     com.doublez.pocketmindserver.memory.domain.MemoryType memoryType) {
+                        return com.doublez.pocketmindserver.context.domain.ContextUri.userMemoriesRoot(userId)
+                                .child(memoryType.name().toLowerCase());
+                    }
+                })
+        );
+        sseReplyService = new SseReplyService(
+                aiFailoverRouter,
+                chatMessageRepository,
                 chatStreamCancellationManager,
-                chatSseEventFactory);
-        injectResource("globalSystemTemplate",      "global system prompt");
-        injectResource("noteSystemTemplate",        "note system prompt");
-        injectResource("branchAliasSystemTemplate", "branch alias system prompt");
-        injectResource("branchAliasUserTemplate",   "<contextPrefix>user: <userMessage>");
+                chatSseEventFactory,
+                tenantSkillToolResolver,
+                chatTranscriptResourceSyncService
+        );
+        service = new AiChatService(
+                chatSessionRepository,
+                chatMessageRepository,
+                contextAssembler,
+                sseReplyService,
+                chatTranscriptResourceSyncService);
+        lenient().when(tenantSkillToolResolver.resolveForUser(anyLong(), anyString()))
+                .thenReturn(new TenantSkillToolResolver.ResolvedTenantSkillTool(
+                        "user-100",
+                        "claude",
+                        null,
+                        java.util.Map.of("tenantKey", "user-100", "agentKey", "claude")
+                ));
+        injectResource(contextAssembler, "globalSystemTemplate", "global system prompt");
+        injectResource(contextAssembler, "noteSystemTemplate", "<noteContext>");
+        injectResource(contextAssembler, "systemWithExtraSectionTemplate", "<systemText>\n\n<extraSection>");
+        injectResource(contextAssembler, "noteContextTemplate", "<noteTextSection><webClipSection><ocrSection><memorySection>");
+        injectResource(contextAssembler, "noteTextSectionTemplate", "<title>\n<content>");
+        injectResource(contextAssembler, "webClipSectionTemplate", "<title>\n<sourceUrl>\n<content>");
+        injectResource(contextAssembler, "ocrSectionTemplate", "<imageTexts>");
+        injectResource(contextAssembler, "memorySectionTemplate", "<memoryContext>");
+        injectResource(sseReplyService, "branchAliasSystemTemplate", "branch alias system prompt");
+        injectResource(sseReplyService, "branchAliasUserTemplate", "<contextPrefix>user: <userMessage>");
     }
 
-    private void injectResource(String fieldName, String content) throws Exception {
-        Field field = AiChatService.class.getDeclaredField(fieldName);
+        private void injectResource(Object target, String fieldName, String content) throws Exception {
+                Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
-        field.set(service, new ByteArrayResource(content.getBytes()));
+                field.set(target, new ByteArrayResource(content.getBytes()));
     }
 
     // =========================================================================
