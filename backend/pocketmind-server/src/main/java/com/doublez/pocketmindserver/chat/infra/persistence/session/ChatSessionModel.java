@@ -17,7 +17,6 @@ public class ChatSessionModel {
     private Long userId;
     private UUID scopeNoteUuid;
     private String title;
-    private String memorySnapshot;
 
     @TableField(fill = FieldFill.INSERT)
     private Instant createdAt;

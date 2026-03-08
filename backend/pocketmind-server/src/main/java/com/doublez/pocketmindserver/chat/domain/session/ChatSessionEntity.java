@@ -19,8 +19,6 @@ public class ChatSessionEntity {
     /** 关联某条笔记（可选；null 表示全局对话） */
     private final UUID scopeNoteUuid;
     private String title;
-    /** 预留：持久记忆快照（暂不实现） */
-    private String memorySnapshot;
     private long updatedAt;
     private boolean deleted;
 
@@ -32,7 +30,6 @@ public class ChatSessionEntity {
             "userId",
             "scopeNoteUuid",
             "title",
-            "memorySnapshot",
             "updatedAt",
             "deleted"
     })
@@ -40,14 +37,12 @@ public class ChatSessionEntity {
                              long userId,
                              UUID scopeNoteUuid,
                              String title,
-                             String memorySnapshot,
                              long updatedAt,
                              boolean deleted) {
         this.uuid = Objects.requireNonNull(uuid, "uuid 不能为空");
         this.userId = userId;
         this.scopeNoteUuid = scopeNoteUuid;
         this.title = title;
-        this.memorySnapshot = memorySnapshot;
         this.updatedAt = updatedAt;
         this.deleted = deleted;
     }
@@ -60,7 +55,6 @@ public class ChatSessionEntity {
                 userId,
                 scopeNoteUuid,
                 title,
-                null,
                 System.currentTimeMillis(),
                 false
         );
@@ -70,12 +64,6 @@ public class ChatSessionEntity {
     /** 修改会话标题 */
     public void updateTitle(String title) {
         this.title = title;
-        this.updatedAt = System.currentTimeMillis();
-    }
-
-    /** 更新会话记忆快照 */
-    public void updateMemorySnapshot(String memorySnapshot) {
-        this.memorySnapshot = memorySnapshot;
         this.updatedAt = System.currentTimeMillis();
     }
 

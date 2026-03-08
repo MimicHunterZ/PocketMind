@@ -42,7 +42,6 @@ class ChatStructMapperTest {
             7L,
             noteUuid,
             "标题",
-            "快照内容",
             ts,
             false
         );
@@ -54,7 +53,6 @@ class ChatStructMapperTest {
         assertEquals(original.getUserId(), restored.getUserId());
         assertEquals(original.getScopeNoteUuid(), restored.getScopeNoteUuid());
         assertEquals(original.getTitle(), restored.getTitle());
-        assertEquals(original.getMemorySnapshot(), restored.getMemorySnapshot());
         assertEquals(original.getUpdatedAt(), restored.getUpdatedAt());
         assertEquals(original.isDeleted(), restored.isDeleted());
     }

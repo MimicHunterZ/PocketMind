@@ -12,7 +12,7 @@ import java.util.UUID;
 public interface ChatSessionMapper extends BaseMapper<ChatSessionModel> {
 
     @Select("""
-            SELECT id, uuid, user_id, scope_note_uuid, title, memory_snapshot,
+            SELECT id, uuid, user_id, scope_note_uuid, title,
                    created_at, updated_at, is_deleted
               FROM chat_sessions
              WHERE user_id = #{userId}
@@ -26,7 +26,7 @@ public interface ChatSessionMapper extends BaseMapper<ChatSessionModel> {
             @Param("noteUuid") UUID noteUuid);
 
     @Select("""
-            SELECT id, uuid, user_id, scope_note_uuid, title, memory_snapshot,
+            SELECT id, uuid, user_id, scope_note_uuid, title,
                    created_at, updated_at, is_deleted
               FROM chat_sessions
              WHERE user_id = #{userId}

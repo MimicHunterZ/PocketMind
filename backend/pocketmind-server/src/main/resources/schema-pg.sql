@@ -217,8 +217,6 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
     user_id          BIGINT      NOT NULL,
     scope_note_uuid  UUID,                   -- 关联某条笔记，NULL = 全局会话
     title            TEXT,
-    -- 预留：会话记忆快照（持久记忆系统，暂不实现）
-    memory_snapshot  TEXT,
 
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at       BIGINT      NOT NULL DEFAULT 0,

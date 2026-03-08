@@ -10,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -77,17 +76,5 @@ public class AiAnalyseChatSessionService {
     }
 
     public record ChatInit(UUID sessionUuid, UUID userMessageUuid) {
-    }
-
-    @Transactional
-    public void updateMemorySnapshot(long userId, UUID sessionUuid, String memorySnapshot) {
-        Optional<ChatSessionEntity> sessionOpt = chatSessionRepository.findByUuidAndUserId(sessionUuid, userId);
-        if (sessionOpt.isEmpty()) {
-            log.warn("chat session not found for memory snapshot update: userId={}, sessionUuid={}", userId, sessionUuid);
-            return;
-        }
-        ChatSessionEntity session = sessionOpt.get();
-        session.updateMemorySnapshot(memorySnapshot);
-        chatSessionRepository.update(session);
     }
 }
