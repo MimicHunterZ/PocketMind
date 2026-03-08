@@ -57,8 +57,8 @@ class Note {
   /// AI 生成的摘要
   String? aiSummary;
 
-  /// 待处理的 AI 问题（用户保存时输入，content 获取成功后再调用 AI）
-  String? pendingAiQuestion;
+  /// 服务端分配的单调递增版本号，null 表示本地新建尚未推送
+  int? serverVersion;
 
   Note copyWith({
     Id? id,
@@ -77,7 +77,7 @@ class Note {
     String? previewContent,
     String? resourceStatus,
     String? aiSummary,
-    String? pendingAiQuestion,
+    int? serverVersion,
   }) {
     return Note()
       ..id = id ?? this.id
@@ -96,6 +96,6 @@ class Note {
       ..previewContent = previewContent ?? this.previewContent
       ..resourceStatus = resourceStatus ?? this.resourceStatus
       ..aiSummary = aiSummary ?? this.aiSummary
-      ..pendingAiQuestion = pendingAiQuestion ?? this.pendingAiQuestion;
+      ..serverVersion = serverVersion ?? this.serverVersion;
   }
 }

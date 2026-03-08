@@ -11,8 +11,11 @@ import 'package:pocketmind/page/home/mixin/search_logic_mixin.dart';
 import 'package:pocketmind/providers/nav_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/providers/app_config_provider.dart';
+import 'package:pocketmind/service/note_service.dart';
+import 'package:pocketmind/sync/sync_state_provider.dart';
+import 'package:pocketmind/util/theme_data.dart';
 import 'package:pocketmind/util/logger_service.dart';
-import 'package:pocketmind/lan_sync/lan_sync_service.dart';
+import 'package:pocketmind/providers/sync_providers.dart';
 
 final String tag = 'HomeScreen';
 
@@ -89,21 +92,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Keep sync service alive so auto-start and inbound connections work
-    // even if the user never opens the sync settings page.
-    ref.watch(lanSyncProvider);
-
-    // 对应 Category 下的 note
-    final noteByCategory = ref.watch(noteByCategoryProvider);
-    final noteService = ref.watch(noteServiceProvider);
-    // 获取当前布局模式
-    final currentLayout = ref.watch(appConfigProvider).waterfallLayoutEnabled
-        ? NoteLayout.grid
-        : NoteLayout.list;
-    // 获取搜索查询
-    final searchQuery = ref.watch(searchQueryProvider);
-    // 获取搜索结果
-    final searchResults = ref.watch(searchResultsProvider);
+    // 确保自适应同步调度器处于激活状态（30s 定时器 + 网络恢复触发）
+    ref.watch(adaptiveSyncSchedulerProvider);
 
     return Scaffold(
       // 使用主题背景色
@@ -145,91 +135,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
             // 笔记列表（根据布局模式切换 或 搜索结果）
             Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                switchInCurve: Curves.easeInOut,
-                switchOutCurve: Curves.easeInOut,
-                transitionBuilder: (Widget child, Animation<double> animation) {
-                  // 淡入淡出 + 轻微缩放效果，掩盖瀑布流的重排
-                  return FadeTransition(
-                    opacity: animation,
-                    child: ScaleTransition(
-                      scale: Tween<double>(
-                        begin: 0.95,
-                        end: 1.0,
-                      ).animate(animation),
-                      child: child,
-                    ),
-                  );
-                },
-                child: KeyedSubtree(
-                  key: ValueKey(
-                    searchQuery != null
-                        ? 'search_${searchQuery}_${searchResults.value?.length ?? 0}'
-                        : 'notes_count_${noteByCategory.value?.length ?? 0}',
-                  ),
-                  child: searchQuery != null
-                      ? _buildSearchResults(
-                          searchResults,
-                          currentLayout,
-                          noteService,
-                        )
-                      : noteByCategory.when(
-                          skipLoadingOnRefresh: true,
-                          data: (notes) {
-                            if (notes.isEmpty) {
-                              return Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.note_add_outlined,
-                                      size: 80.sp,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.secondary,
-                                    ),
-                                    SizedBox(height: 16.h),
-                                    Text(
-                                      '你的思绪将汇聚于此',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleMedium
-                                          ?.copyWith(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.secondary,
-                                          ),
-                                    ),
-                                    SizedBox(height: 8.h),
-                                    Text(
-                                      '点击右下角，捕捉第一个灵感',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-
-                            // 使用共用的列表构建方法
-                            return _buildNotesList(
-                              notes,
-                              currentLayout,
-                              noteService,
-                            );
-                          },
-                          error: (error, stack) {
-                            PMlog.e(tag, 'stack: $error,stack:$stack');
-                            return const Center(child: Text('加载笔记失败'));
-                          },
-                          loading: () =>
-                              const Center(child: CircularProgressIndicator()),
-                        ),
-                ), // KeyedSubtree
-              ), // AnimatedSwitcher
-            ), // Expanded
+              child: _HomeNotesPane(scrollController: _scrollController),
+            ),
           ],
         ),
       ),
@@ -347,13 +254,101 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ),
     );
   }
+}
 
-  // 构建搜索结果列表
-  Widget _buildSearchResults(
-    AsyncValue<List<Note>> searchResults,
-    NoteLayout currentLayout,
-    noteService,
-  ) {
+class _HomeNotesPane extends ConsumerWidget {
+  const _HomeNotesPane({required this.scrollController});
+
+  final ScrollController scrollController;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final noteService = ref.read(noteServiceProvider);
+    final currentLayout = ref.watch(
+      appConfigProvider.select(
+        (config) =>
+            config.waterfallLayoutEnabled ? NoteLayout.grid : NoteLayout.list,
+      ),
+    );
+    final searchQuery = ref.watch(searchQueryProvider);
+
+    if (searchQuery != null) {
+      final searchResults = ref.watch(searchResultsProvider);
+      return _HomeSearchResults(
+        searchResults: searchResults,
+        currentLayout: currentLayout,
+        noteService: noteService,
+        scrollController: scrollController,
+      );
+    }
+
+    final isInitialPull = ref.watch(syncIsInitialPullProvider);
+    if (isInitialPull) {
+      return const _InitialPullSkeleton();
+    }
+
+    final noteByCategory = ref.watch(noteByCategoryProvider);
+    return noteByCategory.when(
+      skipLoadingOnRefresh: true,
+      data: (notes) {
+        if (notes.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.note_add_outlined,
+                  size: 80.sp,
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+                SizedBox(height: 16.h),
+                Text(
+                  '你的思绪将汇聚于此',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+                ),
+                SizedBox(height: 8.h),
+                Text(
+                  '点击右下角，捕捉第一个灵感',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          );
+        }
+
+        return _NotesListView(
+          notes: notes,
+          currentLayout: currentLayout,
+          noteService: noteService,
+          scrollController: scrollController,
+        );
+      },
+      error: (error, stack) {
+        PMlog.e(tag, 'stack: $error,stack:$stack');
+        return const Center(child: Text('加载笔记失败'));
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+class _HomeSearchResults extends StatelessWidget {
+  const _HomeSearchResults({
+    required this.searchResults,
+    required this.currentLayout,
+    required this.noteService,
+    required this.scrollController,
+  });
+
+  final AsyncValue<List<Note>> searchResults;
+  final NoteLayout currentLayout;
+  final NoteService noteService;
+  final ScrollController scrollController;
+
+  @override
+  Widget build(BuildContext context) {
     return searchResults.when(
       data: (notes) {
         if (notes.isEmpty) {
@@ -380,8 +375,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           );
         }
 
-        // 使用与主列表相同的布局逻辑
-        return _buildNotesList(notes, currentLayout, noteService);
+        return _NotesListView(
+          notes: notes,
+          currentLayout: currentLayout,
+          noteService: noteService,
+          scrollController: scrollController,
+        );
       },
       error: (error, stack) {
         PMlog.e(tag, '搜索错误: $error, stack:$stack');
@@ -390,17 +389,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       loading: () => const Center(child: CircularProgressIndicator()),
     );
   }
+}
 
-  // 构建笔记列表
-  Widget _buildNotesList(
-    List<Note> notes,
-    NoteLayout currentLayout,
-    noteService,
-  ) {
+class _NotesListView extends StatelessWidget {
+  const _NotesListView({
+    required this.notes,
+    required this.currentLayout,
+    required this.noteService,
+    required this.scrollController,
+  });
+
+  final List<Note> notes;
+  final NoteLayout currentLayout;
+  final NoteService noteService;
+  final ScrollController scrollController;
+
+  @override
+  Widget build(BuildContext context) {
     if (currentLayout == NoteLayout.grid) {
-      // 瀑布流布局
       return MasonryGridView.count(
-        controller: _scrollController,
+        controller: scrollController,
         key: const PageStorageKey('masonry_grid_view'),
         crossAxisCount: 2,
         cacheExtent: 500.h,
@@ -418,26 +426,95 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           );
         },
       );
-    } else {
-      // 列表布局
-      return ListView.builder(
-        controller: _scrollController,
-        key: const PageStorageKey('list_view'),
-        cacheExtent: 500.h,
-        padding: EdgeInsets.symmetric(horizontal: 4.w),
-        itemCount: notes.length,
-        itemBuilder: (context, index) {
-          final note = notes[index];
-          return RepaintBoundary(
-            child: NoteItem(
-              note: note,
-              noteService: noteService,
-              isWaterfall: false,
-              key: ValueKey('note_${note.id}'),
-            ),
-          );
-        },
-      );
     }
+
+    return ListView.builder(
+      controller: scrollController,
+      key: const PageStorageKey('list_view'),
+      cacheExtent: 500.h,
+      padding: EdgeInsets.symmetric(horizontal: 4.w),
+      itemCount: notes.length,
+      itemBuilder: (context, index) {
+        final note = notes[index];
+        return RepaintBoundary(
+          child: NoteItem(
+            note: note,
+            noteService: noteService,
+            isWaterfall: false,
+            key: ValueKey('note_${note.id}'),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _InitialPullSkeleton extends StatelessWidget {
+  const _InitialPullSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final appColors = AppColors.of(context);
+
+    return ListView.separated(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+      itemCount: 6,
+      separatorBuilder: (_, _) => SizedBox(height: 12.h),
+      itemBuilder: (context, index) {
+        return Container(
+          height: 112.h,
+          decoration: BoxDecoration(
+            color: appColors.skeletonBase,
+            borderRadius: BorderRadius.circular(20.r),
+            border: Border.all(color: appColors.cardBorder),
+          ),
+          padding: EdgeInsets.all(16.r),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: (0.55 + (index % 3) * 0.12).sw,
+                height: 16.h,
+                decoration: BoxDecoration(
+                  color: appColors.skeletonHighlight,
+                  borderRadius: BorderRadius.circular(999.r),
+                ),
+              ),
+              SizedBox(height: 14.h),
+              Container(
+                width: double.infinity,
+                height: 12.h,
+                decoration: BoxDecoration(
+                  color: appColors.skeletonHighlight,
+                  borderRadius: BorderRadius.circular(999.r),
+                ),
+              ),
+              SizedBox(height: 8.h),
+              Container(
+                width: 0.72.sw,
+                height: 12.h,
+                decoration: BoxDecoration(
+                  color: appColors.skeletonHighlight,
+                  borderRadius: BorderRadius.circular(999.r),
+                ),
+              ),
+              const Spacer(),
+              Align(
+                alignment: Alignment.bottomRight,
+                child: Container(
+                  width: 64.w,
+                  height: 22.h,
+                  decoration: BoxDecoration(
+                    color: appColors.skeletonHighlight,
+                    borderRadius: BorderRadius.circular(999.r),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

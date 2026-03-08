@@ -31,12 +31,6 @@ public interface NoteStructMapper {
 
     /**
      * 持久化模型 → 领域实体
-     * <ul>
-     *   <li>{@code isDeleted} → {@code deleted}</li>
-     *   <li>{@code categoryId} 为 null 时默认 1（与建表 DEFAULT 1 保持一致）</li>
-     *   <li>{@code resourceStatus} 为 null 时默认 NONE</li>
-     *   <li>{@code id} / {@code createdAt} 仅存在于 Model，Entity 不需要</li>
-     * </ul>
      */
     @Mapping(target = "deleted", source = "model.isDeleted")
     @Mapping(target = "categoryId", defaultValue = "1L")

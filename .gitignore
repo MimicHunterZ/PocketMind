@@ -35,6 +35,7 @@ application.yml
 document/
 build/
 MediaCrawler-main/
+OpenViking/
 
 # flutter
 .flutter-plugins-dependencies

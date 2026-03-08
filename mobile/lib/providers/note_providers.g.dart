@@ -294,7 +294,7 @@ final class NoteServiceProvider
   }
 }
 
-String _$noteServiceHash() => r'96de4e37cb5321144fe987d7953ebc2f2201421b';
+String _$noteServiceHash() => r'df763f5b91aa5f2af239b1034b1b112ed9c8a971';
 
 /// 搜索查询 Provider - 用于管理当前搜索关键词
 
@@ -610,7 +610,7 @@ final class NoteByCategoryProvider
   NoteByCategory create() => NoteByCategory();
 }
 
-String _$noteByCategoryHash() => r'ff4f68c901927a9d99304dbb5e632d24191ff235';
+String _$noteByCategoryHash() => r'275e930bc9882e6fea9599625601775d29c4b093';
 
 /// 根据分类获取笔记的 StreamNotifier
 
@@ -682,7 +682,7 @@ final class NoteDetailProvider
   }
 }
 
-String _$noteDetailHash() => r'f4a8e6d6da7ccfba522ce4dfb66adc914de59c77';
+String _$noteDetailHash() => r'c7935bbfa15b44fab3b655ea74a4aa529915f123';
 
 final class NoteDetailFamily extends $Family
     with

@@ -8,10 +8,8 @@ targets:
         generate_for:
           include:
             - lib/model/**
-            - lib/sync/models/**
-            - lib/sync/repository/**
-            - lib/lan_sync/model/**
-      
+            - lib/sync/model/**
+
       # Riverpod generator - process provider files
       riverpod_generator:
         enabled: true
@@ -19,4 +17,4 @@ targets:
           include:
             - lib/providers/**
             - lib/api/**
-            - lib/sync/sync_service.dart
+            - lib/sync/sync_state_provider.dart

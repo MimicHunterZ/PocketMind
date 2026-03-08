@@ -747,7 +747,7 @@ final class ChatSendProvider
   }
 }
 
-String _$chatSendHash() => r'34c2490df7cf8396acb6972b8798da7025c90c2b';
+String _$chatSendHash() => r'8b52df9f58cc82bfc91c502193cc05449e54ffce';
 
 /// 消息发送 Notifier，按 [sessionUuid] 分组（family）。
 

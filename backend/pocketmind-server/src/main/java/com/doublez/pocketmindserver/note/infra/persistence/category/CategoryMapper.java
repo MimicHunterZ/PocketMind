@@ -25,4 +25,28 @@ public interface CategoryMapper extends BaseMapper<CategoryModel> {
 		int softDeleteByIdAndUserId(@Param("id") long id,
 																@Param("userId") long userId,
 																@Param("updatedAt") long updatedAt);
-}
+
+		/**	按 UUID 软删除分类并更新 updated_at（绕过 @TableLogic，用于同步）。
+		 */
+		@Update("""
+						UPDATE categories
+						SET is_deleted = TRUE,
+								updated_at = #{updatedAt}
+						WHERE uuid = #{uuid}::uuid
+							AND user_id = #{userId}
+						""")
+		int softDeleteByUuidAndUserId(@Param("uuid") java.util.UUID uuid,
+																	@Param("userId") long userId,
+																	@Param("updatedAt") long updatedAt);
+
+		/**	 同步回填 server_version。
+		 */
+		@Update("""
+					UPDATE categories
+					   SET server_version = #{serverVersion}
+					 WHERE uuid    = #{uuid}::uuid
+					   AND user_id = #{userId}
+					""")
+		int updateServerVersion(@Param("uuid") java.util.UUID uuid,
+												@Param("userId") long userId,
+												@Param("serverVersion") long serverVersion);}

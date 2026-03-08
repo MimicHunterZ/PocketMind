@@ -6,11 +6,10 @@ import com.doublez.pocketmindserver.note.domain.tag.TagRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
-/**
- * TagRepository 的 MyBatis-Plus 实现
- */
+
 @Repository
 public class MybatisTagRepository implements TagRepository {
 
@@ -34,10 +33,10 @@ public class MybatisTagRepository implements TagRepository {
     }
 
     @Override
-    public List<TagEntity> findByUserId(long userId) {
-        return tagMapper.selectList(new LambdaQueryWrapper<TagModel>()
-                .eq(TagModel::getUserId, userId)
-                .orderByAsc(TagModel::getName))
-                .stream().map(structMapper::toEntity).toList();
+    public Optional<TagEntity> findByUuidAndUserId(UUID uuid, long userId) {
+        TagModel model = tagMapper.selectOne(new LambdaQueryWrapper<TagModel>()
+                .eq(TagModel::getUuid, uuid)
+                .eq(TagModel::getUserId, userId));
+        return Optional.ofNullable(model).map(structMapper::toEntity);
     }
 }

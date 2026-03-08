@@ -7,10 +7,8 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
-/**
- * CategoryRepository 的 MyBatis-Plus 实现
- */
 @Repository
 public class MybatisCategoryRepository implements CategoryRepository {
 
@@ -31,9 +29,17 @@ public class MybatisCategoryRepository implements CategoryRepository {
     }
 
     @Override
-    public Optional<CategoryEntity> findByIdAndUserId(long id, long userId) {
+    public void update(CategoryEntity category) {
+        CategoryModel model = structMapper.toModel(category);
+        mapper.update(model, new LambdaQueryWrapper<CategoryModel>()
+                .eq(CategoryModel::getUuid, category.getUuid())
+                .eq(CategoryModel::getUserId, category.getUserId()));
+    }
+
+    @Override
+    public Optional<CategoryEntity> findByUuidAndUserId(UUID uuid, long userId) {
         CategoryModel model = mapper.selectOne(new LambdaQueryWrapper<CategoryModel>()
-                .eq(CategoryModel::getId, id)
+                .eq(CategoryModel::getUuid, uuid)
                 .eq(CategoryModel::getUserId, userId));
         return Optional.ofNullable(model).map(structMapper::toEntity);
     }
@@ -47,7 +53,12 @@ public class MybatisCategoryRepository implements CategoryRepository {
     }
 
     @Override
-    public void deleteByIdAndUserId(long id, long userId) {
-        mapper.softDeleteByIdAndUserId(id, userId, System.currentTimeMillis());
+    public void softDeleteByUuidAndUserId(UUID uuid, long userId, long updatedAt) {
+        mapper.softDeleteByUuidAndUserId(uuid, userId, updatedAt);
+    }
+
+    @Override
+    public void updateServerVersion(UUID uuid, long userId, long serverVersion) {
+        mapper.updateServerVersion(uuid, userId, serverVersion);
     }
 }

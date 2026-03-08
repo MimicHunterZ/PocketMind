@@ -271,16 +271,29 @@ ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS branch_alias VARCHAR(20);
 -- content 列旧版为 NOT NULL 但无 DEFAULT，补充 DEFAULT 值（DDL 不可重复执行跳过）
 CREATE INDEX IF NOT EXISTS idx_messages_parent ON chat_messages(parent_uuid);
 
+DROP TABLE IF EXISTS  sync_change_log;
 -- ============================================================
--- 9. sync_change_log（后端增量 pull 使用，不存内容只存变更事件）
+-- 9. sync_change_log（V3 同步架构：change_log.id 即 serverVersion 游标）
 -- ============================================================
 CREATE TABLE IF NOT EXISTS sync_change_log (
-    id           BIGSERIAL   PRIMARY KEY,
-    user_id      BIGINT      NOT NULL,
-    entity_type  VARCHAR(30) NOT NULL,   -- 'note'|'asset'|'asset_extraction'|'chat_message'...
-    entity_uuid  UUID        NOT NULL,
-    op           VARCHAR(10) NOT NULL,   -- 'upsert' | 'delete'
-    updated_at   BIGINT      NOT NULL DEFAULT 0
+    id                   BIGSERIAL    PRIMARY KEY,  -- 服务端版本号，全局严格单调递增，即 serverVersion
+    user_id              BIGINT       NOT NULL,
+    entity_type          VARCHAR(30)  NOT NULL,     -- 'note' | 'category'
+    entity_uuid          UUID         NOT NULL,
+    operation            VARCHAR(8)   NOT NULL,     -- 'create' | 'update' | 'delete'
+    updated_at           BIGINT       NOT NULL DEFAULT 0,  -- 业务实体 updatedAt 毫秒时间戳，LWW 裁决依据
+    client_mutation_id   VARCHAR(36)  NULL UNIQUE,  -- Push 幂等键（UUID v4）；AI 后端触发时为 NULL
+    payload              TEXT         NULL,         -- 实体完整 JSON 快照；delete 时为 NULL
+    created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_sync_log_user_time  ON sync_change_log(user_id, updated_at DESC);
+-- (user_id, id) 复合索引：Pull 查询 WHERE user_id=? AND id > sinceVersion ORDER BY id 直接命中
+CREATE INDEX IF NOT EXISTS idx_sync_log_user_version ON sync_change_log(user_id, id);
+
+-- ============================================================
+-- 存量表补列（IF NOT EXISTS 保证幂等）
+-- ============================================================
+ALTER TABLE notes      ADD COLUMN IF NOT EXISTS server_version BIGINT NULL;
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS server_version BIGINT NULL;
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS description    TEXT   NULL;
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon_path      TEXT   NULL;

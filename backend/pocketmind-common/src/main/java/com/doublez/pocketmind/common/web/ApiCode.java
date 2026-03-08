@@ -28,6 +28,10 @@ public enum ApiCode {
     ASSET_INVALID_FORMAT(503002, "不支持的图片格式"),
     ASSET_NOT_FOUND(503003, "图片资产不存在或无权访问"),
 
+    SYNC_PUSH_FAILED(504001, "同步推送处理失败"),
+    SYNC_PULL_FAILED(504002, "同步拉取失败"),
+    SYNC_INVALID_ENTITY_TYPE(504003, "不支持的实体类型"),
+
     INTERNAL_ERROR(500000, "服务器内部错误");
 
     private final int code;

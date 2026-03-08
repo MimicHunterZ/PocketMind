@@ -38,12 +38,17 @@ const CategorySchema = CollectionSchema(
       type: IsarType.bool,
     ),
     r'name': PropertySchema(id: 4, name: r'name', type: IsarType.string),
-    r'updatedAt': PropertySchema(
+    r'serverVersion': PropertySchema(
       id: 5,
+      name: r'serverVersion',
+      type: IsarType.long,
+    ),
+    r'updatedAt': PropertySchema(
+      id: 6,
       name: r'updatedAt',
       type: IsarType.long,
     ),
-    r'uuid': PropertySchema(id: 6, name: r'uuid', type: IsarType.string),
+    r'uuid': PropertySchema(id: 7, name: r'uuid', type: IsarType.string),
   },
 
   estimateSize: _categoryEstimateSize,
@@ -140,8 +145,9 @@ void _categorySerialize(
   writer.writeString(offsets[2], object.iconPath);
   writer.writeBool(offsets[3], object.isDeleted);
   writer.writeString(offsets[4], object.name);
-  writer.writeLong(offsets[5], object.updatedAt);
-  writer.writeString(offsets[6], object.uuid);
+  writer.writeLong(offsets[5], object.serverVersion);
+  writer.writeLong(offsets[6], object.updatedAt);
+  writer.writeString(offsets[7], object.uuid);
 }
 
 Category _categoryDeserialize(
@@ -157,8 +163,9 @@ Category _categoryDeserialize(
   object.id = id;
   object.isDeleted = reader.readBool(offsets[3]);
   object.name = reader.readString(offsets[4]);
-  object.updatedAt = reader.readLong(offsets[5]);
-  object.uuid = reader.readStringOrNull(offsets[6]);
+  object.serverVersion = reader.readLongOrNull(offsets[5]);
+  object.updatedAt = reader.readLong(offsets[6]);
+  object.uuid = reader.readStringOrNull(offsets[7]);
   return object;
 }
 
@@ -180,8 +187,10 @@ P _categoryDeserializeProp<P>(
     case 4:
       return (reader.readString(offset)) as P;
     case 5:
-      return (reader.readLong(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 6:
+      return (reader.readLong(offset)) as P;
+    case 7:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1256,6 +1265,81 @@ extension CategoryQueryFilter
     });
   }
 
+  QueryBuilder<Category, Category, QAfterFilterCondition>
+  serverVersionIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'serverVersion'),
+      );
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition>
+  serverVersionIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'serverVersion'),
+      );
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> serverVersionEqualTo(
+    int? value,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'serverVersion', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition>
+  serverVersionGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'serverVersion',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> serverVersionLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'serverVersion',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterFilterCondition> serverVersionBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'serverVersion',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
   QueryBuilder<Category, Category, QAfterFilterCondition> updatedAtEqualTo(
     int value,
   ) {
@@ -1545,6 +1629,18 @@ extension CategoryQuerySortBy on QueryBuilder<Category, Category, QSortBy> {
     });
   }
 
+  QueryBuilder<Category, Category, QAfterSortBy> sortByServerVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'serverVersion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterSortBy> sortByServerVersionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'serverVersion', Sort.desc);
+    });
+  }
+
   QueryBuilder<Category, Category, QAfterSortBy> sortByUpdatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'updatedAt', Sort.asc);
@@ -1644,6 +1740,18 @@ extension CategoryQuerySortThenBy
     });
   }
 
+  QueryBuilder<Category, Category, QAfterSortBy> thenByServerVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'serverVersion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Category, Category, QAfterSortBy> thenByServerVersionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'serverVersion', Sort.desc);
+    });
+  }
+
   QueryBuilder<Category, Category, QAfterSortBy> thenByUpdatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'updatedAt', Sort.asc);
@@ -1707,6 +1815,12 @@ extension CategoryQueryWhereDistinct
     });
   }
 
+  QueryBuilder<Category, Category, QDistinct> distinctByServerVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'serverVersion');
+    });
+  }
+
   QueryBuilder<Category, Category, QDistinct> distinctByUpdatedAt() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'updatedAt');
@@ -1757,6 +1871,12 @@ extension CategoryQueryProperty
   QueryBuilder<Category, String, QQueryOperations> nameProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'name');
+    });
+  }
+
+  QueryBuilder<Category, int?, QQueryOperations> serverVersionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'serverVersion');
     });
   }
 

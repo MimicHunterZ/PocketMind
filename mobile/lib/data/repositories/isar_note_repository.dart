@@ -21,18 +21,24 @@ class IsarNoteRepository {
     return _isar.notes.getByUuid(uuid);
   }
 
-  Future<int> save(Note note, {bool updateTimestamp = true}) async {
+  /// 保存同步内部衍生字段。
+  ///
+  /// 仅供抓取器、AI 轮询、同步回放等内部流程调用。
+  /// 不追加 mutation，也默认不改写 `updatedAt`，避免伪造“用户主动编辑”。
+  Future<int> saveSyncInternalNote(
+    Note note, {
+    bool preserveUpdatedAt = true,
+  }) async {
     PMlog.d(
       _tag,
-      'Saving note: title: ${note.title}, categoryId: ${note.categoryId}, updateTimestamp: $updateTimestamp',
+      'Saving internal note: title: ${note.title}, categoryId: ${note.categoryId}, preserveUpdatedAt: $preserveUpdatedAt',
     );
 
     try {
       // 如果没有设置时间，使用当前时间
       note.time ??= DateTime.now();
 
-      // 设置同步字段
-      if (updateTimestamp) {
+      if (!preserveUpdatedAt) {
         note.updatedAt = DateTime.now().millisecondsSinceEpoch;
       }
 
@@ -64,7 +70,7 @@ class IsarNoteRepository {
         await note.category.save();
       });
 
-      PMlog.d(_tag, 'Note saved successfully with id: $resultId');
+      PMlog.d(_tag, 'Internal note saved successfully with id: $resultId');
       return resultId;
     } catch (e, stackTrace) {
       PMlog.e(_tag, 'Error while saving note: $e\n$stackTrace');
@@ -113,37 +119,6 @@ class IsarNoteRepository {
       PMlog.d(_tag, 'Note soft deleted: id=$id');
     } on IsarError catch (e, stackTrace) {
       PMlog.e(_tag, 'Error while deleting note: $e\n$stackTrace');
-      rethrow;
-    }
-  }
-
-  Future<void> deleteAllByCategoryId(int categoryId) async {
-    try {
-      await _isar.writeTxn(() async {
-        final notes = await _isar.notes
-            .filter()
-            .categoryIdEqualTo(categoryId)
-            .findAll();
-        final now = DateTime.now().millisecondsSinceEpoch;
-        for (final note in notes) {
-          // 删除对应的图片文件（如果有）
-          if (note.url != null &&
-              note.url!.startsWith(AppConstants.localImagePathPrefix)) {
-            try {
-              await ImageStorageHelper().deleteImage(note.url!);
-            } catch (e) {
-              PMlog.w(_tag, 'Failed to delete image ${note.url}: $e');
-            }
-          }
-
-          note.isDeleted = true;
-          note.updatedAt = now;
-        }
-        await _isar.notes.putAll(notes);
-        PMlog.d(_tag, '成功软删除了 ${notes.length} 条 categoryId为 $categoryId 的笔记');
-      });
-    } catch (e, stackTrace) {
-      PMlog.e(_tag, 'Error while deleting notes by category: $e\n$stackTrace');
       rethrow;
     }
   }
@@ -323,5 +298,23 @@ class IsarNoteRepository {
         .resourceStatusEqualTo('FAILED')
         .isDeletedEqualTo(false)
         .findAll();
+  }
+
+  /// 查询指定 resourceStatus 的笔记列表（用于 ResourceFetchScheduler 扫描）
+  Future<List<Note>> findByResourceStatus(String status) async {
+    return _isar.notes
+        .filter()
+        .resourceStatusEqualTo(status)
+        .isDeletedEqualTo(false)
+        .urlIsNotNull()
+        .findAll();
+  }
+
+  /// 更新笔记的 resourceStatus 字段并落库（不更新 updatedAt，避免干扰 LWW）
+  Future<void> updateResourceStatus(Note note, String status) async {
+    note.resourceStatus = status;
+    await _isar.writeTxn(() async {
+      await _isar.notes.put(note);
+    });
   }
 }

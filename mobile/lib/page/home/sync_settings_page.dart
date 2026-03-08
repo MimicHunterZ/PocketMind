@@ -1,169 +1,44 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-import '../../lan_sync/lan_sync_service.dart';
-import '../../lan_sync/model/lan_peer.dart';
-import '../../lan_sync/model/device_info.dart';
-import '../../providers/app_config_provider.dart';
-import '../widget/creative_toast.dart';
+import '../../providers/sync_providers.dart';
+import '../../sync/sync_state_provider.dart';
+import '../../util/theme_data.dart';
 import '../widget/pm_app_bar.dart';
 
-/// 同步设置页面
-class SyncSettingsPage extends ConsumerStatefulWidget {
+/// 云同步状态页面
+class SyncSettingsPage extends ConsumerWidget {
   const SyncSettingsPage({super.key});
 
   @override
-  ConsumerState<SyncSettingsPage> createState() => _SyncSettingsPageState();
-}
-
-class _SyncSettingsPageState extends ConsumerState<SyncSettingsPage> {
-  bool _isScanning = false;
-  bool _isTesting = false;
-  String? _testResult;
-  late bool _syncAutoStart;
-
-  @override
-  void initState() {
-    super.initState();
-    _syncAutoStart = ref.read(appConfigProvider).syncAutoStart;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final syncState = ref.watch(lanSyncProvider);
-    final syncNotifier = ref.read(lanSyncProvider.notifier);
-
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: const PMAppBar(title: Text('局域网同步')),
+      appBar: const PMAppBar(title: Text('云端同步')),
       body: ListView(
         padding: EdgeInsets.all(16.r),
         children: [
-          // 同步开关设置卡片
-          _buildSyncSettingsCard(syncState, syncNotifier),
+          const _SyncStatusCard(),
           SizedBox(height: 16.h),
-
-          // 本机设备信息
-          _buildLocalDeviceCard(syncState, syncNotifier),
-          SizedBox(height: 16.h),
-
-          // 发现的设备
-          _buildDiscoveredDevicesCard(syncState, syncNotifier),
-          SizedBox(height: 16.h),
-
-          // 同步状态
-          _buildSyncStatusCard(syncState),
-
-          SizedBox(height: 16.h),
-
-          // 诊断信息
-          _buildDiagnosticsCard(syncState),
+          const _SyncActionCard(),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed:
-            _isScanning || syncState.isSyncing || !syncState.isServerRunning
-            ? null
-            : () => _discoverAndSync(syncNotifier),
-        icon: _isScanning || syncState.isSyncing
-            ? SizedBox(
-                width: 24.w,
-                height: 24.w,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : const Icon(Icons.sync),
-        label: Text(
-          _isScanning
-              ? '扫描中...'
-              : syncState.isSyncing
-              ? '同步中...'
-              : !syncState.isServerRunning
-              ? '请先开启同步'
-              : '扫描并同步',
-        ),
-        backgroundColor: !syncState.isServerRunning
-            ? Theme.of(context).colorScheme.surfaceContainerHighest
-            : null,
-      ),
     );
   }
+}
 
-  /// 同步设置卡片
-  Widget _buildSyncSettingsCard(LanSyncState state, LanSyncNotifier notifier) {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(16.r),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.settings,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                SizedBox(width: 8.w),
-                Text(
-                  '同步设置',
-                  style: TextStyle(
-                    fontSize: 18.sp,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 12.h),
-            // 允许其他设备同步开关
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('允许其他设备同步'),
-              subtitle: Text(
-                state.isServerRunning ? '其他设备可以发现并同步此设备' : '其他设备无法发现此设备',
-                style: TextStyle(
-                  color: state.isServerRunning ? Colors.green : Colors.grey,
-                  fontSize: 12.sp,
-                ),
-              ),
-              value: state.isServerRunning,
-              onChanged: (value) async {
-                if (value) {
-                  await notifier.startServer();
-                } else {
-                  await notifier.stopServer();
-                }
-                // 服务器状态变化时，清除测试结果
-                setState(() => _testResult = null);
-              },
-            ),
-            const Divider(),
-            // 启动时自动开启开关
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('启动时自动开启同步'),
-              subtitle: Text(
-                '下次打开应用时自动允许其他设备同步',
-                style: TextStyle(fontSize: 12.sp),
-              ),
-              value: _syncAutoStart,
-              onChanged: (value) async {
-                await ref
-                    .read(appConfigProvider.notifier)
-                    .setSyncAutoStart(value);
-                setState(() => _syncAutoStart = value);
-              },
-            ),
-          ],
-        ),
-      ),
+class _SyncStatusCard extends ConsumerWidget {
+  const _SyncStatusCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(syncStateProvider);
+    final colorScheme = Theme.of(context).colorScheme;
+    final appColors = AppColors.of(context);
+    final status = _SyncStatusPresentation.fromState(
+      state: state,
+      colorScheme: colorScheme,
     );
-  }
-
-  /// 本机设备信息卡片
-  Widget _buildLocalDeviceCard(LanSyncState state, LanSyncNotifier notifier) {
-    final device = state.localDevice;
 
     return Card(
       child: Padding(
@@ -173,478 +48,129 @@ class _SyncSettingsPageState extends ConsumerState<SyncSettingsPage> {
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.phone_android,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+                Icon(status.icon, color: status.color, size: 24.r),
                 SizedBox(width: 8.w),
-                Text(
-                  '本机设备',
-                  style: TextStyle(
-                    fontSize: 18.sp,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                  decoration: BoxDecoration(
-                    color: state.isServerRunning ? Colors.green : Colors.grey,
-                    borderRadius: BorderRadius.circular(12.r),
-                  ),
-                  child: Text(
-                    state.isServerRunning ? '服务运行中' : '服务已停止',
-                    style: TextStyle(color: Colors.white, fontSize: 12.sp),
-                  ),
-                ),
+                Text('同步状态', style: Theme.of(context).textTheme.titleMedium),
               ],
             ),
             SizedBox(height: 12.h),
-            if (device != null) ...[
-              _buildInfoRow('设备名称', device.deviceName),
-              _buildInfoRow('IP 地址', device.ipAddress ?? '未知'),
-              _buildInfoRow('端口', device.port.toString()),
-              _buildInfoRow('设备 ID', '${device.deviceId.substring(0, 8)}...'),
+            Text(status.text, style: TextStyle(color: status.color)),
+            if (state.pendingCount > 0) ...[
+              SizedBox(height: 4.h),
+              Text(
+                '${state.pendingCount} 条变更等待同步',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            if (state.hasFailed) ...[
+              SizedBox(height: 4.h),
+              Text(
+                '${state.failedCount} 条变更同步失败',
+                style: TextStyle(color: appColors.errorText, fontSize: 12.sp),
+              ),
+            ],
+            if (state.isSyncing) ...[
               SizedBox(height: 12.h),
-              // 测试服务器按钮
-              if (state.isServerRunning)
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: _isTesting ? null : () => _testServer(notifier),
-                    icon: _isTesting
-                        ? SizedBox(
-                            width: 16.w,
-                            height: 16.w,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.network_check),
-                    label: Text(_isTesting ? '测试中...' : '测试服务器可达性'),
-                  ),
-                ),
-              if (_testResult != null)
-                Padding(
-                  padding: EdgeInsets.only(top: 8.h),
-                  child: Container(
-                    padding: EdgeInsets.all(8.r),
-                    decoration: BoxDecoration(
-                      color: _testResult!.startsWith('✅')
-                          ? Colors.green.withAlpha(26)
-                          : Colors.red.withAlpha(26),
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                    child: Text(
-                      _testResult!,
-                      style: TextStyle(
-                        color: _testResult!.startsWith('✅')
-                            ? Colors.green
-                            : Colors.red,
-                      ),
-                    ),
-                  ),
-                ),
-            ] else
-              const Text('正在获取设备信息...'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 测试服务器
-  Future<void> _testServer(LanSyncNotifier notifier) async {
-    setState(() {
-      _isTesting = true;
-      _testResult = null;
-    });
-
-    try {
-      final result = await notifier.testLocalServer();
-      if (mounted) {
-        setState(() {
-          _testResult = result ? '✅ 服务器可达，其他设备应该能发现此设备' : '❌ 服务器不可达，请检查网络设置';
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _testResult = '❌ 测试失败: $e';
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isTesting = false);
-      }
-    }
-  }
-
-  /// 发现的设备卡片
-  Widget _buildDiscoveredDevicesCard(
-    LanSyncState state,
-    LanSyncNotifier notifier,
-  ) {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(16.r),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.devices,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                SizedBox(width: 8.w),
-                Text(
-                  '已连接的设备',
-                  style: TextStyle(
-                    fontSize: 18.sp,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                  decoration: BoxDecoration(
-                    color: state.discoveredDevices.isNotEmpty
-                        ? Colors.green
-                        : Colors.grey,
-                    borderRadius: BorderRadius.circular(12.r),
-                  ),
-                  child: Text(
-                    '${state.discoveredDevices.length} 台',
-                    style: TextStyle(color: Colors.white, fontSize: 12.sp),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 8.h),
-            if (state.discoveredDevices.isNotEmpty)
-              Container(
-                padding: EdgeInsets.all(8.r),
-                decoration: BoxDecoration(
-                  color: Colors.green.withAlpha(26),
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.sync, color: Colors.green, size: 16.sp),
-                    SizedBox(width: 8.w),
-                    Text(
-                      '实时同步已启用 - 数据变化将自动同步',
-                      style: TextStyle(color: Colors.green, fontSize: 12.sp),
-                    ),
-                  ],
-                ),
+              LinearProgressIndicator(
+                backgroundColor: colorScheme.surfaceContainerLow,
+                valueColor: AlwaysStoppedAnimation<Color>(status.color),
               ),
-            SizedBox(height: 12.h),
-            if (state.peers.isEmpty)
-              Padding(
-                padding: EdgeInsets.symmetric(vertical: 16.h),
-                child: Center(
-                  child: Text(
-                    '未发现其他设备\n点击下方按钮扫描并连接',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ),
-              )
-            else
-              ..._sortedPeers(
-                state,
-              ).map((peer) => _buildPeerTile(peer, state, notifier)),
+            ],
           ],
         ),
       ),
     );
   }
+}
 
-  List<LanPeer> _sortedPeers(LanSyncState state) {
-    final peers = [...state.peers];
-    peers.sort((a, b) {
-      if (a.connected != b.connected) return a.connected ? -1 : 1;
-      return b.lastSeen.compareTo(a.lastSeen);
-    });
-    return peers;
-  }
+class _SyncActionCard extends ConsumerWidget {
+  const _SyncActionCard();
 
-  /// 设备列表项
-  Widget _buildPeerTile(
-    LanPeer peer,
-    LanSyncState state,
-    LanSyncNotifier notifier,
-  ) {
-    final isConnected = peer.connected;
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: (isConnected ? Colors.green : Colors.grey).withAlpha(
-          50,
-        ),
-        child: Icon(
-          Icons.phone_android,
-          color: isConnected ? Colors.green : Colors.grey,
-        ),
-      ),
-      title: Row(
-        children: [
-          Text(peer.deviceName),
-          SizedBox(width: 8.w),
-          Container(
-            width: 8.w,
-            height: 8.w,
-            decoration: BoxDecoration(
-              color: isConnected ? Colors.green : Colors.grey,
-              shape: BoxShape.circle,
-            ),
-          ),
-        ],
-      ),
-      subtitle: Text(
-        '${peer.ip}:${peer.wsPort} · ${isConnected ? '已连接' : '未连接'}',
-      ),
-      trailing: state.isSyncing
-          ? SizedBox(
-              width: 24.w,
-              height: 24.w,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : IconButton(
-              icon: const Icon(Icons.sync),
-              tooltip: '手动同步',
-              onPressed: () => _syncWithPeer(notifier, peer),
-            ),
-    );
-  }
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isSyncing = ref.watch(syncIsSyncingProvider);
+    final syncEngine = ref.read(syncEngineProvider);
 
-  Future<void> _syncWithPeer(LanSyncNotifier notifier, LanPeer peer) async {
-    final device = DeviceInfo(
-      deviceId: peer.deviceId,
-      deviceName: peer.deviceName,
-      ipAddress: peer.ip,
-      port: peer.wsPort,
-      lastSeen: peer.lastSeen,
-    );
-    await _syncWithDevice(notifier, device);
-  }
-
-  /// 同步状态卡片
-  Widget _buildSyncStatusCard(LanSyncState state) {
     return Card(
       child: Padding(
         padding: EdgeInsets.all(16.r),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.history,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                SizedBox(width: 8.w),
-                Text(
-                  '同步状态',
-                  style: TextStyle(
-                    fontSize: 18.sp,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
+            Text('操作', style: Theme.of(context).textTheme.titleMedium),
             SizedBox(height: 12.h),
-            if (state.lastSyncTime != null)
-              _buildInfoRow('上次同步', _formatDateTime(state.lastSyncTime!)),
-            if (state.lastError != null)
-              Padding(
-                padding: EdgeInsets.only(top: 8.h),
-                child: Container(
-                  padding: EdgeInsets.all(8.r),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withAlpha(26),
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.error_outline, color: Colors.red, size: 20.sp),
-                      SizedBox(width: 8.w),
-                      Expanded(
-                        child: Text(
-                          state.lastError!,
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: isSyncing ? null : syncEngine.kick,
+                icon: const Icon(Icons.sync),
+                label: Text(isSyncing ? '同步中...' : '立即同步'),
               ),
-            if (state.lastSyncTime == null && state.lastError == null)
-              const Text('尚未进行过同步', style: TextStyle(color: Colors.grey)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 诊断信息卡片
-  Widget _buildDiagnosticsCard(LanSyncState state) {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(16.r),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.bug_report,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                SizedBox(width: 8.w),
-                Text(
-                  '诊断信息',
-                  style: TextStyle(
-                    fontSize: 18.sp,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 12.h),
-            const Text(
-              '如果设备无法相互发现，请检查：',
-              style: TextStyle(fontWeight: FontWeight.w500),
-            ),
-            SizedBox(height: 8.h),
-            _buildCheckItem('两台设备连接到同一 WiFi 网络'),
-            _buildCheckItem('两台设备都开启了"允许其他设备同步"'),
-            _buildCheckItem('防火墙允许端口 54322 的访问'),
-            _buildCheckItem('路由器未开启 AP 隔离功能'),
-            SizedBox(height: 12.h),
-            Text(
-              '提示：\n• 企业/公共 WiFi 通常会隔离设备\n• 手机热点可能无法被其他设备发现\n• 建议使用家庭 WiFi 或专用路由器',
-              style: TextStyle(color: Colors.grey, fontSize: 12.sp),
             ),
           ],
         ),
       ),
     );
   }
+}
 
-  /// 检查项
-  Widget _buildCheckItem(String text) {
-    return Padding(
-      padding: EdgeInsets.only(left: 8.w, top: 4.h),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('• ', style: TextStyle(color: Colors.grey)),
-          Expanded(
-            child: Text(text, style: const TextStyle(color: Colors.grey)),
-          ),
-        ],
-      ),
-    );
-  }
+class _SyncStatusPresentation {
+  const _SyncStatusPresentation({
+    required this.text,
+    required this.color,
+    required this.icon,
+  });
 
-  /// 信息行
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 4.h),
-      child: Row(
-        children: [
-          Text('$label: ', style: const TextStyle(color: Colors.grey)),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  final String text;
+  final Color color;
+  final IconData icon;
 
-  /// 自动发现并同步
-  Future<void> _discoverAndSync(LanSyncNotifier notifier) async {
-    setState(() => _isScanning = true);
-    try {
-      final results = await notifier.discoverAndSyncAll();
-
-      if (!mounted) return;
-
-      // 显示同步结果
-      if (results.isEmpty) {
-        CreativeToast.warning(
-          context,
-          title: '未发现设备',
-          message: '局域网中未发现其他可同步设备',
-          direction: ToastDirection.bottom,
+  factory _SyncStatusPresentation.fromState({
+    required SyncState state,
+    required ColorScheme colorScheme,
+  }) {
+    switch (state.phase) {
+      case SyncPhase.idle:
+        return _SyncStatusPresentation(
+          text: state.lastSyncedAt != null
+              ? '上次同步: ${_formatTime(state.lastSyncedAt!)}'
+              : '尚未同步',
+          color: colorScheme.tertiary,
+          icon: Icons.cloud_done_outlined,
         );
-      } else {
-        final successCount = results.values.where((r) => r.success).length;
-        final totalChanges = results.values
-            .where((r) => r.success)
-            .fold<int>(0, (sum, r) => sum + r.totalChanges);
-
-        CreativeToast.success(
-          context,
-          title: '同步完成',
-          message: '$successCount 台设备, $totalChanges 条变更',
-          direction: ToastDirection.bottom,
+      case SyncPhase.initialPull:
+        return _SyncStatusPresentation(
+          text: '首次全量同步中，请稍候...',
+          color: colorScheme.primary,
+          icon: Icons.cloud_download_outlined,
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isScanning = false);
-      }
+      case SyncPhase.pulling:
+        return _SyncStatusPresentation(
+          text: '拉取云端数据...',
+          color: colorScheme.primary,
+          icon: Icons.cloud_download_outlined,
+        );
+      case SyncPhase.pushing:
+        return _SyncStatusPresentation(
+          text: '推送本地变更... (${state.pendingCount} 条)',
+          color: colorScheme.secondary,
+          icon: Icons.cloud_upload_outlined,
+        );
+      case SyncPhase.error:
+        return _SyncStatusPresentation(
+          text: '同步出错，将自动重试',
+          color: colorScheme.error,
+          icon: Icons.cloud_off_outlined,
+        );
     }
   }
+}
 
-  /// 与设备同步
-  Future<void> _syncWithDevice(
-    LanSyncNotifier notifier,
-    DeviceInfo device,
-  ) async {
-    if (device.ipAddress == null) return;
-
-    final result = await notifier.syncWithDevice(
-      device.ipAddress!,
-      port: device.port,
-    );
-
-    if (!mounted) return;
-
-    if (result.success) {
-      CreativeToast.success(
-        context,
-        title: '同步成功',
-        message: '${result.totalChanges} 条变更已同步',
-        direction: ToastDirection.bottom,
-      );
-    } else {
-      CreativeToast.error(
-        context,
-        title: '同步失败',
-        message: result.error ?? '未知错误',
-        direction: ToastDirection.bottom,
-      );
-    }
-  }
-
-  /// 格式化日期时间
-  String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final diff = now.difference(dateTime);
-
-    if (diff.inMinutes < 1) {
-      return '刚刚';
-    } else if (diff.inHours < 1) {
-      return '${diff.inMinutes} 分钟前';
-    } else if (diff.inDays < 1) {
-      return '${diff.inHours} 小时前';
-    } else {
-      return '${dateTime.month}/${dateTime.day} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
-    }
-  }
+String _formatTime(DateTime dt) {
+  final now = DateTime.now();
+  final diff = now.difference(dt);
+  if (diff.inSeconds < 60) return '刚刚';
+  if (diff.inMinutes < 60) return '${diff.inMinutes} 分钟前';
+  if (diff.inHours < 24) return '${diff.inHours} 小时前';
+  return '${dt.month}/${dt.day} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
 }

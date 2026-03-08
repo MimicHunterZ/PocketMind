@@ -1,4 +1,4 @@
-package com.doublez.pocketmind // 请替换为你的包名
+package com.doublez.pocketmind
 
 import android.content.ClipboardManager
 import android.content.Context

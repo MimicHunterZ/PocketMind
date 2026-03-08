@@ -27,6 +27,12 @@ public class CategoryModel {
 
     private String name;
 
+    /** 分类描述 */
+    private String description;
+
+    /** 图标路径 */
+    private String iconPath;
+
     @TableField(fill = FieldFill.INSERT)
     private Instant createdAt;
 
@@ -34,4 +40,7 @@ public class CategoryModel {
 
     @TableLogic
     private Boolean isDeleted;
+
+    /** 服务端同步版本号（sync_change_log.id） */
+    private Long serverVersion;
 }

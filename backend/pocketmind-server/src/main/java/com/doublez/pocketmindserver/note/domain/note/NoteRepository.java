@@ -18,21 +18,38 @@ public interface NoteRepository {
 
     Optional<NoteEntity> findByUuidAndUserId(UUID uuid, long userId);
 
-    List<NoteEntity> findByUserId(long userId, PageQuery pageQuery);
-
-    /**
-     * 全文搜索（title + content + preview_content + preview_title）
-     * 使用 PostgreSQL to_tsvector FTS
-     */
-    List<NoteEntity> searchByText(long userId, String query, PageQuery pageQuery);
-
     /**
      * 增量同步：拉取 updatedAt > cursor 的变更（含软删除）
      */
     List<NoteEntity> findChangedSince(long userId, SyncCursorQuery query);
 
+
     /**
-     * 按 UUID 列表批量查询
+     * 同步专用：回填服务端版本号（不修改 updatedAt）。
      */
-    List<NoteEntity> findByUuids(long userId, List<UUID> uuids);
+    void updateServerVersion(UUID uuid, long userId, long serverVersion);
+
+    /**
+     * 同步专用：按 UUID 显式软删除笔记并更新 updatedAt。
+     * <p>
+     * 不能走通用 {@code update()}，否则 {@code @TableLogic} 可能导致
+     * {@code is_deleted} 不进入 UPDATE SET。
+     */
+    void softDeleteByUuidAndUserId(UUID uuid, long userId, long updatedAt);
+
+    /**
+     * AI 回调岂用：写入 AI 权威字段（不修改 updatedAt，保证 LWW 正确）。
+     */
+    void updateAiFields(UUID uuid, long userId, String aiSummary, String resourceStatus,
+                        String previewTitle, String previewDescription, String previewContent);
+
+    /**
+     * 同步专用：读取笔记关联的标签名称列表。
+     */
+    List<String> findTagNamesByUuid(UUID noteUuid, long userId);
+
+    /**
+     * 同步专用：按客户端最终结果全量替换笔记标签。
+     */
+    void replaceTagNames(UUID noteUuid, long userId, List<String> tagNames);
 }

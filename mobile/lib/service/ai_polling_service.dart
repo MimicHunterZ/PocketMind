@@ -2,6 +2,7 @@ import 'package:pocketmind/api/post_detail_service.dart';
 import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/data/repositories/isar_note_repository.dart';
 import 'package:pocketmind/util/logger_service.dart';
+import 'package:pocketmind/util/tag_list_utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const String _tag = 'AiPollingService';
@@ -67,15 +68,17 @@ class AiPollingService {
         }
         // 合并 AI 标签到本地（不覆盖用户手动添加的标签）
         if (result.tags.isNotEmpty) {
-          final merged = {...note.tags.toSet(), ...result.tags};
-          note.tags = merged.toList();
+          note.tags = TagListUtils.mergeLocalAndServer(
+            localTags: note.tags,
+            serverTags: result.tags,
+          );
         }
         PMlog.d(_tag, 'AI 分析完成，写入结果: uuid=$noteUuid');
       } else {
         PMlog.w(_tag, 'AI 分析失败，保留现有数据: uuid=$noteUuid');
       }
 
-      await _noteRepository.save(note);
+      await _noteRepository.saveSyncInternalNote(note);
       await _removePending(noteUuid);
     } catch (e) {
       // 轮询异常（如网络断开）不移出队列，下次 resume 重试

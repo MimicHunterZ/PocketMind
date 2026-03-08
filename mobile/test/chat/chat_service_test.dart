@@ -14,6 +14,16 @@ import 'package:pocketmind/service/chat_service.dart';
 class MockIsarChatMessageRepository extends Mock
     implements IsarChatMessageRepository {
   @override
+  Future<List<ChatBranchSummaryModel>> buildLocalBranchSummaries(
+    String sessionUuid,
+  ) =>
+      (super.noSuchMethod(
+            Invocation.method(#buildLocalBranchSummaries, [sessionUuid]),
+            returnValue: Future<List<ChatBranchSummaryModel>>.value([]),
+          )
+          as Future<List<ChatBranchSummaryModel>>);
+
+  @override
   Future<void> updateContent(String uuid, String content) =>
       (super.noSuchMethod(
             Invocation.method(#updateContent, [uuid, content]),
@@ -497,7 +507,15 @@ void main() {
   // ----------------------------------------------------------
   group('fetchBranches', () {
     test('返回 API 响应的分支列表', () async {
-      final branches = <ChatBranchSummaryModel>[];
+      final branches = [
+        const ChatBranchSummaryModel(
+          leafUuid: 'leaf-1',
+          branchAlias: '分支一',
+          lastUserContent: '用户问题',
+          lastAssistantContent: 'AI 回答',
+          updatedAt: 100,
+        ),
+      ];
       when(
         apiService.fetchBranches(sessionUuid),
       ).thenAnswer((_) async => branches);
@@ -506,14 +524,54 @@ void main() {
 
       expect(result, same(branches));
       verify(apiService.fetchBranches(sessionUuid)).called(1);
+      verifyNever(messageRepo.buildLocalBranchSummaries(sessionUuid));
     });
 
-    test('API 失败时异常向上传播', () async {
+    test('API 返回空列表时回退到本地分支摘要', () async {
+      final localBranches = [
+        const ChatBranchSummaryModel(
+          leafUuid: 'leaf-local',
+          branchAlias: '本地分支',
+          lastUserContent: '本地用户问题',
+          lastAssistantContent: '本地 AI 回答',
+          updatedAt: 200,
+        ),
+      ];
+
+      when(apiService.fetchBranches(sessionUuid)).thenAnswer((_) async => []);
+      when(
+        messageRepo.buildLocalBranchSummaries(sessionUuid),
+      ).thenAnswer((_) async => localBranches);
+
+      final result = await service.fetchBranches(sessionUuid);
+
+      expect(result, same(localBranches));
+      verify(apiService.fetchBranches(sessionUuid)).called(1);
+      verify(messageRepo.buildLocalBranchSummaries(sessionUuid)).called(1);
+    });
+
+    test('API 失败时降级本地分支摘要', () async {
+      final localBranches = [
+        const ChatBranchSummaryModel(
+          leafUuid: 'leaf-fallback',
+          branchAlias: '降级分支',
+          lastUserContent: '离线问题',
+          lastAssistantContent: '离线回答',
+          updatedAt: 300,
+        ),
+      ];
+
       when(
         apiService.fetchBranches(sessionUuid),
       ).thenAnswer((_) => Future.error(Exception('分支拉取失败')));
+      when(
+        messageRepo.buildLocalBranchSummaries(sessionUuid),
+      ).thenAnswer((_) async => localBranches);
 
-      await expectLater(service.fetchBranches(sessionUuid), throwsException);
+      final result = await service.fetchBranches(sessionUuid);
+
+      expect(result, same(localBranches));
+      verify(messageRepo.buildLocalBranchSummaries(sessionUuid)).called(1);
     });
   });
 }

@@ -27,8 +27,8 @@ class CategoryEntityTest {
     @Test
     void equals_shouldBeBasedOnUuid() {
         UUID uuid = UUID.randomUUID();
-        CategoryEntity a = new CategoryEntity(10L, uuid, 1L, "A", 1L, false);
-        CategoryEntity b = new CategoryEntity(11L, uuid, 2L, "B", 2L, true);
+        CategoryEntity a = new CategoryEntity(10L, uuid, 1L, "A", null, null, 1L, false, null);
+        CategoryEntity b = new CategoryEntity(11L, uuid, 2L, "B", "desc", "icon", 2L, true, 3L);
         assertEquals(a, b);
         assertEquals(a.hashCode(), b.hashCode());
     }

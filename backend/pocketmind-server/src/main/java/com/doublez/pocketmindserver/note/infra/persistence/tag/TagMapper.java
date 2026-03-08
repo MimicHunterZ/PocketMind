@@ -1,6 +1,7 @@
 package com.doublez.pocketmindserver.note.infra.persistence.tag;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Update;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -26,4 +27,18 @@ public interface TagMapper extends BaseMapper<TagModel> {
                               @Param("userId") long userId,
                               @Param("name") String name,
                               @Param("updatedAt") long updatedAt);
+
+    /**
+     * 显式软删除标签，绕过 @TableLogic 自动更新限制。
+     */
+    @Update("""
+            UPDATE tags
+               SET is_deleted = TRUE,
+                   updated_at = #{updatedAt}
+             WHERE uuid = #{uuid}
+               AND user_id = #{userId}
+            """)
+    int softDeleteByUuidAndUserId(@Param("uuid") UUID uuid,
+                                  @Param("userId") long userId,
+                                  @Param("updatedAt") long updatedAt);
 }

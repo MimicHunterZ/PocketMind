@@ -1,46 +1,21 @@
 package com.doublez.pocketmindserver.sync.api.dto;
 
-import com.fasterxml.jackson.annotation.JsonAnyGetter;
-import com.fasterxml.jackson.annotation.JsonAnySetter;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import lombok.Data;
-
-import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 /**
- * 单条同步变更条目
- * payload 为动态字段，不同 entityType 有不同结构
+ *
+ * @param entityType   实体类型：'note' | 'category'
+ * @param uuid         业务实体 UUID 字符串
+ * @param operation    操作类型：'create' | 'update' | 'delete'
+ * @param serverVersion 本条变更对应的 sync_change_log.id（服务端版本号）
+ * @param updatedAt    业务实体 updatedAt 毫秒时间戳，作为客户端 LWW 裁决依据
+ * @param payload      实体完整字段 map；delete 操作时为空 map
  */
-@Data
-public class SyncChangeItem {
-
-    @NotBlank
-    private String entityType;
-
-    @NotNull
-    private UUID uuid;
-
-    /** upsert | delete */
-    @NotBlank
-    private String op;
-
-    /** 毫秒时间戳 */
-    private long updatedAt;
-
-    /** 动态 payload（根据 entityType 结构不同） */
-    private Map<String, Object> payload = new HashMap<>();
-
-    @JsonAnyGetter
-    public Map<String, Object> getPayload() { return payload; }
-
-    @JsonAnySetter
-    public void setPayload(String key, Object value) {
-        if (!"entityType".equals(key) && !"uuid".equals(key)
-                && !"op".equals(key) && !"updatedAt".equals(key)) {
-            this.payload.put(key, value);
-        }
-    }
-}
+public record SyncChangeItem(
+        String entityType,
+        String uuid,
+        String operation,
+        long serverVersion,
+        long updatedAt,
+        Map<String, Object> payload
+) {}

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -19,7 +20,7 @@ public interface NoteMapper extends BaseMapper<NoteModel> {
     @Select("""
             SELECT id, uuid, user_id, title, content, source_url, category_id,
                    note_time, preview_title, preview_description, preview_content,
-                   resource_status, summary, memory_path, created_at, updated_at, is_deleted
+                   resource_status, summary, memory_path, created_at, updated_at, is_deleted, server_version
               FROM notes
              WHERE user_id = #{userId}
                AND is_deleted = FALSE
@@ -45,7 +46,7 @@ public interface NoteMapper extends BaseMapper<NoteModel> {
     @Select("""
             SELECT id, uuid, user_id, title, content, source_url, category_id,
                    note_time, preview_title, preview_description, preview_content,
-                   resource_status, summary, memory_path, created_at, updated_at, is_deleted
+                   resource_status, summary, memory_path, created_at, updated_at, is_deleted, server_version
               FROM notes
              WHERE user_id = #{userId}
                AND updated_at > #{cursor}
@@ -56,4 +57,52 @@ public interface NoteMapper extends BaseMapper<NoteModel> {
             @Param("userId") long userId,
             @Param("cursor") long cursor,
             @Param("limit") int limit);
+
+    /**
+     * 同步回填 server_version（不动 updatedAt）。
+     */
+    @Update("""
+            UPDATE notes
+               SET server_version = #{serverVersion}
+             WHERE uuid = #{uuid}
+               AND user_id = #{userId}
+            """)
+    int updateServerVersion(@Param("uuid") java.util.UUID uuid,
+                            @Param("userId") long userId,
+                            @Param("serverVersion") long serverVersion);
+
+    /**
+     * 同步删除：显式写入 is_deleted，绕过 @TableLogic 自动更新限制。
+     */
+    @Update("""
+            UPDATE notes
+               SET is_deleted = TRUE,
+                   updated_at = #{updatedAt}
+             WHERE uuid = #{uuid}
+               AND user_id = #{userId}
+            """)
+    int softDeleteByUuidAndUserId(@Param("uuid") java.util.UUID uuid,
+                                  @Param("userId") long userId,
+                                  @Param("updatedAt") long updatedAt);
+
+    /**
+     * AI 回调：更新 AI 权威字段（不动 updated_at，保证 LWW 正确）。
+     */
+    @Update("""
+            UPDATE notes
+               SET summary             = #{aiSummary},
+                   resource_status     = #{resourceStatus},
+                   preview_title       = #{previewTitle},
+                   preview_description = #{previewDescription},
+                   preview_content     = #{previewContent}
+             WHERE uuid    = #{uuid}
+               AND user_id = #{userId}
+            """)
+    int updateAiFields(@Param("uuid") java.util.UUID uuid,
+                       @Param("userId") long userId,
+                       @Param("aiSummary") String aiSummary,
+                       @Param("resourceStatus") String resourceStatus,
+                       @Param("previewTitle") String previewTitle,
+                       @Param("previewDescription") String previewDescription,
+                       @Param("previewContent") String previewContent);
 }

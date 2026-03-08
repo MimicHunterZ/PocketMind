@@ -17,6 +17,14 @@ class ApiConstants {
   /// 图片资产（上传 POST，绑定 PATCH /{uuid}/bind）
   static const String assetsImages = '/api/assets/images';
 
+  // 同步端点
+
+  /// 增量拉取（GET，参数：sinceVersion, pageSize）
+  static const String syncPull = '/api/sync/pull';
+
+  /// 批量推送本地变更（POST）
+  static const String syncPush = '/api/sync/push';
+
   // Chat 会话 & 消息
 
   /// 会话列表 / 创建会话（GET / POST）

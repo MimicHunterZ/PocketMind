@@ -9,15 +9,17 @@ part of 'category_providers.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// CategoryRepository Provider - 数据层
-/// 提供 Isar 的具体实现
+/// 提供 Isar 的具体实现（与 sync_providers.dart 中共用同一 provider，
+/// 若已经 import sync_providers，此处直接复用 categoryRepositoryProvider）
 
-@ProviderFor(categoryRepository)
-const categoryRepositoryProvider = CategoryRepositoryProvider._();
+@ProviderFor(isarCategoryRepository)
+const isarCategoryRepositoryProvider = IsarCategoryRepositoryProvider._();
 
 /// CategoryRepository Provider - 数据层
-/// 提供 Isar 的具体实现
+/// 提供 Isar 的具体实现（与 sync_providers.dart 中共用同一 provider，
+/// 若已经 import sync_providers，此处直接复用 categoryRepositoryProvider）
 
-final class CategoryRepositoryProvider
+final class IsarCategoryRepositoryProvider
     extends
         $FunctionalProvider<
           IsarCategoryRepository,
@@ -26,20 +28,21 @@ final class CategoryRepositoryProvider
         >
     with $Provider<IsarCategoryRepository> {
   /// CategoryRepository Provider - 数据层
-  /// 提供 Isar 的具体实现
-  const CategoryRepositoryProvider._()
+  /// 提供 Isar 的具体实现（与 sync_providers.dart 中共用同一 provider，
+  /// 若已经 import sync_providers，此处直接复用 categoryRepositoryProvider）
+  const IsarCategoryRepositoryProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'categoryRepositoryProvider',
+        name: r'isarCategoryRepositoryProvider',
         isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$categoryRepositoryHash();
+  String debugGetCreateSourceHash() => _$isarCategoryRepositoryHash();
 
   @$internal
   @override
@@ -49,7 +52,7 @@ final class CategoryRepositoryProvider
 
   @override
   IsarCategoryRepository create(Ref ref) {
-    return categoryRepository(ref);
+    return isarCategoryRepository(ref);
   }
 
   /// {@macro riverpod.override_with_value}
@@ -61,21 +64,24 @@ final class CategoryRepositoryProvider
   }
 }
 
-String _$categoryRepositoryHash() =>
-    r'b4fc8616d983e738a7baebaa5846e55848f9ef0f';
+String _$isarCategoryRepositoryHash() =>
+    r'a422a5fb9e30465b12e07b603381d4fc05f5d22e';
 
 /// CategoryService Provider - 业务层
+/// 注入 LocalWriteCoordinator + SyncEngine，确保写操作走同步链路
 
 @ProviderFor(categoryService)
 const categoryServiceProvider = CategoryServiceProvider._();
 
 /// CategoryService Provider - 业务层
+/// 注入 LocalWriteCoordinator + SyncEngine，确保写操作走同步链路
 
 final class CategoryServiceProvider
     extends
         $FunctionalProvider<CategoryService, CategoryService, CategoryService>
     with $Provider<CategoryService> {
   /// CategoryService Provider - 业务层
+  /// 注入 LocalWriteCoordinator + SyncEngine，确保写操作走同步链路
   const CategoryServiceProvider._()
     : super(
         from: null,
@@ -109,7 +115,7 @@ final class CategoryServiceProvider
   }
 }
 
-String _$categoryServiceHash() => r'b47d95ad06288b5e265d860a918ad9ed30ad6c5e';
+String _$categoryServiceHash() => r'2a7f2eefe1b70703c0a5c1463c947642ba8f72fb';
 
 /// 所有分类 Stream Provider - 自动监听数据库变化
 

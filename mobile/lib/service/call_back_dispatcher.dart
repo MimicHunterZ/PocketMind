@@ -10,6 +10,8 @@ import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/model/note_asset.dart';
 import 'package:pocketmind/model/chat_session.dart';
 import 'package:pocketmind/model/chat_message.dart';
+import 'package:pocketmind/sync/model/mutation_entry.dart';
+import 'package:pocketmind/sync/model/sync_checkpoint.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';
 import 'package:pocketmind/service/notification_service.dart';
@@ -17,7 +19,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:uuid/uuid.dart';
 
-import '../api/asset_api_service.dart';
 import '../api/note_api_service.dart';
 import '../api/models/note_metadata.dart';
 import '../providers/note_providers.dart';
@@ -51,6 +52,8 @@ void callbackDispatcher() {
         NoteAssetSchema,
         ChatSessionSchema,
         ChatMessageSchema,
+        MutationEntrySchema,
+        SyncCheckpointSchema,
       ], directory: dir.path);
 
       final prefs = await SharedPreferences.getInstance();
@@ -184,17 +187,17 @@ Future<void> scrapeAndSave(
       final metaData = metadataResults[url];
       final bool isFromPlatformScraper =
           metaData?.source == MetadataSource.platformScraper;
-      final previewContent =
+      final fetchedPreviewContent =
           metaData?.previewContent ?? metaData?.previewDescription;
-      final bool hasClientContent =
-          previewContent != null && previewContent.isNotEmpty;
+      final bool hasFetchedContent =
+          fetchedPreviewContent != null && fetchedPreviewContent.isNotEmpty;
 
       try {
         // 更新客户端抓取到的基础元数据（如有）
         if (metaData != null) {
-          if (note.previewTitle == null) note.previewTitle = metaData.title;
-          if (note.previewContent == null && hasClientContent) {
-            note.previewContent = previewContent;
+          note.previewTitle ??= metaData.title;
+          if (note.previewContent == null && hasFetchedContent) {
+            note.previewContent = fetchedPreviewContent;
           }
           // 将元数据中的第一张图路径设为预览图
           if (note.previewImageUrl == null && metaData.imageUrls.isNotEmpty) {
@@ -262,8 +265,8 @@ Future<void> scrapeAndSave(
         await noteApiService.submitAnalysis(
           uuid: note.uuid!,
           url: url,
-          previewTitle: metaData?.title,
-          previewContent: hasClientContent ? previewContent : null,
+          previewTitle: note.previewTitle,
+          previewContent: _nonEmptyText(note.previewContent),
           userQuestion: userQuestion,
         );
 
@@ -276,7 +279,7 @@ Future<void> scrapeAndSave(
           note,
           AppConstants.resourceStatusCrawled,
         );
-        await ref.read(noteRepositoryProvider).save(note);
+        await ref.read(noteRepositoryProvider).saveSyncInternalNote(note);
 
         final platform = _getPlatformName(url, metaData?.source);
         final content = note.previewTitle ?? note.previewContent;
@@ -453,6 +456,12 @@ String _truncateText(String? text, int maxLength) {
   if (text == null || text.isEmpty) return '无标题';
   if (text.length <= maxLength) return text;
   return '${text.substring(0, maxLength)}...';
+}
+
+String? _nonEmptyText(String? text) {
+  if (text == null) return null;
+  final normalized = text.trim();
+  return normalized.isEmpty ? null : normalized;
 }
 
 /// 将 noteUuid 加入 AI 分析待轮询队列。

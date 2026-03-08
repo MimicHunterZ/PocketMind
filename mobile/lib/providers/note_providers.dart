@@ -1,6 +1,5 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:pocketmind/providers/shared_preferences_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/data/repositories/isar_note_repository.dart';
@@ -9,13 +8,13 @@ import 'package:pocketmind/model/note_asset.dart';
 import 'package:pocketmind/providers/nav_providers.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/service/note_service.dart';
-import 'package:pocketmind/api/note_api_service.dart';
-
-import '../util/logger_service.dart';
-
+import 'package:pocketmind/providers/sync_providers.dart';
+import 'package:pocketmind/sync/sync_state_provider.dart';
+import 'package:pocketmind/providers/shared_preferences_provider.dart';
 import 'package:pocketmind/service/metadata_manager.dart';
 import 'package:pocketmind/api/link_preview_api_service.dart';
-import 'package:pocketmind/providers/pm_service_providers.dart';
+
+import '../util/logger_service.dart';
 
 part 'note_providers.freezed.dart';
 part 'note_providers.g.dart';
@@ -58,10 +57,15 @@ MetadataManager metadataManager(Ref ref) {
 @Riverpod(keepAlive: true)
 NoteService noteService(Ref ref) {
   final repository = ref.watch(noteRepositoryProvider);
-  final metadataManager = ref.watch(metadataManagerProvider);
+  final writeCoordinator = ref.watch(localWriteCoordinatorProvider);
+  final syncEngine = ref.watch(syncEngineProvider);
   final prefs = ref.watch(sharedPreferencesProvider);
-  final noteApiService = ref.watch(noteApiServiceProvider);
-  return NoteService(repository, metadataManager, prefs, noteApiService);
+  return NoteService(
+    noteRepository: repository,
+    writeCoordinator: writeCoordinator,
+    syncEngine: syncEngine,
+    prefs: prefs,
+  );
 }
 
 /// 搜索查询 Provider - 用于管理当前搜索关键词
@@ -111,21 +115,27 @@ class SelectedNote extends _$SelectedNote {
 /// 根据分类获取笔记的 StreamNotifier
 @riverpod
 class NoteByCategory extends _$NoteByCategory {
-  // build 方法返回 Stream，自动监听数据库变化
+  /// build 方法返回 Stream，自动监听数据库变化
   @override
   Stream<List<Note>> build() async* {
-    // 获取 noteService
     final noteService = ref.watch(noteServiceProvider);
-
+    final isInitialPull = ref.watch(syncIsInitialPullProvider);
     final targetCategoryId = await ref.watch(activeCategoryIdProvider.future);
 
     PMlog.d('activeIndex', 'targetCategoryId: $targetCategoryId');
 
-    // 直接转发 watchCategoryNotes 的 Stream
+    // initialPull 阶段：本地库可能为空，先冻结输出为空列表
+    // UI 层根据 syncStateProvider.isInitialPull 显示骨架屏
+    // 暂不订阅 Isar Watch，避免全量写入期间 Widget 高频重绘
+    if (isInitialPull) {
+      yield const <Note>[];
+      return;
+    }
+
     yield* noteService.watchCategoryNotes(targetCategoryId);
   }
 
-  // 删除笔记方法
+  /// 删除笔记
   Future<void> deleteNote(int noteId) async {
     try {
       // 直接删除，watchCategoryNotes() 的 Stream 会自动更新 UI
@@ -211,7 +221,6 @@ class NoteDetail extends _$NoteDetail {
             tags: state.note.tags,
             previewTitle: state.note.previewTitle,
             previewDescription: state.note.previewDescription,
-            updatedAt: state.note.updatedAt,
           );
       if (ref.mounted) {
         state = state.copyWith(note: state.note.copyWith(id: id));

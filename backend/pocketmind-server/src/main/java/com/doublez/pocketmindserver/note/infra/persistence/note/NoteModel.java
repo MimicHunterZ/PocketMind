@@ -48,4 +48,7 @@ public class NoteModel {
 
     @TableLogic
     private Boolean isDeleted;
+
+    /** 服务端同步版本号（sync_change_log.id），null 表示未同步 */
+    private Long serverVersion;
 }

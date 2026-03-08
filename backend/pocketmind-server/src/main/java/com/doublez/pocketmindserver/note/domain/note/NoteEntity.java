@@ -52,6 +52,8 @@ public class NoteEntity {
     // 同步字段
     private long updatedAt;
     private boolean deleted;
+    /** 服务端分配的单调递增版本号；null 表示尚未同步至服务端 */
+    private Long serverVersion;
 
     /**
      * 构造函数仅用于持久化反序列化 / 映射（由 MapStruct 调用）。
@@ -73,7 +75,8 @@ public class NoteEntity {
             "summary",
             "memoryPath",
             "updatedAt",
-            "deleted"
+            "deleted",
+            "serverVersion"
     })
     public NoteEntity(UUID uuid,
                       long userId,
@@ -90,7 +93,8 @@ public class NoteEntity {
                       String summary,
                       String memoryPath,
                       long updatedAt,
-                      boolean deleted) {
+                      boolean deleted,
+                      Long serverVersion) {
         this.uuid = Objects.requireNonNull(uuid, "uuid must not be null");
         this.userId = userId;
         this.title = title;
@@ -107,6 +111,7 @@ public class NoteEntity {
         this.memoryPath = memoryPath;
         this.updatedAt = updatedAt;
         this.deleted = deleted;
+        this.serverVersion = serverVersion;
     }
 
     // 工厂方法
@@ -132,7 +137,8 @@ public class NoteEntity {
                 null,
                 null,
                 System.currentTimeMillis(),
-                false
+                false,
+                null
         );
     }
 
@@ -267,6 +273,25 @@ public class NoteEntity {
     public void softDelete() {
         this.deleted = true;
         this.updatedAt = System.currentTimeMillis();
+    }
+
+    /**
+     * 同步专用：服务端写入 change_log 后回填 server_version，不修改 updatedAt。
+     */
+    public void assignServerVersion(long serverVersion) {
+        this.serverVersion = serverVersion;
+    }
+
+    /**
+     * 同步专用：仅更新 sourceUrl，不自动修改 resourceStatus（资源状态由 AI 管线独立管理）。
+     *
+     * @return 是否发生了有效的 URL 变更（调用方据此决定是否触发爬取管线）
+     */
+    public boolean syncSourceUrl(String newUrl) {
+        boolean changed = !Objects.equals(this.sourceUrl, newUrl)
+                && newUrl != null && !newUrl.isBlank();
+        this.sourceUrl = newUrl;
+        return changed;
     }
 
     public List<NoteTag> getTags() {

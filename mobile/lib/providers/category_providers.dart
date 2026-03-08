@@ -2,23 +2,32 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/data/repositories/isar_category_repository.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
+import 'package:pocketmind/providers/sync_providers.dart';
 import 'package:pocketmind/service/category_service.dart';
 
 part 'category_providers.g.dart';
 
 /// CategoryRepository Provider - 数据层
-/// 提供 Isar 的具体实现
+/// 提供 Isar 的具体实现（与 sync_providers.dart 中共用同一 provider，
+/// 若已经 import sync_providers，此处直接复用 categoryRepositoryProvider）
 @Riverpod(keepAlive: true)
-IsarCategoryRepository categoryRepository(Ref ref) {
+IsarCategoryRepository isarCategoryRepository(Ref ref) {
   final isar = ref.watch(isarProvider);
   return IsarCategoryRepository(isar);
 }
 
 /// CategoryService Provider - 业务层
+/// 注入 LocalWriteCoordinator + SyncEngine，确保写操作走同步链路
 @Riverpod(keepAlive: true)
 CategoryService categoryService(Ref ref) {
-  final repository = ref.watch(categoryRepositoryProvider);
-  return CategoryService(repository);
+  final repository = ref.watch(isarCategoryRepositoryProvider);
+  final coordinator = ref.watch(localWriteCoordinatorProvider);
+  final syncEngine = ref.watch(syncEngineProvider);
+  return CategoryService(
+    categoryRepository: repository,
+    writeCoordinator: coordinator,
+    syncEngine: syncEngine,
+  );
 }
 
 /// 所有分类 Stream Provider - 自动监听数据库变化
@@ -49,7 +58,7 @@ class CategoryActions extends _$CategoryActions {
     return await service.addCategory(name: name, iconPath: iconPath);
   }
 
-  /// 删除分类
+  /// 删除分类（软删除，触发同步）
   Future<void> deleteCategory(int categoryId) async {
     final service = ref.read(categoryServiceProvider);
     await service.deleteCategory(categoryId);

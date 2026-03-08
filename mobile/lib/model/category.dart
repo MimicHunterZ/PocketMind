@@ -27,6 +27,9 @@ class Category {
   /// 软删除标记，true 表示已删除
   bool isDeleted = false;
 
+  /// 服务端分配的单调递增版本号，null 表示本地新建尚未推送
+  int? serverVersion;
+
   Category copyWith({
     Id? id,
     String? uuid,
@@ -36,6 +39,7 @@ class Category {
     DateTime? createdTime,
     int? updatedAt,
     bool? isDeleted,
+    int? serverVersion,
   }) {
     return Category()
       ..id = id ?? this.id
@@ -45,6 +49,7 @@ class Category {
       ..iconPath = iconPath ?? this.iconPath
       ..createdTime = createdTime ?? this.createdTime
       ..updatedAt = updatedAt ?? this.updatedAt
-      ..isDeleted = isDeleted ?? this.isDeleted;
+      ..isDeleted = isDeleted ?? this.isDeleted
+      ..serverVersion = serverVersion ?? this.serverVersion;
   }
 }

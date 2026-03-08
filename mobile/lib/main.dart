@@ -24,12 +24,13 @@ import 'model/note.dart';
 import 'model/note_asset.dart';
 import 'model/chat_session.dart';
 import 'model/chat_message.dart';
-import 'lan_sync/model/sync_log.dart';
+import 'sync/model/mutation_entry.dart';
+import 'sync/model/sync_checkpoint.dart';
 import 'data/repositories/isar_category_repository.dart';
 import 'util/logger_service.dart';
-import 'lan_sync/lan_sync_service.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/providers/pm_service_providers.dart';
+import 'package:pocketmind/providers/sync_providers.dart';
 
 // 这会强制构建系统将 main_share.dart 编译到应用中
 // 防止另一个入口没有被引用
@@ -61,7 +62,8 @@ Future<void> main() async {
   isar = await Isar.open([
     NoteSchema,
     CategorySchema,
-    SyncLogSchema,
+    MutationEntrySchema,
+    SyncCheckpointSchema,
     NoteAssetSchema,
     ChatSessionSchema,
     ChatMessageSchema,
@@ -113,8 +115,11 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // 触发 LanSyncService 初始化
-    ref.read(lanSyncProvider);
+    // 确保自适应同步调度器始终激活
+    ref.read(adaptiveSyncSchedulerProvider);
+
+    // 激活 PENDING 笔记抓取调度器（分享链路落地后由此接管端侧抓取）
+    ref.read(resourceFetchSchedulerProvider);
 
     // 初始化鉴权
     ref.read(authControllerProvider);
@@ -138,6 +143,8 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     PMlog.d('MyApp', 'AppLifecycleState changed: $state');
     if (state == AppLifecycleState.resumed) {
       PMlog.d('MyApp', 'App resumed, checking pending URLs');
+      // 触发 PENDING 笔记扫描（分享后切回主 App 的场景）
+      ref.read(resourceFetchSchedulerProvider).runNow();
       ref.read(noteServiceProvider).processPendingUrls();
       ref.read(aiPollingServiceProvider).pollAll();
     }

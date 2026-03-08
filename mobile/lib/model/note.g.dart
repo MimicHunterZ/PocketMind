@@ -33,35 +33,35 @@ const NoteSchema = CollectionSchema(
       name: r'isDeleted',
       type: IsarType.bool,
     ),
-    r'pendingAiQuestion': PropertySchema(
-      id: 4,
-      name: r'pendingAiQuestion',
-      type: IsarType.string,
-    ),
     r'previewContent': PropertySchema(
-      id: 5,
+      id: 4,
       name: r'previewContent',
       type: IsarType.string,
     ),
     r'previewDescription': PropertySchema(
-      id: 6,
+      id: 5,
       name: r'previewDescription',
       type: IsarType.string,
     ),
     r'previewImageUrl': PropertySchema(
-      id: 7,
+      id: 6,
       name: r'previewImageUrl',
       type: IsarType.string,
     ),
     r'previewTitle': PropertySchema(
-      id: 8,
+      id: 7,
       name: r'previewTitle',
       type: IsarType.string,
     ),
     r'resourceStatus': PropertySchema(
-      id: 9,
+      id: 8,
       name: r'resourceStatus',
       type: IsarType.string,
+    ),
+    r'serverVersion': PropertySchema(
+      id: 9,
+      name: r'serverVersion',
+      type: IsarType.long,
     ),
     r'tags': PropertySchema(id: 10, name: r'tags', type: IsarType.stringList),
     r'time': PropertySchema(id: 11, name: r'time', type: IsarType.dateTime),
@@ -156,12 +156,6 @@ int _noteEstimateSize(
     }
   }
   {
-    final value = object.pendingAiQuestion;
-    if (value != null) {
-      bytesCount += 3 + value.length * 3;
-    }
-  }
-  {
     final value = object.previewContent;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -229,12 +223,12 @@ void _noteSerialize(
   writer.writeLong(offsets[1], object.categoryId);
   writer.writeString(offsets[2], object.content);
   writer.writeBool(offsets[3], object.isDeleted);
-  writer.writeString(offsets[4], object.pendingAiQuestion);
-  writer.writeString(offsets[5], object.previewContent);
-  writer.writeString(offsets[6], object.previewDescription);
-  writer.writeString(offsets[7], object.previewImageUrl);
-  writer.writeString(offsets[8], object.previewTitle);
-  writer.writeString(offsets[9], object.resourceStatus);
+  writer.writeString(offsets[4], object.previewContent);
+  writer.writeString(offsets[5], object.previewDescription);
+  writer.writeString(offsets[6], object.previewImageUrl);
+  writer.writeString(offsets[7], object.previewTitle);
+  writer.writeString(offsets[8], object.resourceStatus);
+  writer.writeLong(offsets[9], object.serverVersion);
   writer.writeStringList(offsets[10], object.tags);
   writer.writeDateTime(offsets[11], object.time);
   writer.writeString(offsets[12], object.title);
@@ -255,12 +249,12 @@ Note _noteDeserialize(
   object.content = reader.readStringOrNull(offsets[2]);
   object.id = id;
   object.isDeleted = reader.readBool(offsets[3]);
-  object.pendingAiQuestion = reader.readStringOrNull(offsets[4]);
-  object.previewContent = reader.readStringOrNull(offsets[5]);
-  object.previewDescription = reader.readStringOrNull(offsets[6]);
-  object.previewImageUrl = reader.readStringOrNull(offsets[7]);
-  object.previewTitle = reader.readStringOrNull(offsets[8]);
-  object.resourceStatus = reader.readStringOrNull(offsets[9]);
+  object.previewContent = reader.readStringOrNull(offsets[4]);
+  object.previewDescription = reader.readStringOrNull(offsets[5]);
+  object.previewImageUrl = reader.readStringOrNull(offsets[6]);
+  object.previewTitle = reader.readStringOrNull(offsets[7]);
+  object.resourceStatus = reader.readStringOrNull(offsets[8]);
+  object.serverVersion = reader.readLongOrNull(offsets[9]);
   object.tags = reader.readStringList(offsets[10]) ?? [];
   object.time = reader.readDateTimeOrNull(offsets[11]);
   object.title = reader.readStringOrNull(offsets[12]);
@@ -296,7 +290,7 @@ P _noteDeserializeProp<P>(
     case 8:
       return (reader.readStringOrNull(offset)) as P;
     case 9:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 10:
       return (reader.readStringList(offset) ?? []) as P;
     case 11:
@@ -1175,169 +1169,6 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionIsNull() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        const FilterCondition.isNull(property: r'pendingAiQuestion'),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionIsNotNull() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        const FilterCondition.isNotNull(property: r'pendingAiQuestion'),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionEqualTo(
-    String? value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.equalTo(
-          property: r'pendingAiQuestion',
-          value: value,
-          caseSensitive: caseSensitive,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionGreaterThan(
-    String? value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.greaterThan(
-          include: include,
-          property: r'pendingAiQuestion',
-          value: value,
-          caseSensitive: caseSensitive,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionLessThan(
-    String? value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.lessThan(
-          include: include,
-          property: r'pendingAiQuestion',
-          value: value,
-          caseSensitive: caseSensitive,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionBetween(
-    String? lower,
-    String? upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.between(
-          property: r'pendingAiQuestion',
-          lower: lower,
-          includeLower: includeLower,
-          upper: upper,
-          includeUpper: includeUpper,
-          caseSensitive: caseSensitive,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionStartsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.startsWith(
-          property: r'pendingAiQuestion',
-          value: value,
-          caseSensitive: caseSensitive,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionEndsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.endsWith(
-          property: r'pendingAiQuestion',
-          value: value,
-          caseSensitive: caseSensitive,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionContains(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.contains(
-          property: r'pendingAiQuestion',
-          value: value,
-          caseSensitive: caseSensitive,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionMatches(
-    String pattern, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.matches(
-          property: r'pendingAiQuestion',
-          wildcard: pattern,
-          caseSensitive: caseSensitive,
-        ),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition> pendingAiQuestionIsEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.equalTo(property: r'pendingAiQuestion', value: ''),
-      );
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterFilterCondition>
-  pendingAiQuestionIsNotEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(
-        FilterCondition.greaterThan(property: r'pendingAiQuestion', value: ''),
-      );
-    });
-  }
-
   QueryBuilder<Note, Note, QAfterFilterCondition> previewContentIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -2146,6 +1977,81 @@ extension NoteQueryFilter on QueryBuilder<Note, Note, QFilterCondition> {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
         FilterCondition.greaterThan(property: r'resourceStatus', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> serverVersionIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'serverVersion'),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> serverVersionIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'serverVersion'),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> serverVersionEqualTo(
+    int? value,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'serverVersion', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> serverVersionGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'serverVersion',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> serverVersionLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'serverVersion',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterFilterCondition> serverVersionBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'serverVersion',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
       );
     });
   }
@@ -3035,18 +2941,6 @@ extension NoteQuerySortBy on QueryBuilder<Note, Note, QSortBy> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterSortBy> sortByPendingAiQuestion() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'pendingAiQuestion', Sort.asc);
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterSortBy> sortByPendingAiQuestionDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'pendingAiQuestion', Sort.desc);
-    });
-  }
-
   QueryBuilder<Note, Note, QAfterSortBy> sortByPreviewContent() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'previewContent', Sort.asc);
@@ -3104,6 +2998,18 @@ extension NoteQuerySortBy on QueryBuilder<Note, Note, QSortBy> {
   QueryBuilder<Note, Note, QAfterSortBy> sortByResourceStatusDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'resourceStatus', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> sortByServerVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'serverVersion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> sortByServerVersionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'serverVersion', Sort.desc);
     });
   }
 
@@ -3229,18 +3135,6 @@ extension NoteQuerySortThenBy on QueryBuilder<Note, Note, QSortThenBy> {
     });
   }
 
-  QueryBuilder<Note, Note, QAfterSortBy> thenByPendingAiQuestion() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'pendingAiQuestion', Sort.asc);
-    });
-  }
-
-  QueryBuilder<Note, Note, QAfterSortBy> thenByPendingAiQuestionDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'pendingAiQuestion', Sort.desc);
-    });
-  }
-
   QueryBuilder<Note, Note, QAfterSortBy> thenByPreviewContent() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'previewContent', Sort.asc);
@@ -3298,6 +3192,18 @@ extension NoteQuerySortThenBy on QueryBuilder<Note, Note, QSortThenBy> {
   QueryBuilder<Note, Note, QAfterSortBy> thenByResourceStatusDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'resourceStatus', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> thenByServerVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'serverVersion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Note, Note, QAfterSortBy> thenByServerVersionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'serverVersion', Sort.desc);
     });
   }
 
@@ -3391,17 +3297,6 @@ extension NoteQueryWhereDistinct on QueryBuilder<Note, Note, QDistinct> {
     });
   }
 
-  QueryBuilder<Note, Note, QDistinct> distinctByPendingAiQuestion({
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(
-        r'pendingAiQuestion',
-        caseSensitive: caseSensitive,
-      );
-    });
-  }
-
   QueryBuilder<Note, Note, QDistinct> distinctByPreviewContent({
     bool caseSensitive = true,
   }) {
@@ -3451,6 +3346,12 @@ extension NoteQueryWhereDistinct on QueryBuilder<Note, Note, QDistinct> {
         r'resourceStatus',
         caseSensitive: caseSensitive,
       );
+    });
+  }
+
+  QueryBuilder<Note, Note, QDistinct> distinctByServerVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'serverVersion');
     });
   }
 
@@ -3528,12 +3429,6 @@ extension NoteQueryProperty on QueryBuilder<Note, Note, QQueryProperty> {
     });
   }
 
-  QueryBuilder<Note, String?, QQueryOperations> pendingAiQuestionProperty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'pendingAiQuestion');
-    });
-  }
-
   QueryBuilder<Note, String?, QQueryOperations> previewContentProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'previewContent');
@@ -3561,6 +3456,12 @@ extension NoteQueryProperty on QueryBuilder<Note, Note, QQueryProperty> {
   QueryBuilder<Note, String?, QQueryOperations> resourceStatusProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'resourceStatus');
+    });
+  }
+
+  QueryBuilder<Note, int?, QQueryOperations> serverVersionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'serverVersion');
     });
   }
 

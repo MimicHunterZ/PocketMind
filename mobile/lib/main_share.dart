@@ -19,6 +19,11 @@ import 'package:pocketmind/data/repositories/isar_note_repository.dart';
 import 'package:pocketmind/service/call_back_dispatcher.dart';
 import 'package:pocketmind/service/metadata_manager.dart';
 import 'package:pocketmind/service/note_service.dart';
+import 'package:pocketmind/sync/model/mutation_entry.dart';
+import 'package:pocketmind/sync/model/sync_checkpoint.dart';
+import 'package:pocketmind/sync/local_write_coordinator.dart';
+import 'package:pocketmind/data/repositories/isar_note_repository.dart'
+    show IsarNoteRepository;
 import 'package:pocketmind/service/notification_service.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/util/proxy_config.dart';
@@ -66,6 +71,8 @@ Future<void> mainShare() async {
     NoteAssetSchema,
     ChatSessionSchema,
     ChatMessageSchema,
+    MutationEntrySchema,
+    SyncCheckpointSchema,
   ], directory: dir.path);
 
   final notificationSvc = NotificationService();
@@ -137,11 +144,12 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
         NoteAssetSchema,
         ChatSessionSchema,
         ChatMessageSchema,
+        MutationEntrySchema,
+        SyncCheckpointSchema,
       ], directory: dir.path);
       noteService = NoteService(
-        IsarNoteRepository(isar),
-        MetadataManager(),
-        ref.read(sharedPreferencesProvider),
+        noteRepository: IsarNoteRepository(isar),
+        writeCoordinator: LocalWriteCoordinator(isar),
       );
       PMlog.d(tag, 'Isar 重新打开，NoteService 已重建');
     }

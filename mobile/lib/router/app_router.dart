@@ -13,7 +13,9 @@ import 'package:pocketmind/page/home/auth_page.dart';
 import 'package:pocketmind/page/settings/platform_accounts_page.dart';
 import 'package:pocketmind/page/main_layout.dart';
 import 'package:pocketmind/router/route_paths.dart';
-import 'package:pocketmind/util/global_network_alert.dart';
+
+/// 全局路由 NavigatorKey，供需要在 BuildContext 之外导航的场景使用
+final appNavigatorKey = GlobalKey<NavigatorState>();
 
 /// 全局路由配置
 final appRouter = GoRouter(
