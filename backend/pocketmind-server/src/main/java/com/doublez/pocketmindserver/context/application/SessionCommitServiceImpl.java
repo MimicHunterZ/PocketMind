@@ -10,6 +10,7 @@ import com.doublez.pocketmindserver.context.domain.ContextCatalogRepository;
 import com.doublez.pocketmindserver.context.domain.ContextRefEntity;
 import com.doublez.pocketmindserver.context.domain.ContextRefRepository;
 import com.doublez.pocketmindserver.context.domain.ContextUri;
+import com.doublez.pocketmindserver.memory.application.MemoryExtractorService;
 import com.doublez.pocketmindserver.resource.application.ChatTranscriptResourceSyncService;
 import com.doublez.pocketmindserver.resource.application.ResourceCatalogSyncService;
 import com.doublez.pocketmindserver.resource.application.ResourceContextService;
@@ -63,6 +64,7 @@ public class SessionCommitServiceImpl implements SessionCommitService {
     private final ContextRefRepository contextRefRepository;
     private final ContextCatalogRepository contextCatalogRepository;
     private final AiFailoverRouter aiFailoverRouter;
+    private final MemoryExtractorService memoryExtractorService;
 
     @Value("classpath:prompts/compression/structured_summary_system.md")
     private Resource summarySystemTemplate;
@@ -78,7 +80,8 @@ public class SessionCommitServiceImpl implements SessionCommitService {
                                     ResourceCatalogSyncService catalogSyncService,
                                     ContextRefRepository contextRefRepository,
                                     ContextCatalogRepository contextCatalogRepository,
-                                    AiFailoverRouter aiFailoverRouter) {
+                                    AiFailoverRouter aiFailoverRouter,
+                                    MemoryExtractorService memoryExtractorService) {
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.transcriptSyncService = transcriptSyncService;
@@ -88,6 +91,7 @@ public class SessionCommitServiceImpl implements SessionCommitService {
         this.contextRefRepository = contextRefRepository;
         this.contextCatalogRepository = contextCatalogRepository;
         this.aiFailoverRouter = aiFailoverRouter;
+        this.memoryExtractorService = memoryExtractorService;
     }
 
     @Override
@@ -150,13 +154,29 @@ public class SessionCommitServiceImpl implements SessionCommitService {
                 userId, sessionUuid, messages.size(),
                 truncate(summaryResult.abstractText(), 60));
 
-        return new SessionCommitResult(
+        SessionCommitResult result = new SessionCommitResult(
                 sessionUuid,
                 transcriptResource != null ? transcriptResource.getUuid() : null,
                 summaryResource.getUuid(),
                 messages.size(),
                 summaryResult.abstractText()
         );
+
+        // 9. 异步触发记忆抽取（虚拟线程，不阻塞事务）
+        final SessionCommitResult commitResult = result;
+        Thread.ofVirtual().name("memory-extract-" + sessionUuid)
+                .start(() -> {
+                    try {
+                        int extracted = memoryExtractorService.extractFromCommit(userId, sessionUuid, commitResult);
+                        log.info("记忆异步抽取完成: userId={}, sessionUuid={}, extracted={}",
+                                userId, sessionUuid, extracted);
+                    } catch (Exception e) {
+                        log.error("记忆异步抽取失败: userId={}, sessionUuid={}, error={}",
+                                userId, sessionUuid, e.getMessage(), e);
+                    }
+                });
+
+        return result;
     }
 
     // ─── 内部方法 ──────────────────────────────────────────────────

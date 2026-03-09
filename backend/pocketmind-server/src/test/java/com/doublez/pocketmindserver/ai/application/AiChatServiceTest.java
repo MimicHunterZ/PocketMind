@@ -14,6 +14,7 @@ import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
+import com.doublez.pocketmindserver.memory.application.InMemoryMemoryRecordRepository;
 import com.doublez.pocketmindserver.resource.application.ChatTranscriptResourceSyncService;
 import com.doublez.pocketmind.common.web.BusinessException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -82,7 +83,7 @@ class AiChatServiceTest {
                         return com.doublez.pocketmindserver.context.domain.ContextUri.userMemoriesRoot(userId)
                                 .child(memoryType.name().toLowerCase());
                     }
-                })
+                }, new InMemoryMemoryRecordRepository())
         );
         sseReplyService = new SseReplyService(
                 aiFailoverRouter,
@@ -90,7 +91,9 @@ class AiChatServiceTest {
                 chatStreamCancellationManager,
                 chatSseEventFactory,
                 tenantSkillToolResolver,
-                chatTranscriptResourceSyncService
+                chatTranscriptResourceSyncService,
+                new com.doublez.pocketmindserver.memory.application.MemoryToolSet.MemoryToolSetFactory(
+                        new InMemoryMemoryRecordRepository())
         );
         service = new AiChatService(
                 chatSessionRepository,

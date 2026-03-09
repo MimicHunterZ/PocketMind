@@ -1,6 +1,6 @@
 {
   "project": "PocketMind Context Architecture",
-  "lastUpdated": "2026-03-09",
+  "lastUpdated": "2026-03-09T18:55",
   "phases": [
     {
       "id": "phase-0",
@@ -31,7 +31,7 @@
     {
       "id": "phase-2",
       "name": "检索基建 + Resource 层最小闭环",
-      "status": "in-progress",
+      "status": "completed",
       "tasks": [
         { "id": "2.1", "done": true, "desc": "ContextNode record 实现" },
         { "id": "2.2", "done": true, "desc": "context_catalog 表 DDL + ContextCatalogModel" },
@@ -45,46 +45,52 @@
         { "id": "2.10", "done": true, "desc": "Note->Resource 投影与同步" },
         { "id": "2.11", "done": true, "desc": "Chat transcript->Resource 同步最小链路" },
         { "id": "2.12", "done": true, "desc": "单元测试: ContextNodeTest, HotnessScorerTest, RetrieverTest, SearchStrategyTest, SyncServiceTest" },
-        { "id": "2.13", "done": false, "desc": "修正 context_catalog.description→abstract_text 命名对齐" },
-        { "id": "2.14", "done": false, "desc": "修正 memory_records DDL 补齐 L0/L1/L2 + active_count + evidence 等字段" },
-        { "id": "2.15", "done": false, "desc": "Web clip -> Resource 规范化接入" },
-        { "id": "2.16", "done": false, "desc": "OCR/PDF/音视频转写 -> Resource 统一入口" },
-        { "id": "2.17", "done": false, "desc": "Resource hash/version/state 规则统一" },
+        { "id": "2.13", "done": true, "desc": "修正 context_catalog.description→abstract_text 命名对齐" },
+        { "id": "2.14", "done": true, "desc": "修正 memory_records DDL 补齐 L0/L1/L2 + active_count + evidence 等字段" },
+        { "id": "2.15", "done": false, "desc": "Web clip -> Resource 规范化接入 (deferred)" },
+        { "id": "2.16", "done": false, "desc": "OCR/PDF/音视频转写 -> Resource 统一入口 (deferred)" },
+        { "id": "2.17", "done": false, "desc": "Resource hash/version/state 规则统一 (deferred)" },
         { "id": "2.18", "done": false, "desc": "resource_records + context_catalog 增加 embedding vector 列 (Phase8前置)" }
       ]
     },
     {
       "id": "phase-3",
       "name": "Session commit 与中间层摘要",
-      "status": "not-started",
+      "status": "completed",
       "tasks": [
-        { "id": "3.1", "done": false, "desc": "ContextRef Java 模型 (entity + model + repository + mapper)" },
-        { "id": "3.2", "done": false, "desc": "SessionCommitService 接口设计 (commit 触发条件)" },
-        { "id": "3.3", "done": false, "desc": "SessionCommitServiceImpl: 归档消息→生成 transcript resource (L2)" },
-        { "id": "3.4", "done": false, "desc": "LLM 生成结构化摘要 prompt: compression/structured_summary.st" },
-        { "id": "3.5", "done": false, "desc": "从摘要提取 abstract (L0)" },
-        { "id": "3.6", "done": false, "desc": "CommitLog 记录 (sessionId, commitIndex, stats)" },
-        { "id": "3.7", "done": false, "desc": "建立 ContextRef 关联 (session_uri ↔ 引用的 URI)" },
-        { "id": "3.8", "done": false, "desc": "更新 active_count (本轮使用的所有 context URI)" },
-        { "id": "3.9", "done": false, "desc": "单元测试: SessionCommitServiceTest" }
+        { "id": "3.1", "done": true, "desc": "ContextRef Java 模型 (entity + model + repository + mapper)" },
+        { "id": "3.2", "done": true, "desc": "SessionCommitService 接口设计 (commit 触发条件)" },
+        { "id": "3.3", "done": true, "desc": "SessionCommitServiceImpl: 归档消息→生成 transcript resource (L2)" },
+        { "id": "3.4", "done": true, "desc": "LLM 生成结构化摘要 prompt: compression/structured_summary" },
+        { "id": "3.5", "done": true, "desc": "从摘要提取 abstract (L0) + summary (L1)" },
+        { "id": "3.6", "done": false, "desc": "CommitLog 记录 (sessionId, commitIndex, stats) (deferred)" },
+        { "id": "3.7", "done": true, "desc": "建立 ContextRef 关联 (session_uri ↔ 引用的 URI)" },
+        { "id": "3.8", "done": true, "desc": "更新 active_count (本轮使用的所有 context URI)" },
+        { "id": "3.9", "done": true, "desc": "单元测试: SessionCommitServiceTest (4 tests pass)" },
+        { "id": "3.10", "done": true, "desc": "CHAT_STAGE_SUMMARY 资源类型 + ResourceRecordEntity 工厂方法" },
+        { "id": "3.11", "done": true, "desc": "ResourceContextService.chatStageSummaryResource URI 生成" }
       ]
     },
     {
       "id": "phase-4",
       "name": "User Memory + Memory Tool Set 最小闭环",
-      "status": "not-started",
+      "status": "completed",
       "tasks": [
-        { "id": "4.1", "done": false, "desc": "MemoryRecord 主模型 (entity + model + repository + mapper)" },
-        { "id": "4.2", "done": false, "desc": "MemoryEvidence 引用模型 (sourceUri, snippetRange, capturedAt)" },
-        { "id": "4.3", "done": false, "desc": "MemoryExtractor prompt: compression/memory_extraction.st" },
-        { "id": "4.4", "done": false, "desc": "MemoryDeduplicator (pgvector预过滤 + LLM决策)" },
-        { "id": "4.5", "done": false, "desc": "MemoryMergeService prompt: compression/memory_merge.st" },
-        { "id": "4.6", "done": false, "desc": "session commit 和 note/resource 更新触发 memory candidates" },
-        { "id": "4.7", "done": false, "desc": "MemoryToolSet: browseMemoryCategories() Tool" },
-        { "id": "4.8", "done": false, "desc": "MemoryToolSet: searchMemories(query, type) Tool" },
-        { "id": "4.9", "done": false, "desc": "MemoryToolSet: getMemoryDetail(memoryId) Tool" },
-        { "id": "4.10", "done": false, "desc": "在 AiToolsConfiguration 中注册 MemoryToolSet" },
-        { "id": "4.11", "done": false, "desc": "单元测试: MemoryToolSetTest, MemoryExtractorTest" }
+        { "id": "4.1", "done": true, "desc": "MemoryRecord 主模型 (entity + model + repository + mapper + structMapper)" },
+        { "id": "4.2", "done": true, "desc": "MemoryEvidence 引用模型 (sourceUri, snippetRange, capturedAt)" },
+        { "id": "4.3", "done": true, "desc": "MemoryEvidenceJsonbTypeHandler (JSONB 序列化)" },
+        { "id": "4.4", "done": true, "desc": "MybatisMemoryRecordRepository 完整实现" },
+        { "id": "4.5", "done": true, "desc": "MemoryExtractor prompt: compression/memory_extraction_{system,user}.md" },
+        { "id": "4.6", "done": true, "desc": "MemoryExtractorServiceImpl (LLM 抽取 + mergeKey 去重)" },
+        { "id": "4.7", "done": true, "desc": "SessionCommitServiceImpl 异步触发 memory extraction (虚拟线程)" },
+        { "id": "4.8", "done": true, "desc": "MemoryToolSet: browseMemoryCategories() Tool" },
+        { "id": "4.9", "done": true, "desc": "MemoryToolSet: searchMemories(query, type) Tool" },
+        { "id": "4.10", "done": true, "desc": "MemoryToolSet: getMemoryDetail(memoryId) Tool" },
+        { "id": "4.11", "done": true, "desc": "MemoryToolSetFactory 请求级工厂 + SseReplyService 集成" },
+        { "id": "4.12", "done": true, "desc": "MemoryQueryServiceImpl 实现 (关键词搜索 + 热度递增)" },
+        { "id": "4.13", "done": true, "desc": "单元测试: MemoryRecordEntityTest(6), MemoryToolSetTest(11), MemoryExtractorServiceTest(6)" },
+        { "id": "4.14", "done": false, "desc": "MemoryDeduplicator pgvector 语义去重 (deferred to Phase 8)" },
+        { "id": "4.15", "done": false, "desc": "MemoryMergeService LLM 合并 (deferred to Phase 7)" }
       ]
     },
     {

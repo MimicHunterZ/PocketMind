@@ -80,7 +80,8 @@ class SessionCommitServiceTest {
                 catalogSyncService,
                 refRepo,
                 catalogRepo,
-                aiFailoverRouter
+                aiFailoverRouter,
+                (userId, sessionUuid, commitResult) -> 0  // no-op memory extractor for unit test
         );
         // 注入 @Value 模板资源（单元测试无 Spring 上下文）
         ReflectionTestUtils.setField(service, "summarySystemTemplate",

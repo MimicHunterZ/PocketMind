@@ -5,6 +5,7 @@ import com.doublez.pocketmindserver.ai.tool.skill.TenantSkillToolResolver;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
+import com.doublez.pocketmindserver.memory.application.MemoryToolSet;
 import com.doublez.pocketmindserver.resource.application.ChatTranscriptResourceSyncService;
 import com.doublez.pocketmindserver.shared.util.PromptBuilder;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,7 @@ public class SseReplyService {
     private final ChatSseEventFactory chatSseEventFactory;
     private final TenantSkillToolResolver tenantSkillToolResolver;
     private final ChatTranscriptResourceSyncService chatTranscriptResourceSyncService;
+    private final MemoryToolSet.MemoryToolSetFactory memoryToolSetFactory;
 
     @Value("classpath:prompts/chat/branch_alias_system.md")
     private Resource branchAliasSystemTemplate;
@@ -51,13 +53,15 @@ public class SseReplyService {
                            ChatStreamCancellationManager chatStreamCancellationManager,
                            ChatSseEventFactory chatSseEventFactory,
                            TenantSkillToolResolver tenantSkillToolResolver,
-                           ChatTranscriptResourceSyncService chatTranscriptResourceSyncService) {
+                           ChatTranscriptResourceSyncService chatTranscriptResourceSyncService,
+                           MemoryToolSet.MemoryToolSetFactory memoryToolSetFactory) {
         this.aiFailoverRouter = aiFailoverRouter;
         this.chatMessageRepository = chatMessageRepository;
         this.chatStreamCancellationManager = chatStreamCancellationManager;
         this.chatSseEventFactory = chatSseEventFactory;
         this.tenantSkillToolResolver = tenantSkillToolResolver;
         this.chatTranscriptResourceSyncService = chatTranscriptResourceSyncService;
+        this.memoryToolSetFactory = memoryToolSetFactory;
     }
 
     public Flux<ServerSentEvent<String>> streamReply(long userId,
@@ -134,6 +138,11 @@ public class SseReplyService {
                                           String userPrompt) {
         TenantSkillToolResolver.ResolvedTenantSkillTool resolvedSkillTool =
                 tenantSkillToolResolver.resolveForUser(userId, "chat-stream");
+
+        // 构建请求级记忆工具
+        MemoryToolSet memoryToolSet = memoryToolSetFactory.createForUser(userId);
+        org.springframework.ai.tool.ToolCallback[] memoryCallbacks = memoryToolSet.toToolCallbacks();
+
         return aiFailoverRouter.executeChatStream(
                 "streamReply",
                 client -> {
@@ -142,6 +151,14 @@ public class SseReplyService {
                             .system(systemText)
                             .messages(historyMessages.toArray(new Message[0]))
                             .user(userPrompt);
+
+                    // 注入记忆工具
+                    if (memoryCallbacks.length > 0) {
+                        requestSpec = requestSpec.toolCallbacks(memoryCallbacks);
+                        log.info("[memory-tool] 对话请求注入记忆工具: userId={}, toolCount={}",
+                                userId, memoryCallbacks.length);
+                    }
+
                     if (resolvedSkillTool.skillCallback() != null) {
                         log.info("[skill] 对话请求注入 tenant skill: userId={}, tenantKey={}, agentKey={}",
                                 userId, resolvedSkillTool.tenantKey(), resolvedSkillTool.agentKey());

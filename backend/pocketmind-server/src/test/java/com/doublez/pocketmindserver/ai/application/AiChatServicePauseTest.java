@@ -14,6 +14,7 @@ import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
 import com.doublez.pocketmindserver.context.domain.ContextUri;
+import com.doublez.pocketmindserver.memory.application.InMemoryMemoryRecordRepository;
 import com.doublez.pocketmindserver.memory.application.MemoryContextService;
 import com.doublez.pocketmindserver.memory.domain.MemoryType;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
@@ -90,15 +91,17 @@ class AiChatServicePauseTest {
                     public ContextUri userMemoryByType(long userId, MemoryType memoryType) {
                         return ContextUri.userMemoriesRoot(userId).child(memoryType.name().toLowerCase());
                     }
-                })
+                }, new InMemoryMemoryRecordRepository())
         );
         sseReplyService = new SseReplyService(
                 aiFailoverRouter,
                 chatMessageRepository,
                 chatStreamCancellationManager,
                 chatSseEventFactory,
-            tenantSkillToolResolver,
-            chatTranscriptResourceSyncService
+                tenantSkillToolResolver,
+                chatTranscriptResourceSyncService,
+                new com.doublez.pocketmindserver.memory.application.MemoryToolSet.MemoryToolSetFactory(
+                        new InMemoryMemoryRecordRepository())
         );
 
         when(tenantSkillToolResolver.resolveForUser(anyLong(), anyString()))
