@@ -5,6 +5,7 @@ import com.doublez.pocketmindserver.ai.tool.skill.TenantSkillToolResolver;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
+import com.doublez.pocketmindserver.context.application.SessionCommitService;
 import com.doublez.pocketmindserver.memory.application.MemoryToolSet;
 import com.doublez.pocketmindserver.resource.application.ChatTranscriptResourceSyncService;
 import com.doublez.pocketmindserver.shared.util.PromptBuilder;
@@ -41,6 +42,7 @@ public class SseReplyService {
     private final TenantSkillToolResolver tenantSkillToolResolver;
     private final ChatTranscriptResourceSyncService chatTranscriptResourceSyncService;
     private final MemoryToolSet.MemoryToolSetFactory memoryToolSetFactory;
+    private final SessionCommitService sessionCommitService;
 
     @Value("classpath:prompts/chat/branch_alias_system.md")
     private Resource branchAliasSystemTemplate;
@@ -54,7 +56,8 @@ public class SseReplyService {
                            ChatSseEventFactory chatSseEventFactory,
                            TenantSkillToolResolver tenantSkillToolResolver,
                            ChatTranscriptResourceSyncService chatTranscriptResourceSyncService,
-                           MemoryToolSet.MemoryToolSetFactory memoryToolSetFactory) {
+                           MemoryToolSet.MemoryToolSetFactory memoryToolSetFactory,
+                           SessionCommitService sessionCommitService) {
         this.aiFailoverRouter = aiFailoverRouter;
         this.chatMessageRepository = chatMessageRepository;
         this.chatStreamCancellationManager = chatStreamCancellationManager;
@@ -62,6 +65,7 @@ public class SseReplyService {
         this.tenantSkillToolResolver = tenantSkillToolResolver;
         this.chatTranscriptResourceSyncService = chatTranscriptResourceSyncService;
         this.memoryToolSetFactory = memoryToolSetFactory;
+        this.sessionCommitService = sessionCommitService;
     }
 
     public Flux<ServerSentEvent<String>> streamReply(long userId,
@@ -207,6 +211,9 @@ public class SseReplyService {
             generateBranchAliasAsync(userId, assistantMsgUuid, historyMessages, userPrompt);
         }
 
+        // 异步触发会话提交：生成阶段摘要 + 记忆抽取
+        triggerSessionCommitAsync(userId, sessionUuid);
+
         return chatSseEventFactory.done(requestId, assistantMsgUuid);
     }
 
@@ -226,6 +233,33 @@ public class SseReplyService {
         chatMessageRepository.save(assistantMsg);
             chatTranscriptResourceSyncService.syncSessionTranscript(userId, sessionUuid);
         return assistantMsgUuid;
+    }
+
+    /**
+     * 异步触发会话提交：生成阶段摘要并抽取记忆。
+     *
+     * <p>使用虚拟线程 fire-and-forget，不阻塞 SSE 响应流。
+     * 失败时仅记录日志，不影响对话正常进行。
+     */
+    private void triggerSessionCommitAsync(long userId, UUID sessionUuid) {
+        if (sessionCommitService == null) {
+            log.debug("SessionCommitService 未注入，跳过会话提交: sessionUuid={}", sessionUuid);
+            return;
+        }
+        Thread.ofVirtual().name("session-commit-" + sessionUuid)
+                .start(() -> {
+                    try {
+                        var result = sessionCommitService.commit(userId, sessionUuid);
+                        log.info("会话提交成功: userId={}, sessionUuid={}, messageCount={}, abstract={}",
+                                userId, sessionUuid, result.messageCount(),
+                                result.abstractText() != null && result.abstractText().length() > 60
+                                        ? result.abstractText().substring(0, 60) + "…"
+                                        : result.abstractText());
+                    } catch (Exception e) {
+                        log.warn("会话提交失败（静默忽略）: userId={}, sessionUuid={}, error={}",
+                                userId, sessionUuid, e.getMessage());
+                    }
+                });
     }
 
     private void generateBranchAliasAsync(long userId,

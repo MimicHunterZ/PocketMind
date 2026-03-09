@@ -1,14 +1,3 @@
--- ============================================================
--- PocketMind Database Schema v2
--- 公共列约定（每张业务表都有）：
---   id         BIGSERIAL PRIMARY KEY
---   uuid       UUID UNIQUE NOT NULL  （业务键，API 对外暴露）
---   user_id    BIGINT NOT NULL       （多租户隔离，FK → users.id）
---   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
---   updated_at BIGINT NOT NULL DEFAULT 0  （毫秒时间戳，LWW 冲突依据 & pull cursor）
---   is_deleted BOOLEAN NOT NULL DEFAULT FALSE
--- ============================================================
-
 -- pgvector 扩展
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -57,8 +46,8 @@ CREATE TABLE IF NOT EXISTS notes (
     -- AI 分析（轮询模式）：总结
     summary             TEXT,
 
-    -- 预留：持久记忆系统扩展（暂不实现）
-    memory_path         TEXT,
+    -- 同步版本号（服务端写入）
+    server_version      BIGINT,
 
     -- 公共列
     created_at          TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -82,14 +71,19 @@ CREATE INDEX IF NOT EXISTS idx_notes_fts ON notes USING GIN (
 -- 2. categories（笔记分类目录）
 -- ============================================================
 CREATE TABLE IF NOT EXISTS categories (
-    id         BIGSERIAL    PRIMARY KEY,
-    uuid       UUID         NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    user_id    BIGINT       NOT NULL,
-    name       VARCHAR(100) NOT NULL,
+    id              BIGSERIAL    PRIMARY KEY,
+    uuid            UUID         NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    user_id         BIGINT       NOT NULL,
+    name            VARCHAR(100) NOT NULL,
+    description     TEXT,
+    icon_path       TEXT,
 
-    created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at BIGINT       NOT NULL DEFAULT 0,
-    is_deleted BOOLEAN      NOT NULL DEFAULT FALSE
+    -- 同步版本号（服务端写入）
+    server_version  BIGINT,
+
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at      BIGINT       NOT NULL DEFAULT 0,
+    is_deleted      BOOLEAN      NOT NULL DEFAULT FALSE
 );
 
 CREATE INDEX IF NOT EXISTS idx_categories_user ON categories(user_id);
@@ -370,17 +364,8 @@ CREATE INDEX IF NOT EXISTS idx_messages_parent        ON chat_messages(parent_uu
 -- 覆盖 findBySessionUuid 主查询路径：(user_id, session_uuid, is_deleted, created_at)
 CREATE INDEX IF NOT EXISTS idx_messages_user_session   ON chat_messages(user_id, session_uuid, is_deleted, created_at ASC);
 
--- 兼容旧库：为已存在的 chat_messages 表添加新列（IF NOT EXISTS 保证幂等）
-ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS parent_uuid  UUID;
-ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS message_type VARCHAR(30) NOT NULL DEFAULT 'TEXT';
-ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS rating       INT         NOT NULL DEFAULT 0;
-ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS branch_alias VARCHAR(20);
--- content 列旧版为 NOT NULL 但无 DEFAULT，补充 DEFAULT 值（DDL 不可重复执行跳过）
-CREATE INDEX IF NOT EXISTS idx_messages_parent ON chat_messages(parent_uuid);
-
-DROP TABLE IF EXISTS  sync_change_log;
 -- ============================================================
--- 9. sync_change_log（V3 同步架构：change_log.id 即 serverVersion 游标）
+-- 13. sync_change_log（V3 同步架构：change_log.id 即 serverVersion 游标）
 -- ============================================================
 CREATE TABLE IF NOT EXISTS sync_change_log (
     id                   BIGSERIAL    PRIMARY KEY,  -- 服务端版本号，全局严格单调递增，即 serverVersion
@@ -396,37 +381,3 @@ CREATE TABLE IF NOT EXISTS sync_change_log (
 
 -- (user_id, id) 复合索引：Pull 查询 WHERE user_id=? AND id > sinceVersion ORDER BY id 直接命中
 CREATE INDEX IF NOT EXISTS idx_sync_log_user_version ON sync_change_log(user_id, id);
-
--- ============================================================
--- 存量表补列（IF NOT EXISTS 保证幂等）
--- ============================================================
-ALTER TABLE notes      ADD COLUMN IF NOT EXISTS server_version BIGINT NULL;
-ALTER TABLE categories ADD COLUMN IF NOT EXISTS server_version BIGINT NULL;
-ALTER TABLE categories ADD COLUMN IF NOT EXISTS description    TEXT   NULL;
-ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon_path      TEXT   NULL;
-
--- ============================================================
--- 兼容旧库：resource_records 新增 L0/L1 分层字段
--- ============================================================
-ALTER TABLE resource_records ADD COLUMN IF NOT EXISTS abstract_text TEXT NULL;
-ALTER TABLE resource_records ADD COLUMN IF NOT EXISTS summary_text  TEXT NULL;
-
--- ============================================================
--- 兼容旧库：context_catalog 重命名 description→abstract_text
--- ============================================================
-ALTER TABLE context_catalog ADD COLUMN IF NOT EXISTS abstract_text TEXT NULL;
--- 将旧 description 数据迁移到 abstract_text（仅当 abstract_text 为空时）
-UPDATE context_catalog SET abstract_text = description WHERE abstract_text IS NULL AND description IS NOT NULL;
-
--- ============================================================
--- 兼容旧库：memory_records 补齐 L0/L1 + 治理字段
--- ============================================================
-ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS tenant_id          BIGINT       NULL;
-ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS space_type         VARCHAR(20)  NOT NULL DEFAULT 'USER';
-ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS abstract_text      TEXT         NULL;
-ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS summary_text       TEXT         NULL;
-ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS evidence_refs      JSONB        NULL;
-ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS merge_key          VARCHAR(128) NULL;
-ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS confidence_score   DECIMAL(5,4) NOT NULL DEFAULT 1.0;
-ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS active_count       BIGINT       NOT NULL DEFAULT 0;
-ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS last_validated_at  BIGINT       NULL;

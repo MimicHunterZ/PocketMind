@@ -6,6 +6,8 @@ import com.doublez.pocketmindserver.memory.domain.MemoryRecordEntity;
 import com.doublez.pocketmindserver.memory.domain.MemoryType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 
 import java.util.List;
 
@@ -22,7 +24,10 @@ class MemoryToolSetTest {
     @BeforeEach
     void setUp() {
         repository = new InMemoryMemoryRecordRepository();
-        toolSet = new MemoryToolSet(1L, repository);
+        Resource browseTpl = new ClassPathResource("prompts/memory/browse_categories.md");
+        Resource searchTpl = new ClassPathResource("prompts/memory/search_results.md");
+        Resource detailTpl = new ClassPathResource("prompts/memory/memory_detail.md");
+        toolSet = new MemoryToolSet(1L, repository, browseTpl, searchTpl, detailTpl);
     }
 
     // ─── browseMemoryCategories ──────────────────────────────

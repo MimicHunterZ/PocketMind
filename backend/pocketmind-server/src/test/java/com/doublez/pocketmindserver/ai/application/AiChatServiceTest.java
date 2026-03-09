@@ -93,7 +93,8 @@ class AiChatServiceTest {
                 tenantSkillToolResolver,
                 chatTranscriptResourceSyncService,
                 new com.doublez.pocketmindserver.memory.application.MemoryToolSet.MemoryToolSetFactory(
-                        new InMemoryMemoryRecordRepository())
+                        new InMemoryMemoryRecordRepository()),
+                null  // SessionCommitService — 单元测试不触发会话提交
         );
         service = new AiChatService(
                 chatSessionRepository,
