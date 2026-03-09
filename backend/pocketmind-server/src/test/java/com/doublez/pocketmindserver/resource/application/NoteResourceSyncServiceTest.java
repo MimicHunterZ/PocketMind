@@ -4,6 +4,7 @@ import com.doublez.pocketmindserver.note.domain.note.NoteEntity;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordEntity;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordRepository;
 import com.doublez.pocketmindserver.resource.domain.ResourceSourceType;
+import com.doublez.pocketmindserver.resource.application.NoOpResourceCatalogSyncService;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -25,7 +26,8 @@ class NoteResourceSyncServiceTest {
     private final InMemoryResourceRecordRepository repository = new InMemoryResourceRecordRepository();
     private final NoteResourceSyncService service = new NoteResourceSyncServiceImpl(
             new NoteResourceProjectionServiceImpl(new ResourceContextServiceImpl()),
-            repository
+            repository,
+            new NoOpResourceCatalogSyncService()
     );
 
     @Test

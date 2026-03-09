@@ -17,11 +17,14 @@ public class NoteResourceSyncServiceImpl implements NoteResourceSyncService {
 
     private final NoteResourceProjectionService projectionService;
     private final ResourceRecordRepository resourceRecordRepository;
+    private final ResourceCatalogSyncService catalogSyncService;
 
     public NoteResourceSyncServiceImpl(NoteResourceProjectionService projectionService,
-                                       ResourceRecordRepository resourceRecordRepository) {
+                                       ResourceRecordRepository resourceRecordRepository,
+                                       ResourceCatalogSyncService catalogSyncService) {
         this.projectionService = projectionService;
         this.resourceRecordRepository = resourceRecordRepository;
+        this.catalogSyncService = catalogSyncService;
     }
 
     @Override
@@ -48,12 +51,15 @@ public class NoteResourceSyncServiceImpl implements NoteResourceSyncService {
             return;
         }
         if (existing.isEmpty()) {
-            resourceRecordRepository.save(projectionService.projectNoteText(note));
+            ResourceRecordEntity resource = projectionService.projectNoteText(note);
+            resourceRecordRepository.save(resource);
+            catalogSyncService.syncToCatalog(resource);
             return;
         }
         ResourceRecordEntity resource = existing.getFirst();
         resource.updateContent(note.getTitle(), note.getContent());
         resourceRecordRepository.update(resource);
+        catalogSyncService.syncToCatalog(resource);
     }
 
     private void syncWebClip(NoteEntity note) {
@@ -63,12 +69,15 @@ public class NoteResourceSyncServiceImpl implements NoteResourceSyncService {
             return;
         }
         if (existing.isEmpty()) {
-            resourceRecordRepository.save(projectionService.projectWebClip(note));
+            ResourceRecordEntity resource = projectionService.projectWebClip(note);
+            resourceRecordRepository.save(resource);
+            catalogSyncService.syncToCatalog(resource);
             return;
         }
         ResourceRecordEntity resource = existing.getFirst();
         resource.updateContent(note.getPreviewTitle(), note.getPreviewContent(), note.getSourceUrl());
         resourceRecordRepository.update(resource);
+        catalogSyncService.syncToCatalog(resource);
     }
 
     private List<ResourceRecordEntity> findByType(NoteEntity note, ResourceSourceType sourceType) {
@@ -82,6 +91,7 @@ public class NoteResourceSyncServiceImpl implements NoteResourceSyncService {
         for (ResourceRecordEntity resource : resources) {
             resource.softDelete();
             resourceRecordRepository.update(resource);
+            catalogSyncService.removeFromCatalog(resource);
         }
     }
 }

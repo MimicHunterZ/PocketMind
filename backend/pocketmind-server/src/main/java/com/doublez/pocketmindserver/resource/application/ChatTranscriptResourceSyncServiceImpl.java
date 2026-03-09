@@ -24,15 +24,18 @@ public class ChatTranscriptResourceSyncServiceImpl implements ChatTranscriptReso
     private final ChatSessionRepository chatSessionRepository;
     private final ResourceRecordRepository resourceRecordRepository;
     private final ResourceContextService resourceContextService;
+    private final ResourceCatalogSyncService catalogSyncService;
 
     public ChatTranscriptResourceSyncServiceImpl(ChatMessageRepository chatMessageRepository,
                                                  ChatSessionRepository chatSessionRepository,
                                                  ResourceRecordRepository resourceRecordRepository,
-                                                 ResourceContextService resourceContextService) {
+                                                 ResourceContextService resourceContextService,
+                                                 ResourceCatalogSyncService catalogSyncService) {
         this.chatMessageRepository = chatMessageRepository;
         this.chatSessionRepository = chatSessionRepository;
         this.resourceRecordRepository = resourceRecordRepository;
         this.resourceContextService = resourceContextService;
+        this.catalogSyncService = catalogSyncService;
     }
 
     @Override
@@ -61,20 +64,23 @@ public class ChatTranscriptResourceSyncServiceImpl implements ChatTranscriptReso
         String transcript = renderTranscript(messages);
 
         if (existing.isEmpty()) {
-            resourceRecordRepository.save(ResourceRecordEntity.createChatTranscript(
+            ResourceRecordEntity resource = ResourceRecordEntity.createChatTranscript(
                     UUID.randomUUID(),
                     userId,
                     sessionUuid,
                     resourceContextService.chatTranscriptResource(userId, sessionUuid),
                     title,
                     transcript
-            ));
+            );
+            resourceRecordRepository.save(resource);
+            catalogSyncService.syncToCatalog(resource);
             return;
         }
 
         ResourceRecordEntity resource = existing.getFirst();
         resource.updateContent(title, transcript);
         resourceRecordRepository.update(resource);
+        catalogSyncService.syncToCatalog(resource);
     }
 
     @Override
@@ -93,6 +99,7 @@ public class ChatTranscriptResourceSyncServiceImpl implements ChatTranscriptReso
         for (ResourceRecordEntity resource : resources) {
             resource.softDelete();
             resourceRecordRepository.update(resource);
+            catalogSyncService.removeFromCatalog(resource);
         }
     }
 

@@ -23,6 +23,8 @@ public class ResourceRecordEntity {
     private final UUID sessionUuid;
     private final UUID assetUuid;
     private String title;
+    private String abstractText;
+    private String summaryText;
     private String content;
     private String sourceUrl;
     private long updatedAt;
@@ -37,6 +39,8 @@ public class ResourceRecordEntity {
             "sessionUuid",
             "assetUuid",
             "title",
+            "abstractText",
+            "summaryText",
             "content",
             "sourceUrl",
             "updatedAt",
@@ -50,6 +54,8 @@ public class ResourceRecordEntity {
                                 UUID sessionUuid,
                                 UUID assetUuid,
                                 String title,
+                                String abstractText,
+                                String summaryText,
                                 String content,
                                 String sourceUrl,
                                 long updatedAt,
@@ -62,6 +68,8 @@ public class ResourceRecordEntity {
         this.sessionUuid = sessionUuid;
         this.assetUuid = assetUuid;
         this.title = title;
+        this.abstractText = abstractText;
+        this.summaryText = summaryText;
         this.content = content;
         this.sourceUrl = sourceUrl;
         this.updatedAt = updatedAt;
@@ -83,6 +91,8 @@ public class ResourceRecordEntity {
                 null,
                 null,
                 title,
+                null,
+                null,
                 content,
                 null,
                 System.currentTimeMillis(),
@@ -106,6 +116,8 @@ public class ResourceRecordEntity {
                 null,
                 null,
                 title,
+                null,
+                null,
                 content,
                 sourceUrl,
                 System.currentTimeMillis(),
@@ -128,6 +140,8 @@ public class ResourceRecordEntity {
                 null,
                 Objects.requireNonNull(assetUuid, "assetUuid 不能为空"),
                 title,
+                null,
+                null,
                 content,
                 null,
                 System.currentTimeMillis(),
@@ -150,6 +164,8 @@ public class ResourceRecordEntity {
                 Objects.requireNonNull(sessionUuid, "sessionUuid 不能为空"),
                 null,
                 title,
+                null,
+                null,
                 content,
                 null,
                 System.currentTimeMillis(),
@@ -172,6 +188,46 @@ public class ResourceRecordEntity {
         this.content = content;
         this.sourceUrl = sourceUrl;
         this.updatedAt = System.currentTimeMillis();
+    }
+
+    /**
+     * 更新 L0 摘要文本（~100 token，由 AI 或规则生成）。
+     */
+    public void updateAbstractText(String abstractText) {
+        this.abstractText = abstractText;
+        this.updatedAt = System.currentTimeMillis();
+    }
+
+    /**
+     * 更新 L1 结构化概览（~2k token，由 AI 或规则生成）。
+     */
+    public void updateSummaryText(String summaryText) {
+        this.summaryText = summaryText;
+        this.updatedAt = System.currentTimeMillis();
+    }
+
+    /**
+     * 生成简易 L0 摘要 — 截取标题+正文前 200 字符。
+     *
+     * <p>用于 Resource 首次保存时的默认 L0 摘要。
+     * 后续可由 AI 生成更精确的摘要覆盖。
+     */
+    public String deriveDefaultAbstract() {
+        StringBuilder sb = new StringBuilder();
+        if (title != null && !title.isBlank()) {
+            sb.append(title);
+        }
+        if (content != null && !content.isBlank()) {
+            if (!sb.isEmpty()) {
+                sb.append("：");
+            }
+            int maxLen = Math.min(content.length(), 200);
+            sb.append(content, 0, maxLen);
+            if (content.length() > 200) {
+                sb.append("…");
+            }
+        }
+        return sb.toString();
     }
 
     /**

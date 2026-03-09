@@ -287,7 +287,9 @@ CREATE TABLE IF NOT EXISTS resource_records (
     source_type      VARCHAR(30)  NOT NULL,
     root_uri         TEXT         NOT NULL,
     title            TEXT,
-    content          TEXT,
+    abstract_text    TEXT,           -- L0 摘要 (~100 token)
+    summary_text     TEXT,           -- L1 结构化概览 (~2k token)
+    content          TEXT,           -- L2 完整正文
     source_url       TEXT,
     note_uuid        UUID,
     session_uuid     UUID,
@@ -391,3 +393,9 @@ ALTER TABLE notes      ADD COLUMN IF NOT EXISTS server_version BIGINT NULL;
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS server_version BIGINT NULL;
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS description    TEXT   NULL;
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon_path      TEXT   NULL;
+
+-- ============================================================
+-- 兼容旧库：resource_records 新增 L0/L1 分层字段
+-- ============================================================
+ALTER TABLE resource_records ADD COLUMN IF NOT EXISTS abstract_text TEXT NULL;
+ALTER TABLE resource_records ADD COLUMN IF NOT EXISTS summary_text  TEXT NULL;

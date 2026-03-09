@@ -1,4 +1,4 @@
-package com.doublez.pocketmindserver.resource.infra.persistence;
+package com.doublez.pocketmindserver.context.infra.persistence;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
@@ -11,26 +11,28 @@ import lombok.Data;
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * context_catalog 表 MyBatis-Plus 持久化模型。
+ */
 @Data
-@TableName("resource_records")
-public class ResourceRecordModel {
+@TableName("context_catalog")
+public class ContextCatalogModel {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
     private UUID uuid;
     private Long userId;
-    private String sourceType;
-    private String rootUri;
-    private String title;
-    private String abstractText;
-    private String summaryText;
-    private String content;
-    private String sourceUrl;
-    private UUID noteUuid;
-    private UUID sessionUuid;
-    private UUID assetUuid;
+    private String contextType;
+    private String subType;
+    private String uri;
+    private String parentUri;
+    private String name;
+    private String description;
+    private String layer;
     private String status;
+    private Boolean isLeaf;
+    private Long activeCount;
 
     @TableField(fill = FieldFill.INSERT)
     private Instant createdAt;

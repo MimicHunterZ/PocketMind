@@ -8,6 +8,7 @@ import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordEntity;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordRepository;
 import com.doublez.pocketmindserver.resource.domain.ResourceSourceType;
+import com.doublez.pocketmindserver.resource.application.NoOpResourceCatalogSyncService;
 import com.doublez.pocketmindserver.shared.domain.PageQuery;
 import com.doublez.pocketmindserver.shared.domain.SyncCursorQuery;
 import org.junit.jupiter.api.Test;
@@ -33,7 +34,8 @@ class ChatTranscriptResourceSyncServiceTest {
             chatMessageRepository,
             chatSessionRepository,
             resourceRecordRepository,
-            new ResourceContextServiceImpl()
+            new ResourceContextServiceImpl(),
+            new NoOpResourceCatalogSyncService()
     );
 
     @Test
