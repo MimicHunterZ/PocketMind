@@ -9,5 +9,6 @@ public enum ResourceSourceType {
     OCR_TEXT,
     PDF_TEXT,
     MARKDOWN_TEXT,
-    CHAT_TRANSCRIPT
+    CHAT_TRANSCRIPT,
+    CHAT_STAGE_SUMMARY
 }

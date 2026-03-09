@@ -45,4 +45,12 @@ public class ResourceContextServiceImpl implements ResourceContextService {
                 .child(sessionUuid.toString())
                 .child("transcript");
     }
+
+    @Override
+    public ContextUri chatStageSummaryResource(long userId, UUID sessionUuid) {
+        return ContextUri.userResourcesRoot(userId)
+                .child("chats")
+                .child(sessionUuid.toString())
+                .child("summary");
+    }
 }

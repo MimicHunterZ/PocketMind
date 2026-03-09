@@ -1,0 +1,149 @@
+{
+  "project": "PocketMind Context Architecture",
+  "lastUpdated": "2026-03-09",
+  "phases": [
+    {
+      "id": "phase-0",
+      "name": "纠偏与架构清障",
+      "status": "completed",
+      "tasks": [
+        { "id": "0.1", "done": true, "desc": "删除 memorySnapshot 相关设计" },
+        { "id": "0.2", "done": true, "desc": "确认 Note/ChatSession/ChatMessage/Asset 为业务真相源" },
+        { "id": "0.3", "done": true, "desc": "清理错误的 Skill 持久化和多余骨架" },
+        { "id": "0.4", "done": true, "desc": "聊天上下文装配切向模板化方向" }
+      ]
+    },
+    {
+      "id": "phase-1",
+      "name": "Context 骨架与统一标识",
+      "status": "completed",
+      "tasks": [
+        { "id": "1.1", "done": true, "desc": "建立 ContextType 枚举" },
+        { "id": "1.2", "done": true, "desc": "建立 ContextLayer 枚举" },
+        { "id": "1.3", "done": true, "desc": "建立 ContextStatus 枚举" },
+        { "id": "1.4", "done": true, "desc": "建立 ContextUri record" },
+        { "id": "1.5", "done": true, "desc": "建立 ResourceSourceType 枚举" },
+        { "id": "1.6", "done": true, "desc": "建立 MemoryType 枚举 (8类)" },
+        { "id": "1.7", "done": true, "desc": "SpaceType 五层枚举落地" },
+        { "id": "1.8", "done": true, "desc": "Visibility 可见性枚举落地" }
+      ]
+    },
+    {
+      "id": "phase-2",
+      "name": "检索基建 + Resource 层最小闭环",
+      "status": "in-progress",
+      "tasks": [
+        { "id": "2.1", "done": true, "desc": "ContextNode record 实现" },
+        { "id": "2.2", "done": true, "desc": "context_catalog 表 DDL + ContextCatalogModel" },
+        { "id": "2.3", "done": true, "desc": "ContextCatalogRepository 接口 + MybatisContextCatalogRepository" },
+        { "id": "2.4", "done": true, "desc": "HierarchicalRetriever SPI 稳定接口" },
+        { "id": "2.5", "done": true, "desc": "ChildSearchStrategy SPI + DbChildSearchStrategy" },
+        { "id": "2.6", "done": true, "desc": "HotnessScorer SPI + DefaultHotnessScorer" },
+        { "id": "2.7", "done": true, "desc": "DefaultHierarchicalRetriever 优先队列递归" },
+        { "id": "2.8", "done": true, "desc": "ResourceCatalogSyncService (Resource→ContextCatalog 同步)" },
+        { "id": "2.9", "done": true, "desc": "Resource L0/L1 字段 (abstractText, summaryText)" },
+        { "id": "2.10", "done": true, "desc": "Note->Resource 投影与同步" },
+        { "id": "2.11", "done": true, "desc": "Chat transcript->Resource 同步最小链路" },
+        { "id": "2.12", "done": true, "desc": "单元测试: ContextNodeTest, HotnessScorerTest, RetrieverTest, SearchStrategyTest, SyncServiceTest" },
+        { "id": "2.13", "done": false, "desc": "修正 context_catalog.description→abstract_text 命名对齐" },
+        { "id": "2.14", "done": false, "desc": "修正 memory_records DDL 补齐 L0/L1/L2 + active_count + evidence 等字段" },
+        { "id": "2.15", "done": false, "desc": "Web clip -> Resource 规范化接入" },
+        { "id": "2.16", "done": false, "desc": "OCR/PDF/音视频转写 -> Resource 统一入口" },
+        { "id": "2.17", "done": false, "desc": "Resource hash/version/state 规则统一" },
+        { "id": "2.18", "done": false, "desc": "resource_records + context_catalog 增加 embedding vector 列 (Phase8前置)" }
+      ]
+    },
+    {
+      "id": "phase-3",
+      "name": "Session commit 与中间层摘要",
+      "status": "not-started",
+      "tasks": [
+        { "id": "3.1", "done": false, "desc": "ContextRef Java 模型 (entity + model + repository + mapper)" },
+        { "id": "3.2", "done": false, "desc": "SessionCommitService 接口设计 (commit 触发条件)" },
+        { "id": "3.3", "done": false, "desc": "SessionCommitServiceImpl: 归档消息→生成 transcript resource (L2)" },
+        { "id": "3.4", "done": false, "desc": "LLM 生成结构化摘要 prompt: compression/structured_summary.st" },
+        { "id": "3.5", "done": false, "desc": "从摘要提取 abstract (L0)" },
+        { "id": "3.6", "done": false, "desc": "CommitLog 记录 (sessionId, commitIndex, stats)" },
+        { "id": "3.7", "done": false, "desc": "建立 ContextRef 关联 (session_uri ↔ 引用的 URI)" },
+        { "id": "3.8", "done": false, "desc": "更新 active_count (本轮使用的所有 context URI)" },
+        { "id": "3.9", "done": false, "desc": "单元测试: SessionCommitServiceTest" }
+      ]
+    },
+    {
+      "id": "phase-4",
+      "name": "User Memory + Memory Tool Set 最小闭环",
+      "status": "not-started",
+      "tasks": [
+        { "id": "4.1", "done": false, "desc": "MemoryRecord 主模型 (entity + model + repository + mapper)" },
+        { "id": "4.2", "done": false, "desc": "MemoryEvidence 引用模型 (sourceUri, snippetRange, capturedAt)" },
+        { "id": "4.3", "done": false, "desc": "MemoryExtractor prompt: compression/memory_extraction.st" },
+        { "id": "4.4", "done": false, "desc": "MemoryDeduplicator (pgvector预过滤 + LLM决策)" },
+        { "id": "4.5", "done": false, "desc": "MemoryMergeService prompt: compression/memory_merge.st" },
+        { "id": "4.6", "done": false, "desc": "session commit 和 note/resource 更新触发 memory candidates" },
+        { "id": "4.7", "done": false, "desc": "MemoryToolSet: browseMemoryCategories() Tool" },
+        { "id": "4.8", "done": false, "desc": "MemoryToolSet: searchMemories(query, type) Tool" },
+        { "id": "4.9", "done": false, "desc": "MemoryToolSet: getMemoryDetail(memoryId) Tool" },
+        { "id": "4.10", "done": false, "desc": "在 AiToolsConfiguration 中注册 MemoryToolSet" },
+        { "id": "4.11", "done": false, "desc": "单元测试: MemoryToolSetTest, MemoryExtractorTest" }
+      ]
+    },
+    {
+      "id": "phase-5",
+      "name": "Retrieval 双通道正式化",
+      "status": "not-started",
+      "tasks": [
+        { "id": "5.1", "done": false, "desc": "IntentAnalyzer (prompt: retrieval/intent_analysis.st)" },
+        { "id": "5.2", "done": false, "desc": "TypedQuery 模型 (query, contextType, intent, priority)" },
+        { "id": "5.3", "done": false, "desc": "ResourceRetriever (pgvector 语义搜索)" },
+        { "id": "5.4", "done": false, "desc": "MemoryRetriever (pgvector + hotness 加权)" },
+        { "id": "5.5", "done": false, "desc": "SkillResolver (请求级解析, 已有基础)" },
+        { "id": "5.6", "done": false, "desc": "RetrievalOrchestrator (并发分发 TypedQuery)" },
+        { "id": "5.7", "done": false, "desc": "ContextAssembler 改为消费召回结果" },
+        { "id": "5.8", "done": false, "desc": "Token budget + 重复来源去重 + fallback 规则" },
+        { "id": "5.9", "done": false, "desc": "单元测试: IntentAnalyzer, RetrievalOrchestratorTest" }
+      ]
+    },
+    {
+      "id": "phase-6",
+      "name": "Skill 能力层稳定化",
+      "status": "not-started",
+      "tasks": [
+        { "id": "6.1", "done": false, "desc": "统一 Skill 描述模型" },
+        { "id": "6.2", "done": false, "desc": "Skill 元数据与解析缓存策略" },
+        { "id": "6.3", "done": false, "desc": "Skill 版本化策略" }
+      ]
+    },
+    {
+      "id": "phase-7",
+      "name": "Agent Memory 与高级治理",
+      "status": "not-started",
+      "tasks": [
+        { "id": "7.1", "done": false, "desc": "CASE/PATTERN/PLAYBOOK/TOOL_EXPERIENCE Agent Memory 类型" },
+        { "id": "7.2", "done": false, "desc": "Agent-space ownership 定义" },
+        { "id": "7.3", "done": false, "desc": "治理流程: merge/obsolete/review" }
+      ]
+    },
+    {
+      "id": "phase-8",
+      "name": "检索实现升级 (接口不变)",
+      "status": "not-started",
+      "tasks": [
+        { "id": "8.1", "done": false, "desc": "VectorChildSearchStrategy implements ChildSearchStrategy (pgvector)" },
+        { "id": "8.2", "done": false, "desc": "@ConditionalOnProperty 切换 keyword→vector 实现" },
+        { "id": "8.3", "done": false, "desc": "pgvector 索引优化 (IVFFlat/HNSW)" },
+        { "id": "8.4", "done": false, "desc": "resource_chunk 独立建模评估" }
+      ]
+    },
+    {
+      "id": "phase-9",
+      "name": "服务化准备",
+      "status": "not-started",
+      "tasks": [
+        { "id": "9.1", "done": false, "desc": "跨域接口契约定义" },
+        { "id": "9.2", "done": false, "desc": "资源同步事件模型" },
+        { "id": "9.3", "done": false, "desc": "记忆查询 API 边界" },
+        { "id": "9.4", "done": false, "desc": "检索 API 边界" }
+      ]
+    }
+  ]
+}

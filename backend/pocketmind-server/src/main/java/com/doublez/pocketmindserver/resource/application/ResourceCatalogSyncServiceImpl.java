@@ -106,7 +106,7 @@ public class ResourceCatalogSyncServiceImpl implements ResourceCatalogSyncServic
     private String resolveGroupSegment(ResourceSourceType sourceType) {
         return switch (sourceType) {
             case NOTE_TEXT, WEB_CLIP, MARKDOWN_TEXT -> "notes";
-            case CHAT_TRANSCRIPT -> "chats";
+            case CHAT_TRANSCRIPT, CHAT_STAGE_SUMMARY -> "chats";
             case OCR_TEXT, PDF_TEXT -> "assets";
         };
     }
@@ -117,7 +117,7 @@ public class ResourceCatalogSyncServiceImpl implements ResourceCatalogSyncServic
     private String resolveGroupDescription(ResourceSourceType sourceType) {
         return switch (sourceType) {
             case NOTE_TEXT, WEB_CLIP, MARKDOWN_TEXT -> "笔记类资源";
-            case CHAT_TRANSCRIPT -> "对话记录类资源";
+            case CHAT_TRANSCRIPT, CHAT_STAGE_SUMMARY -> "对话记录类资源";
             case OCR_TEXT, PDF_TEXT -> "附件类资源";
         };
     }

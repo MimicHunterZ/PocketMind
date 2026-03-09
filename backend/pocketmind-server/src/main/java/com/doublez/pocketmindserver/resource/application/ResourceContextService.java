@@ -15,4 +15,6 @@ public interface ResourceContextService {
     ContextUri assetTextResource(long userId, UUID assetUuid);
 
     ContextUri chatTranscriptResource(long userId, UUID sessionUuid);
+
+    ContextUri chatStageSummaryResource(long userId, UUID sessionUuid);
 }

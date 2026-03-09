@@ -36,7 +36,7 @@ public class MybatisContextCatalogRepository implements ContextCatalogRepository
                         ContextCatalogModel::getContextType,
                         ContextCatalogModel::getLayer,
                         ContextCatalogModel::getName,
-                        ContextCatalogModel::getDescription,
+                        ContextCatalogModel::getAbstractText,
                         ContextCatalogModel::getActiveCount,
                         ContextCatalogModel::getUpdatedAt,
                         ContextCatalogModel::getIsLeaf
@@ -56,7 +56,7 @@ public class MybatisContextCatalogRepository implements ContextCatalogRepository
                         ContextCatalogModel::getContextType,
                         ContextCatalogModel::getLayer,
                         ContextCatalogModel::getName,
-                        ContextCatalogModel::getDescription,
+                        ContextCatalogModel::getAbstractText,
                         ContextCatalogModel::getActiveCount,
                         ContextCatalogModel::getUpdatedAt,
                         ContextCatalogModel::getIsLeaf
@@ -70,7 +70,7 @@ public class MybatisContextCatalogRepository implements ContextCatalogRepository
         LambdaQueryWrapper<ContextCatalogModel> wrapper = new LambdaQueryWrapper<ContextCatalogModel>()
                 .and(w -> w.like(ContextCatalogModel::getName, keyword)
                         .or()
-                        .like(ContextCatalogModel::getDescription, keyword))
+                        .like(ContextCatalogModel::getAbstractText, keyword))
                 .eq(userId != null, ContextCatalogModel::getUserId, userId)
                 .eq(contextType != null, ContextCatalogModel::getContextType, contextType.name())
                 .select(
@@ -79,7 +79,7 @@ public class MybatisContextCatalogRepository implements ContextCatalogRepository
                         ContextCatalogModel::getContextType,
                         ContextCatalogModel::getLayer,
                         ContextCatalogModel::getName,
-                        ContextCatalogModel::getDescription,
+                        ContextCatalogModel::getAbstractText,
                         ContextCatalogModel::getActiveCount,
                         ContextCatalogModel::getUpdatedAt,
                         ContextCatalogModel::getIsLeaf
@@ -99,7 +99,7 @@ public class MybatisContextCatalogRepository implements ContextCatalogRepository
                         ContextCatalogModel::getContextType,
                         ContextCatalogModel::getLayer,
                         ContextCatalogModel::getName,
-                        ContextCatalogModel::getDescription,
+                        ContextCatalogModel::getAbstractText,
                         ContextCatalogModel::getActiveCount,
                         ContextCatalogModel::getUpdatedAt,
                         ContextCatalogModel::getIsLeaf
@@ -121,7 +121,7 @@ public class MybatisContextCatalogRepository implements ContextCatalogRepository
                         ContextCatalogModel::getContextType,
                         ContextCatalogModel::getLayer,
                         ContextCatalogModel::getName,
-                        ContextCatalogModel::getDescription,
+                        ContextCatalogModel::getAbstractText,
                         ContextCatalogModel::getActiveCount,
                         ContextCatalogModel::getUpdatedAt,
                         ContextCatalogModel::getIsLeaf
@@ -137,7 +137,7 @@ public class MybatisContextCatalogRepository implements ContextCatalogRepository
 
         if (existing != null) {
             existing.setName(node.name());
-            existing.setDescription(node.abstractText());
+            existing.setAbstractText(node.abstractText());
             existing.setLayer(node.layer().name());
             existing.setIsLeaf(node.isLeaf());
             existing.setUpdatedAt(node.updatedAt());
@@ -150,7 +150,7 @@ public class MybatisContextCatalogRepository implements ContextCatalogRepository
             model.setUri(node.uri().value());
             model.setParentUri(node.parentUri() != null ? node.parentUri().value() : null);
             model.setName(node.name());
-            model.setDescription(node.abstractText());
+            model.setAbstractText(node.abstractText());
             model.setLayer(node.layer().name());
             model.setStatus("ACTIVE");
             model.setIsLeaf(node.isLeaf());
@@ -186,7 +186,7 @@ public class MybatisContextCatalogRepository implements ContextCatalogRepository
                 ContextType.valueOf(model.getContextType()),
                 ContextLayer.valueOf(model.getLayer()),
                 model.getName(),
-                model.getDescription(),
+                model.getAbstractText(),
                 model.getActiveCount() != null ? model.getActiveCount() : 0L,
                 model.getUpdatedAt() != null ? model.getUpdatedAt() : 0L,
                 Boolean.TRUE.equals(model.getIsLeaf())

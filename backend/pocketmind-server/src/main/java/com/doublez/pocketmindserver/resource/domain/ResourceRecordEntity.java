@@ -174,6 +174,39 @@ public class ResourceRecordEntity {
     }
 
     /**
+     * 创建会话阶段摘要资源（L1 结构化概览）。
+     *
+     * @param abstractText L0 一句话摘要 (~100 token)
+     * @param summaryText  L1 结构化概览 (~2k token)
+     * @param content      L2 完整原始对话文本
+     */
+    public static ResourceRecordEntity createChatStageSummary(UUID uuid,
+                                                              long userId,
+                                                              UUID sessionUuid,
+                                                              ContextUri rootUri,
+                                                              String title,
+                                                              String abstractText,
+                                                              String summaryText,
+                                                              String content) {
+        return new ResourceRecordEntity(
+                uuid,
+                userId,
+                ResourceSourceType.CHAT_STAGE_SUMMARY,
+                rootUri,
+                null,
+                Objects.requireNonNull(sessionUuid, "sessionUuid 不能为空"),
+                null,
+                title,
+                abstractText,
+                summaryText,
+                content,
+                null,
+                System.currentTimeMillis(),
+                false
+        );
+    }
+
+    /**
      * 更新资源正文投影。
      */
     public void updateContent(String title, String content) {

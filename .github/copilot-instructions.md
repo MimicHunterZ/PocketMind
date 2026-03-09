@@ -118,6 +118,7 @@ Controller 应作为极薄的“协议适配层”，严禁涉及任何业务逻
 
 ### Backend
 - **Run**: `cd backend && ./mvnw spring-boot:run`
+- **Tests**: `./mvnw test` 确保代码可以编译以及可以启动
 
 ## 🧪 Testing Strategy
 - **Unit Tests**: Mock Repositories to test Services.

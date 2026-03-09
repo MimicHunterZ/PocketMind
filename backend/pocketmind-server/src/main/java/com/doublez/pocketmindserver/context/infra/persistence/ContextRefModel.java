@@ -12,27 +12,25 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * context_catalog 表 MyBatis-Plus 持久化模型。
+ * context_ref 表 MyBatis-Plus 持久化模型。
  */
 @Data
-@TableName("context_catalog")
-public class ContextCatalogModel {
+@TableName("context_ref")
+public class ContextRefModel {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
     private UUID uuid;
     private Long userId;
-    private String contextType;
-    private String subType;
-    private String uri;
-    private String parentUri;
-    private String name;
-    private String abstractText;
-    private String layer;
-    private String status;
-    private Boolean isLeaf;
-    private Long activeCount;
+    private String contextUri;
+    private String bizType;
+    private String bizId;
+    private UUID noteUuid;
+    private UUID sessionUuid;
+    private UUID messageUuid;
+    private UUID assetUuid;
+    private String sourceUrl;
 
     @TableField(fill = FieldFill.INSERT)
     private Instant createdAt;

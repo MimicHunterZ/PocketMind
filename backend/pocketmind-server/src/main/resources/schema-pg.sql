@@ -239,7 +239,7 @@ CREATE TABLE IF NOT EXISTS context_catalog (
     uri              TEXT         NOT NULL UNIQUE,
     parent_uri       TEXT,
     name             TEXT,
-    description      TEXT,
+    abstract_text    TEXT,           -- L0 摘要 (~100 token)
     layer            VARCHAR(20)  NOT NULL DEFAULT 'L2_DETAIL',
     status           VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
     is_leaf          BOOLEAN      NOT NULL DEFAULT TRUE,
@@ -309,21 +309,32 @@ CREATE INDEX IF NOT EXISTS idx_resource_records_asset       ON resource_records(
 -- 11. memory_records（用户长期记忆记录）
 -- ============================================================
 CREATE TABLE IF NOT EXISTS memory_records (
-    id               BIGSERIAL    PRIMARY KEY,
-    uuid             UUID         NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    user_id          BIGINT       NOT NULL,
-    memory_type      VARCHAR(30)  NOT NULL,
-    root_uri         TEXT         NOT NULL,
-    title            TEXT,
-    content          TEXT,
+    id                 BIGSERIAL    PRIMARY KEY,
+    uuid               UUID         NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    user_id            BIGINT       NOT NULL,
+    tenant_id          BIGINT,
+    space_type         VARCHAR(20)  NOT NULL DEFAULT 'USER',
+    memory_type        VARCHAR(30)  NOT NULL,
+    root_uri           TEXT         NOT NULL,
+    title              TEXT,
+    abstract_text      TEXT,           -- L0 摘要 (~100 token)
+    summary_text       TEXT,           -- L1 结构化概览 (~2k token)
+    content            TEXT,           -- L2 完整内容
     source_context_uri TEXT,
-    status           VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
-    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at       BIGINT       NOT NULL DEFAULT 0,
-    is_deleted       BOOLEAN      NOT NULL DEFAULT FALSE
+    evidence_refs      JSONB,          -- [{sourceUri, snippetRange, capturedAt}]
+    merge_key          VARCHAR(128),   -- 去重合并键
+    confidence_score   DECIMAL(5,4) NOT NULL DEFAULT 1.0,
+    active_count       BIGINT       NOT NULL DEFAULT 0,
+    last_validated_at  BIGINT,
+    status             VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
+    created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at         BIGINT       NOT NULL DEFAULT 0,
+    is_deleted         BOOLEAN      NOT NULL DEFAULT FALSE
 );
 
-CREATE INDEX IF NOT EXISTS idx_memory_records_user_type ON memory_records(user_id, memory_type, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memory_records_user_type  ON memory_records(user_id, memory_type, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memory_records_merge_key  ON memory_records(user_id, memory_type, merge_key);
+CREATE INDEX IF NOT EXISTS idx_memory_records_space      ON memory_records(space_type, tenant_id);
 
 -- ============================================================
 -- 12. chat_messages
@@ -399,3 +410,23 @@ ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon_path      TEXT   NULL;
 -- ============================================================
 ALTER TABLE resource_records ADD COLUMN IF NOT EXISTS abstract_text TEXT NULL;
 ALTER TABLE resource_records ADD COLUMN IF NOT EXISTS summary_text  TEXT NULL;
+
+-- ============================================================
+-- 兼容旧库：context_catalog 重命名 description→abstract_text
+-- ============================================================
+ALTER TABLE context_catalog ADD COLUMN IF NOT EXISTS abstract_text TEXT NULL;
+-- 将旧 description 数据迁移到 abstract_text（仅当 abstract_text 为空时）
+UPDATE context_catalog SET abstract_text = description WHERE abstract_text IS NULL AND description IS NOT NULL;
+
+-- ============================================================
+-- 兼容旧库：memory_records 补齐 L0/L1 + 治理字段
+-- ============================================================
+ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS tenant_id          BIGINT       NULL;
+ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS space_type         VARCHAR(20)  NOT NULL DEFAULT 'USER';
+ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS abstract_text      TEXT         NULL;
+ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS summary_text       TEXT         NULL;
+ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS evidence_refs      JSONB        NULL;
+ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS merge_key          VARCHAR(128) NULL;
+ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS confidence_score   DECIMAL(5,4) NOT NULL DEFAULT 1.0;
+ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS active_count       BIGINT       NOT NULL DEFAULT 0;
+ALTER TABLE memory_records ADD COLUMN IF NOT EXISTS last_validated_at  BIGINT       NULL;
