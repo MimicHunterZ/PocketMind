@@ -318,6 +318,9 @@ class SessionCommitServiceTest {
         @Override public void upsert(ContextNode node, Long userId) {}
         @Override public void incrementActiveCount(String uri) { incrementedUris.add(uri); }
         @Override public void incrementActiveCountBatch(List<String> uris) { incrementedUris.addAll(uris); }
+        @Override public List<ScoredCatalogEntry> searchByVector(float[] queryVector, long userId, ContextType contextType, int limit) { return List.of(); }
+        @Override public List<ScoredCatalogEntry> searchChildrenByVector(float[] queryVector, String parentUri, long userId, int limit) { return List.of(); }
+        @Override public void updateEmbedding(String uri, float[] embedding) {}
     }
 
     private static final class NoOpCatalogSyncService implements ResourceCatalogSyncService {

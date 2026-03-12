@@ -93,4 +93,13 @@ public class InMemoryMemoryRecordRepository implements MemoryRecordRepository {
                 .filter(r -> r.getUuid().equals(uuid))
                 .findFirst();
     }
+
+    @Override
+    public List<ScoredMemoryEntry> searchByVector(float[] queryVector, long userId, int limit) {
+        return List.of();
+    }
+
+    @Override
+    public void updateEmbedding(UUID uuid, float[] embedding) {
+    }
 }

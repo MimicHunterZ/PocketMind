@@ -1,5 +1,6 @@
 package com.doublez.pocketmindserver.resource.application;
 
+import com.doublez.pocketmindserver.ai.application.embedding.EmbeddingService;
 import com.doublez.pocketmindserver.context.domain.ContextCatalogRepository;
 import com.doublez.pocketmindserver.context.domain.ContextLayer;
 import com.doublez.pocketmindserver.context.domain.ContextNode;
@@ -27,9 +28,12 @@ import org.springframework.stereotype.Service;
 public class ResourceCatalogSyncServiceImpl implements ResourceCatalogSyncService {
 
     private final ContextCatalogRepository catalogRepository;
+    private final EmbeddingService embeddingService;
 
-    public ResourceCatalogSyncServiceImpl(ContextCatalogRepository catalogRepository) {
+    public ResourceCatalogSyncServiceImpl(ContextCatalogRepository catalogRepository,
+                                          EmbeddingService embeddingService) {
         this.catalogRepository = catalogRepository;
+        this.embeddingService = embeddingService;
     }
 
     @Override
@@ -66,6 +70,9 @@ public class ResourceCatalogSyncServiceImpl implements ResourceCatalogSyncServic
 
         catalogRepository.upsert(leafNode, userId);
         log.debug("[resource-catalog-sync] 同步资源节点: uri={}", resourceUri.value());
+
+        // 为叶子节点生成向量嵌入
+        embedNode(resourceUri.value(), abstractText);
     }
 
     @Override
@@ -120,5 +127,19 @@ public class ResourceCatalogSyncServiceImpl implements ResourceCatalogSyncServic
             case CHAT_TRANSCRIPT, CHAT_STAGE_SUMMARY -> "对话记录类资源";
             case OCR_TEXT, PDF_TEXT -> "附件类资源";
         };
+    }
+
+    /**
+     * 为指定节点生成并存储向量嵌入。
+     */
+    private void embedNode(String uri, String text) {
+        try {
+            float[] embedding = embeddingService.embed(text);
+            if (embedding != null) {
+                catalogRepository.updateEmbedding(uri, embedding);
+            }
+        } catch (Exception e) {
+            log.warn("[resource-catalog-sync] 向量嵌入失败, 不影响同步: uri={}, error={}", uri, e.getMessage());
+        }
     }
 }

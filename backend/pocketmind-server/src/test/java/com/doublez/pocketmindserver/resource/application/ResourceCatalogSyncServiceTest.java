@@ -1,5 +1,6 @@
 package com.doublez.pocketmindserver.resource.application;
 
+import com.doublez.pocketmindserver.ai.application.embedding.EmbeddingService;
 import com.doublez.pocketmindserver.context.domain.ContextCatalogRepository;
 import com.doublez.pocketmindserver.context.domain.ContextLayer;
 import com.doublez.pocketmindserver.context.domain.ContextNode;
@@ -28,7 +29,7 @@ class ResourceCatalogSyncServiceTest {
     @BeforeEach
     void setUp() {
         catalogRepository = new InMemoryCatalogRepository();
-        syncService = new ResourceCatalogSyncServiceImpl(catalogRepository);
+        syncService = new ResourceCatalogSyncServiceImpl(catalogRepository, new NoOpEmbeddingService());
     }
 
     @Test
@@ -199,6 +200,34 @@ class ResourceCatalogSyncServiceTest {
 
         @Override
         public void incrementActiveCountBatch(List<String> uris) {
+        }
+
+        @Override
+        public List<ScoredCatalogEntry> searchByVector(float[] queryVector, long userId, ContextType contextType, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public List<ScoredCatalogEntry> searchChildrenByVector(float[] queryVector, String parentUri, long userId, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public void updateEmbedding(String uri, float[] embedding) {
+        }
+    }
+
+    /**
+     * 无操作的 EmbeddingService — 测试中不实际调用向量嵌入。
+     */
+    private static class NoOpEmbeddingService extends EmbeddingService {
+        NoOpEmbeddingService() {
+            super(null);
+        }
+
+        @Override
+        public float[] embed(String text) {
+            return null;
         }
     }
 }
