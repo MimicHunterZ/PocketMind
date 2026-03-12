@@ -1,5 +1,6 @@
 package com.doublez.pocketmindserver.memory.application;
 
+import com.doublez.pocketmindserver.ai.application.embedding.EmbeddingService;
 import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
 import com.doublez.pocketmindserver.context.application.SessionCommitResult;
 import com.doublez.pocketmindserver.context.domain.ContextUri;
@@ -47,6 +48,7 @@ public class MemoryExtractorServiceImpl implements MemoryExtractorService {
     private final ResourceRecordRepository resourceRecordRepository;
     private final MemoryContextService memoryContextService;
     private final AiFailoverRouter aiFailoverRouter;
+    private final EmbeddingService embeddingService;
 
     @Value("classpath:prompts/compression/memory_extraction_system.md")
     private Resource extractionSystemTemplate;
@@ -61,11 +63,13 @@ public class MemoryExtractorServiceImpl implements MemoryExtractorService {
     public MemoryExtractorServiceImpl(MemoryRecordRepository memoryRecordRepository,
                                       ResourceRecordRepository resourceRecordRepository,
                                       MemoryContextService memoryContextService,
-                                      AiFailoverRouter aiFailoverRouter) {
+                                      AiFailoverRouter aiFailoverRouter,
+                                      EmbeddingService embeddingService) {
         this.memoryRecordRepository = memoryRecordRepository;
         this.resourceRecordRepository = resourceRecordRepository;
         this.memoryContextService = memoryContextService;
         this.aiFailoverRouter = aiFailoverRouter;
+        this.embeddingService = embeddingService;
     }
 
     @Override
@@ -124,6 +128,7 @@ public class MemoryExtractorServiceImpl implements MemoryExtractorService {
                     record.updateContent(candidate.title(), candidate.abstractText(), candidate.content());
                     record.addEvidence(MemoryEvidence.of(sourceContextUri, candidate.title()));
                     memoryRecordRepository.update(record);
+                    embedMemory(record.getUuid(), candidate.content());
                     log.debug("[memory-extractor] 合并已有记忆: mergeKey={}", candidate.mergeKey());
                     savedCount++;
                     continue;
@@ -143,6 +148,7 @@ public class MemoryExtractorServiceImpl implements MemoryExtractorService {
                     candidate.mergeKey()
             );
             memoryRecordRepository.save(newRecord);
+            embedMemory(newRecord.getUuid(), candidate.content());
             savedCount++;
             log.debug("[memory-extractor] 保存新记忆: type={}, title={}", memoryType, candidate.title());
         }
@@ -211,6 +217,20 @@ public class MemoryExtractorServiceImpl implements MemoryExtractorService {
             });
         } catch (IOException e) {
             throw new RuntimeException("加载记忆抽取提示词模板失败", e);
+        }
+    }
+
+    /**
+     * 为记忆生成并存储向量嵌入。
+     */
+    private void embedMemory(UUID uuid, String text) {
+        try {
+            float[] embedding = embeddingService.embed(text);
+            if (embedding != null) {
+                memoryRecordRepository.updateEmbedding(uuid, embedding);
+            }
+        } catch (Exception e) {
+            log.warn("[memory-extractor] 记忆向量嵌入失败, 不影响保存: uuid={}, error={}", uuid, e.getMessage());
         }
     }
 }

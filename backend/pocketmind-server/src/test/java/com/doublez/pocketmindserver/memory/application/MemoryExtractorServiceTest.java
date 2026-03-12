@@ -1,5 +1,6 @@
 package com.doublez.pocketmindserver.memory.application;
 
+import com.doublez.pocketmindserver.ai.application.embedding.EmbeddingService;
 import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
 import com.doublez.pocketmindserver.context.application.SessionCommitResult;
 import com.doublez.pocketmindserver.context.domain.ContextUri;
@@ -50,7 +51,8 @@ class MemoryExtractorServiceTest {
                 memoryRepo,
                 resourceRepo,
                 memoryContextService,
-                aiFailoverRouter
+                aiFailoverRouter,
+                new NoOpEmbeddingService()
         );
 
         // 注入 @Value 资源
@@ -242,5 +244,19 @@ class MemoryExtractorServiceTest {
         @Override public List<ResourceRecordEntity> findByNoteUuid(long userId, UUID noteUuid) { return List.of(); }
         @Override public List<ResourceRecordEntity> findBySessionUuid(long userId, UUID uuid) { return List.of(); }
         @Override public List<ResourceRecordEntity> findByAssetUuid(long userId, UUID assetUuid) { return List.of(); }
+    }
+
+    /**
+     * 无操作的 EmbeddingService — 测试中不实际调用向量嵌入。
+     */
+    private static class NoOpEmbeddingService extends EmbeddingService {
+        NoOpEmbeddingService() {
+            super(null);
+        }
+
+        @Override
+        public float[] embed(String text) {
+            return null;
+        }
     }
 }
