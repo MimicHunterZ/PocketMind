@@ -40,7 +40,7 @@ public interface MemoryRecordRepository {
     Optional<MemoryRecordEntity> findByMergeKey(long userId, MemoryType memoryType, String mergeKey);
 
     /**
-     * 关键词搜索记忆（Phase4 使用 LIKE，Phase5 升级为 pgvector）。
+     * 关键词搜索记忆（回退用，主检索路径走 searchByVector）。
      */
     List<MemoryRecordEntity> searchByKeyword(long userId, String keyword, MemoryType memoryType, int limit);
 

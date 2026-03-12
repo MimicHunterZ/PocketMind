@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * 记忆检索器 SPI — 从 memory_records 中检索与查询相关的记忆片段。
  *
- * <p>当前基于关键词搜索实现。
+ * <p>当前实现：{@link VectorMemoryRetriever} 基于 pgvector 余弦相似度。
  */
 public interface MemoryRetriever {
 

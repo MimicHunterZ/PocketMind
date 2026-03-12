@@ -12,7 +12,6 @@ import java.util.List;
  * 允许以下实现方式自由切换或组合：
  * <ul>
  *   <li>{@code VectorChildSearchStrategy} — 基于 pgvector 语义搜索</li>
- *   <li>{@code VectorChildSearchStrategy} — 基于 pgvector 语义搜索（未来）</li>
  *   <li>{@code FileChildSearchStrategy} — 文件系统目录遍历（AGFS 场景）</li>
  *   <li>{@code CompositeChildSearchStrategy} — 多策略融合</li>
  * </ul>
