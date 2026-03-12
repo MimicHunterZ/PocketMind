@@ -11,6 +11,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -58,6 +59,25 @@ class MultiTenantSkillsToolFactoryTest {
         );
 
         assertFalse(callback.isPresent());
+    }
+
+    @Test
+    void shouldNotFailWhenSkillFrontMatterIsInvalid() throws IOException {
+        Path sharedRoot = tempDir.resolve("shared-skills");
+        Path brokenSkill = sharedRoot.resolve("broken").resolve("SKILL.md");
+        Files.createDirectories(brokenSkill.getParent());
+        // 缺少 description，触发第三方 SkillsTool 的元数据解析异常。
+        Files.writeString(brokenSkill, "---\nname: broken-skill\n---\n\ninvalid meta");
+
+        MultiTenantSkillsToolFactory.ResolvedSkillTool resolved = factory.resolve(
+                sharedRoot.toString(),
+                tempDir.resolve("tenants").toString(),
+                "user-1",
+                "claude"
+        );
+
+        assertEquals(1, resolved.directories().size());
+        assertNotNull(resolved.callback());
     }
 
     private void writeSkill(Path file, String name, String description, String body) throws IOException {

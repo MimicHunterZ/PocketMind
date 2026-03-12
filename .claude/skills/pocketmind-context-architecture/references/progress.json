@@ -132,12 +132,12 @@
     {
       "id": "phase-8",
       "name": "检索实现升级 (接口不变)",
-      "status": "in-progress",
+      "status": "completed",
       "tasks": [
         { "id": "8.1", "done": true, "desc": "VectorChildSearchStrategy implements ChildSearchStrategy (pgvector)" },
         { "id": "8.2", "done": true, "desc": "移除 @ConditionalOnProperty 过渡切换, 直接向量实现" },
         { "id": "8.3", "done": true, "desc": "pgvector HNSW 索引 + 向量 SQL 检索 + EmbeddingModel 接入" },
-        { "id": "8.4", "done": false, "desc": "resource_chunk 独立建模评估" },
+        { "id": "8.4", "done": true, "desc": "resource_chunk 独立建模评估（结论：暂不落地，保留触发条件）" },
         { "id": "8.5", "done": true, "desc": "ResourceCatalogSyncService 同步时写入 context_catalog.embedding" },
         { "id": "8.6", "done": true, "desc": "MemoryExtractorService 抽取后写入 memory_records.embedding" },
         { "id": "8.7", "done": true, "desc": "VectorMemoryRetriever 替换关键词检索并接入 RetrievalOrchestrator" },

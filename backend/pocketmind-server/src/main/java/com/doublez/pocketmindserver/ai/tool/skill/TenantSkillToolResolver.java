@@ -36,12 +36,19 @@ public class TenantSkillToolResolver {
         String tenantKey = "user-" + userId;
         String normalizedAgentKey = normalizeAgentKey(agentKey);
 
-        MultiTenantSkillsToolFactory.ResolvedSkillTool resolved = multiTenantSkillsToolFactory.resolve(
-            sharedSkillsPath,
-            tenantSkillsBasePath,
-                tenantKey,
-                normalizedAgentKey
-        );
+        MultiTenantSkillsToolFactory.ResolvedSkillTool resolved;
+        try {
+            resolved = multiTenantSkillsToolFactory.resolve(
+                    sharedSkillsPath,
+                    tenantSkillsBasePath,
+                    tenantKey,
+                    normalizedAgentKey
+            );
+        } catch (RuntimeException e) {
+            log.warn("[skill] 解析租户技能失败，降级为无技能工具: tenantKey={}, agentKey={}, error={}",
+                    tenantKey, normalizedAgentKey, e.getMessage());
+            resolved = new MultiTenantSkillsToolFactory.ResolvedSkillTool(java.util.List.of(), java.util.Optional.empty());
+        }
 
         Map<String, Object> toolContext = new LinkedHashMap<>();
         toolContext.put("tenantKey", tenantKey);

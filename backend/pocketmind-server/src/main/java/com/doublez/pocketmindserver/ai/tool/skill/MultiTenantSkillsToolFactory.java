@@ -54,12 +54,19 @@ public class MultiTenantSkillsToolFactory {
             return new ResolvedSkillTool(List.of(), Optional.empty());
         }
 
-        ToolCallback callback = SkillsTool.builder()
+        try {
+            ToolCallback callback = SkillsTool.builder()
                 .addSkillsDirectories(directories)
                 .build();
-        log.info("[skill] 已解析技能目录: tenantKey={}, agentKey={}, directories={}",
+            log.info("[skill] 已解析技能目录: tenantKey={}, agentKey={}, directories={}",
                 normalizedTenantKey, normalizedAgentKey, directories);
-        return new ResolvedSkillTool(List.copyOf(directories), Optional.of(callback));
+            return new ResolvedSkillTool(List.copyOf(directories), Optional.of(callback));
+        } catch (RuntimeException e) {
+            // SkillsTool 在读取不完整 front matter 时可能抛 NPE，降级为无技能工具以保证主链路可用。
+            log.warn("[skill] 技能目录解析失败，降级为无技能工具: tenantKey={}, agentKey={}, directories={}, error={}",
+                normalizedTenantKey, normalizedAgentKey, directories, e.getMessage());
+            return new ResolvedSkillTool(List.copyOf(directories), Optional.empty());
+        }
     }
 
     private void addIfDirectory(List<String> directories, String candidatePath) {
