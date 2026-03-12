@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.doublez.pocketmindserver.memory.domain.MemoryEvidence;
+import com.doublez.pocketmindserver.shared.infra.mybatis.VectorTypeHandler;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -66,6 +67,10 @@ public class MemoryRecordModel {
 
     /** 最后验证时间 */
     private Long lastValidatedAt;
+
+    /** pgvector 语义向量 */
+    @TableField(typeHandler = VectorTypeHandler.class)
+    private float[] embedding;
 
     /** 状态 */
     private String status;

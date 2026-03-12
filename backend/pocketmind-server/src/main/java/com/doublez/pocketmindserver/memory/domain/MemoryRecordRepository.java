@@ -55,7 +55,27 @@ public interface MemoryRecordRepository {
     List<MemoryTypeStat> countByUserGroupByType(long userId);
 
     /**
+     * 向量相似度搜索记忆。
+     *
+     * @param queryVector 查询向量
+     * @param userId      用户 ID
+     * @param limit       最大返回数量
+     * @return (entity, similarity) 对列表，按相似度降序
+     */
+    List<ScoredMemoryEntry> searchByVector(float[] queryVector, long userId, int limit);
+
+    /**
+     * 更新指定记忆的向量嵌入。
+     */
+    void updateEmbedding(UUID uuid, float[] embedding);
+
+    /**
      * 记忆类型统计结果。
      */
     record MemoryTypeStat(MemoryType memoryType, long count) {}
+
+    /**
+     * 向量搜索结果条目。
+     */
+    record ScoredMemoryEntry(MemoryRecordEntity entity, double similarity) {}
 }

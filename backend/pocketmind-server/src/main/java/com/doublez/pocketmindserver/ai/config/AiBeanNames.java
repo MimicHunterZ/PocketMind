@@ -29,4 +29,6 @@ public final class AiBeanNames {
 
     public static final String IMAGE_CLIENT = "imageChatClient";
     public static final String AUDIO_CLIENT = "audioChatClient";
+
+    public static final String EMBEDDING_MODEL = "embeddingModel";
 }

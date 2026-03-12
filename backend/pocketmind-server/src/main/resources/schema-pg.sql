@@ -238,6 +238,7 @@ CREATE TABLE IF NOT EXISTS context_catalog (
     status           VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
     is_leaf          BOOLEAN      NOT NULL DEFAULT TRUE,
     active_count     BIGINT       NOT NULL DEFAULT 0,
+    embedding        vector(1024),            -- pgvector 语义向量
     created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at       BIGINT       NOT NULL DEFAULT 0,
     is_deleted       BOOLEAN      NOT NULL DEFAULT FALSE
@@ -245,6 +246,8 @@ CREATE TABLE IF NOT EXISTS context_catalog (
 
 CREATE INDEX IF NOT EXISTS idx_context_catalog_user_type ON context_catalog(user_id, context_type, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_context_catalog_parent    ON context_catalog(parent_uri);
+CREATE INDEX IF NOT EXISTS idx_context_catalog_embedding ON context_catalog
+    USING hnsw (embedding vector_cosine_ops) WHERE embedding IS NOT NULL;
 
 -- ============================================================
 -- 9. context_ref（业务对象与上下文对象关联）
@@ -320,6 +323,7 @@ CREATE TABLE IF NOT EXISTS memory_records (
     confidence_score   DECIMAL(5,4) NOT NULL DEFAULT 1.0,
     active_count       BIGINT       NOT NULL DEFAULT 0,
     last_validated_at  BIGINT,
+    embedding          vector(1024),            -- pgvector 语义向量
     status             VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
     created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at         BIGINT       NOT NULL DEFAULT 0,
@@ -329,6 +333,8 @@ CREATE TABLE IF NOT EXISTS memory_records (
 CREATE INDEX IF NOT EXISTS idx_memory_records_user_type  ON memory_records(user_id, memory_type, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_memory_records_merge_key  ON memory_records(user_id, memory_type, merge_key);
 CREATE INDEX IF NOT EXISTS idx_memory_records_space      ON memory_records(space_type, tenant_id);
+CREATE INDEX IF NOT EXISTS idx_memory_records_embedding  ON memory_records
+    USING hnsw (embedding vector_cosine_ops) WHERE embedding IS NOT NULL;
 
 -- ============================================================
 -- 12. chat_messages

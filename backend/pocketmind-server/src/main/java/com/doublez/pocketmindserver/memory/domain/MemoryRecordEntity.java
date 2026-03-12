@@ -127,6 +127,22 @@ public class MemoryRecordEntity {
     // ─── 业务方法 ──────────────────────────────────────────────────
 
     /**
+     * 从数据库行部分字段重建实体（向量搜索结果映射用）。
+     */
+    public static MemoryRecordEntity reconstitute(UUID uuid, long userId, MemoryType memoryType,
+                                                   ContextUri rootUri, String title,
+                                                   String abstractText, String content,
+                                                   long activeCount) {
+        return new MemoryRecordEntity(
+                uuid, userId, null, SpaceType.USER, memoryType,
+                rootUri != null ? rootUri : ContextUri.of("pm://memories/" + uuid),
+                title, abstractText, null, content, null,
+                List.of(), null, BigDecimal.ONE, activeCount, null,
+                ContextStatus.ACTIVE, 0L, false
+        );
+    }
+
+    /**
      * 递增引用热度。
      */
     public void incrementActiveCount() {

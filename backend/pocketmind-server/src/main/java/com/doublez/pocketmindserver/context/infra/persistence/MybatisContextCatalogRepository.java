@@ -192,4 +192,55 @@ public class MybatisContextCatalogRepository implements ContextCatalogRepository
                 Boolean.TRUE.equals(model.getIsLeaf())
         );
     }
+
+    // ─── 向量搜索 ──────────────────────────────────────────────
+
+    @Override
+    public List<ScoredCatalogEntry> searchByVector(float[] queryVector, long userId, ContextType contextType, int limit) {
+        String vectorStr = toVectorString(queryVector);
+        String ctxType = contextType != null ? contextType.name() : null;
+        return mapper.searchByVector(vectorStr, userId, ctxType, limit).stream()
+                .map(this::toScoredEntry)
+                .toList();
+    }
+
+    @Override
+    public List<ScoredCatalogEntry> searchChildrenByVector(float[] queryVector, String parentUri, long userId, int limit) {
+        String vectorStr = toVectorString(queryVector);
+        return mapper.searchChildrenByVector(vectorStr, parentUri, userId, limit).stream()
+                .map(this::toScoredEntry)
+                .toList();
+    }
+
+    @Override
+    public void updateEmbedding(String uri, float[] embedding) {
+        if (embedding == null) return;
+        mapper.updateEmbedding(uri, toVectorString(embedding));
+    }
+
+    private ScoredCatalogEntry toScoredEntry(java.util.Map<String, Object> row) {
+        ContextNode node = new ContextNode(
+                ContextUri.of((String) row.get("uri")),
+                row.get("parent_uri") != null ? ContextUri.of((String) row.get("parent_uri")) : null,
+                ContextType.valueOf((String) row.get("context_type")),
+                ContextLayer.valueOf((String) row.get("layer")),
+                (String) row.get("name"),
+                (String) row.get("abstract_text"),
+                row.get("active_count") != null ? ((Number) row.get("active_count")).longValue() : 0L,
+                row.get("updated_at") != null ? ((Number) row.get("updated_at")).longValue() : 0L,
+                row.get("is_leaf") != null && (Boolean) row.get("is_leaf")
+        );
+        double similarity = row.get("similarity") != null ? ((Number) row.get("similarity")).doubleValue() : 0.0;
+        return new ScoredCatalogEntry(node, similarity);
+    }
+
+    private String toVectorString(float[] vector) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < vector.length; i++) {
+            if (i > 0) sb.append(',');
+            sb.append(vector[i]);
+        }
+        sb.append(']');
+        return sb.toString();
+    }
 }

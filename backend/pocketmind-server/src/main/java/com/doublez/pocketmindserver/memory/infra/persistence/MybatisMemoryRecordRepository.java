@@ -159,4 +159,48 @@ public class MybatisMemoryRecordRepository implements MemoryRecordRepository {
                 .eq(MemoryRecordModel::getUuid, uuid);
         return mapper.selectOne(wrapper);
     }
+
+    // ─── 向量搜索 ──────────────────────────────────────────────
+
+    @Override
+    public List<ScoredMemoryEntry> searchByVector(float[] queryVector, long userId, int limit) {
+        String vectorStr = toVectorString(queryVector);
+        return mapper.searchByVector(vectorStr, userId, limit).stream()
+                .map(this::toScoredEntry)
+                .toList();
+    }
+
+    @Override
+    public void updateEmbedding(UUID uuid, float[] embedding) {
+        if (embedding == null) return;
+        mapper.updateEmbedding(uuid, toVectorString(embedding));
+    }
+
+    private ScoredMemoryEntry toScoredEntry(java.util.Map<String, Object> row) {
+        com.doublez.pocketmindserver.memory.domain.MemoryRecordEntity entity =
+                com.doublez.pocketmindserver.memory.domain.MemoryRecordEntity.reconstitute(
+                        (UUID) row.get("uuid"),
+                        row.get("user_id") != null ? ((Number) row.get("user_id")).longValue() : 0L,
+                        com.doublez.pocketmindserver.memory.domain.MemoryType.valueOf((String) row.get("memory_type")),
+                        row.get("root_uri") != null
+                                ? com.doublez.pocketmindserver.context.domain.ContextUri.of((String) row.get("root_uri"))
+                                : null,
+                        (String) row.get("title"),
+                        (String) row.get("abstract_text"),
+                        (String) row.get("content"),
+                        row.get("active_count") != null ? ((Number) row.get("active_count")).longValue() : 0L
+                );
+        double similarity = row.get("similarity") != null ? ((Number) row.get("similarity")).doubleValue() : 0.0;
+        return new ScoredMemoryEntry(entity, similarity);
+    }
+
+    private String toVectorString(float[] vector) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < vector.length; i++) {
+            if (i > 0) sb.append(',');
+            sb.append(vector[i]);
+        }
+        sb.append(']');
+        return sb.toString();
+    }
 }

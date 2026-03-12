@@ -60,4 +60,30 @@ public interface ContextCatalogRepository {
      * 批量递增 active_count。
      */
     void incrementActiveCountBatch(List<String> uris);
+
+    /**
+     * 向量相似度搜索 — 返回最相关的节点及其余弦相似度。
+     *
+     * @param queryVector 查询向量
+     * @param userId      用户 ID
+     * @param contextType 上下文类型（null = 不限）
+     * @param limit       最大返回数量
+     * @return (node, similarity) 对列表，按相似度降序
+     */
+    List<ScoredCatalogEntry> searchByVector(float[] queryVector, long userId, ContextType contextType, int limit);
+
+    /**
+     * 向量相似度子节点搜索 — 限定 parentUri 下的子节点。
+     */
+    List<ScoredCatalogEntry> searchChildrenByVector(float[] queryVector, String parentUri, long userId, int limit);
+
+    /**
+     * 更新指定 URI 节点的向量嵌入。
+     */
+    void updateEmbedding(String uri, float[] embedding);
+
+    /**
+     * 向量搜索结果条目。
+     */
+    record ScoredCatalogEntry(ContextNode node, double similarity) {}
 }

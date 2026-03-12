@@ -19,6 +19,9 @@ import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.OpenAiEmbeddingModel;
+import org.springframework.ai.openai.OpenAiEmbeddingOptions;
+import org.springframework.ai.document.MetadataMode;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.tool.ToolCallback;
@@ -267,6 +270,46 @@ public class AiConfiguration {
                 observationRegistry
         );
     }
+
+    // region ChatClient（多角色）
+
+    // region EmbeddingModel
+
+    @Bean(AiBeanNames.EMBEDDING_MODEL)
+    @ConditionalOnProperty(prefix = "pocketmind.ai.embedding", name = "provider")
+    public OpenAiEmbeddingModel embeddingModel(AiProvidersProperties providers,
+                                               EmbeddingProperties embeddingProperties,
+                                               AiHttpClientProperties httpClientProperties,
+                                               ObservationRegistry observationRegistry,
+                                               RetryTemplate retryTemplate) {
+        AiProvidersProperties.ProviderConfig providerCfg = providers.configs().get(embeddingProperties.provider());
+        Objects.requireNonNull(providerCfg,
+                "embedding.provider='" + embeddingProperties.provider() + "' 在 providers.configs 中不存在");
+
+        SimpleClientHttpRequestFactory baseFactory = new SimpleClientHttpRequestFactory();
+        baseFactory.setConnectTimeout(httpClientProperties.connectTimeoutMs());
+        baseFactory.setReadTimeout(httpClientProperties.readTimeoutMs());
+
+        OpenAiApi api = OpenAiApi.builder()
+                .baseUrl(providerCfg.baseUrl())
+                .apiKey(providerCfg.apiKey())
+                .restClientBuilder(RestClient.builder()
+                        .requestFactory(new BufferingClientHttpRequestFactory(baseFactory)))
+                .build();
+
+        return new OpenAiEmbeddingModel(
+                api,
+                MetadataMode.EMBED,
+                OpenAiEmbeddingOptions.builder()
+                        .model(embeddingProperties.model())
+                        .dimensions(embeddingProperties.dimensions())
+                        .build(),
+                retryTemplate,
+                observationRegistry
+        );
+    }
+
+    // endregion
 
     // region ChatClient（多角色）
 
