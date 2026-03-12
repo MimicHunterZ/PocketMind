@@ -83,7 +83,9 @@ class AiChatServiceTest {
                         return com.doublez.pocketmindserver.context.domain.ContextUri.userMemoriesRoot(userId)
                                 .child(memoryType.name().toLowerCase());
                     }
-                }, new InMemoryMemoryRecordRepository())
+                }, new InMemoryMemoryRecordRepository()),
+                mock(com.doublez.pocketmindserver.ai.application.retrieval.RetrievalOrchestrator.class),
+                mock(com.doublez.pocketmindserver.ai.application.retrieval.IntentAnalyzer.class)
         );
         sseReplyService = new SseReplyService(
                 aiFailoverRouter,

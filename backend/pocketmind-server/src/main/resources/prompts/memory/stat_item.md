@@ -1,0 +1,1 @@
+- **<memoryType>**: <count> 条

@@ -15,10 +15,12 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 用户长期记忆工具集 — 供 AI 在对话中主动召回记忆。
@@ -39,20 +41,36 @@ public class MemoryToolSet {
 
     private final long userId;
     private final MemoryRecordRepository memoryRecordRepository;
+
+    // ── 外层模板 ──
     private final Resource browseCategoriesTemplate;
     private final Resource searchResultsTemplate;
     private final Resource memoryDetailTemplate;
+
+    // ── 条目级模板（替代内部 StringBuilder 拼接） ──
+    private final Resource statItemTemplate;
+    private final Resource topMemoryItemTemplate;
+    private final Resource searchResultItemTemplate;
+    private final Resource evidenceItemTemplate;
 
     public MemoryToolSet(long userId,
                          MemoryRecordRepository memoryRecordRepository,
                          Resource browseCategoriesTemplate,
                          Resource searchResultsTemplate,
-                         Resource memoryDetailTemplate) {
+                         Resource memoryDetailTemplate,
+                         Resource statItemTemplate,
+                         Resource topMemoryItemTemplate,
+                         Resource searchResultItemTemplate,
+                         Resource evidenceItemTemplate) {
         this.userId = userId;
         this.memoryRecordRepository = memoryRecordRepository;
         this.browseCategoriesTemplate = browseCategoriesTemplate;
         this.searchResultsTemplate = searchResultsTemplate;
         this.memoryDetailTemplate = memoryDetailTemplate;
+        this.statItemTemplate = statItemTemplate;
+        this.topMemoryItemTemplate = topMemoryItemTemplate;
+        this.searchResultItemTemplate = searchResultItemTemplate;
+        this.evidenceItemTemplate = evidenceItemTemplate;
     }
 
     @Tool(description = "浏览用户记忆分类概览。返回各类记忆的数量和摘要。对话开始时或需要了解用户背景时调用。")
@@ -62,28 +80,28 @@ public class MemoryToolSet {
             return "当前用户暂无长期记忆记录。";
         }
 
-        // 渲染分类统计
-        StringBuilder statsSb = new StringBuilder();
-        for (MemoryTypeStat stat : stats) {
-            statsSb.append("- **").append(stat.memoryType().name())
-                    .append("**: ").append(stat.count()).append(" 条\n");
-        }
+        // 渲染分类统计条目
+        String statsText = stats.stream()
+                .map(stat -> renderItem(statItemTemplate, Map.of(
+                        "memoryType", stat.memoryType().name(),
+                        "count", String.valueOf(stat.count())
+                )))
+                .collect(Collectors.joining());
 
-        // 渲染最近活跃记忆
+        // 渲染最近活跃记忆条目
         List<MemoryRecordEntity> topMemories = memoryRecordRepository.findActiveByUserId(userId, 5);
-        StringBuilder topSb = new StringBuilder();
-        for (MemoryRecordEntity m : topMemories) {
-            topSb.append("- [").append(m.getMemoryType().name()).append("] ").append(m.getTitle());
-            if (m.getAbstractText() != null) {
-                topSb.append(" — ").append(m.getAbstractText());
-            }
-            topSb.append("\n");
-        }
+        String topText = topMemories.stream()
+                .map(m -> renderItem(topMemoryItemTemplate, Map.of(
+                        "memoryType", m.getMemoryType().name(),
+                        "title", m.getTitle() != null ? m.getTitle() : "未命名",
+                        "suffix", m.getAbstractText() != null ? " — " + m.getAbstractText() : ""
+                )))
+                .collect(Collectors.joining());
 
         try {
             return PromptBuilder.render(browseCategoriesTemplate, Map.of(
-                    "stats", statsSb.toString(),
-                    "topMemories", topSb.toString()
+                    "stats", statsText,
+                    "topMemories", topText
             ));
         } catch (IOException e) {
             log.error("[memory-tool] 渲染 browse_categories 模板失败", e);
@@ -109,19 +127,23 @@ public class MemoryToolSet {
             return "未找到与「" + query + "」相关的记忆。";
         }
 
-        // 渲染搜索结果列表
-        StringBuilder resultsSb = new StringBuilder();
-        for (MemoryRecordEntity m : results) {
-            memoryRecordRepository.incrementActiveCount(m.getUuid());
-            resultsSb.append("### [").append(m.getMemoryType().name()).append("] ").append(m.getTitle()).append("\n");
-            resultsSb.append("- **摘要**: ").append(m.getAbstractText() != null ? m.getAbstractText() : "无").append("\n");
-            resultsSb.append("- **ID**: ").append(m.getUuid()).append("\n\n");
-        }
+        // 渲染搜索结果条目
+        String resultsText = results.stream()
+                .map(m -> {
+                    memoryRecordRepository.incrementActiveCount(m.getUuid());
+                    return renderItem(searchResultItemTemplate, Map.of(
+                            "memoryType", m.getMemoryType().name(),
+                            "title", m.getTitle() != null ? m.getTitle() : "未命名",
+                            "abstractText", m.getAbstractText() != null ? m.getAbstractText() : "无",
+                            "uuid", m.getUuid().toString()
+                    ));
+                })
+                .collect(Collectors.joining("\n"));
 
         try {
             return PromptBuilder.render(searchResultsTemplate, Map.of(
                     "query", query,
-                    "results", resultsSb.toString()
+                    "results", resultsText
             ));
         } catch (IOException e) {
             log.error("[memory-tool] 渲染 search_results 模板失败", e);
@@ -147,18 +169,17 @@ public class MemoryToolSet {
         MemoryRecordEntity m = opt.get();
         memoryRecordRepository.incrementActiveCount(m.getUuid());
 
-        // 渲染来源证据列表
-        StringBuilder evidenceSb = new StringBuilder();
+        // 渲染来源证据条目
+        String evidenceText;
         if (!m.getEvidenceRefs().isEmpty()) {
-            for (var ev : m.getEvidenceRefs()) {
-                evidenceSb.append("- ").append(ev.sourceUri());
-                if (ev.snippetRange() != null) {
-                    evidenceSb.append(" (").append(ev.snippetRange()).append(")");
-                }
-                evidenceSb.append("\n");
-            }
+            evidenceText = m.getEvidenceRefs().stream()
+                    .map(ev -> renderItem(evidenceItemTemplate, Map.of(
+                            "sourceUri", ev.sourceUri(),
+                            "snippet", ev.snippetRange() != null ? " (" + ev.snippetRange() + ")" : ""
+                    )))
+                    .collect(Collectors.joining());
         } else {
-            evidenceSb.append("无来源证据\n");
+            evidenceText = "无来源证据\n";
         }
 
         try {
@@ -169,7 +190,7 @@ public class MemoryToolSet {
                     "confidenceScore", m.getConfidenceScore().toString(),
                     "activeCount", String.valueOf(m.getActiveCount()),
                     "content", m.getContent() != null && !m.getContent().isBlank() ? m.getContent() : "无详细内容",
-                    "evidenceList", evidenceSb.toString()
+                    "evidenceList", evidenceText
             ));
         } catch (IOException e) {
             log.error("[memory-tool] 渲染 memory_detail 模板失败", e);
@@ -185,6 +206,17 @@ public class MemoryToolSet {
     }
 
     /**
+     * 使用条目级模板渲染单个数据项，IOException 转为 UncheckedIOException。
+     */
+    private String renderItem(Resource template, Map<String, Object> variables) {
+        try {
+            return PromptBuilder.render(template, variables);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
      * 记忆工具集工厂 — 每次请求创建 MemoryToolSet 实例（持有 userId 上下文）。
      */
     @Component
@@ -192,6 +224,7 @@ public class MemoryToolSet {
 
         private final MemoryRecordRepository memoryRecordRepository;
 
+        // ── 外层模板 ──
         @Value("classpath:prompts/memory/browse_categories.md")
         private Resource browseCategoriesTemplate;
 
@@ -200,6 +233,19 @@ public class MemoryToolSet {
 
         @Value("classpath:prompts/memory/memory_detail.md")
         private Resource memoryDetailTemplate;
+
+        // ── 条目级模板 ──
+        @Value("classpath:prompts/memory/stat_item.md")
+        private Resource statItemTemplate;
+
+        @Value("classpath:prompts/memory/top_memory_item.md")
+        private Resource topMemoryItemTemplate;
+
+        @Value("classpath:prompts/memory/search_result_item.md")
+        private Resource searchResultItemTemplate;
+
+        @Value("classpath:prompts/memory/evidence_item.md")
+        private Resource evidenceItemTemplate;
 
         public MemoryToolSetFactory(MemoryRecordRepository memoryRecordRepository) {
             this.memoryRecordRepository = memoryRecordRepository;
@@ -210,7 +256,8 @@ public class MemoryToolSet {
          */
         public MemoryToolSet createForUser(long userId) {
             return new MemoryToolSet(userId, memoryRecordRepository,
-                    browseCategoriesTemplate, searchResultsTemplate, memoryDetailTemplate);
+                    browseCategoriesTemplate, searchResultsTemplate, memoryDetailTemplate,
+                    statItemTemplate, topMemoryItemTemplate, searchResultItemTemplate, evidenceItemTemplate);
         }
     }
 }

@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 基于数据库关键词匹配的子节点搜索策略 — Day 1 默认实现。
+ * 基于数据库关键词匹配的子节点搜索策略。
  *
  * <h3>工作方式</h3>
  * <ol>
@@ -25,13 +25,6 @@ import java.util.List;
  *   <li>精确匹配（name 完全包含查询） → 1.0</li>
  *   <li>关键词匹配（分词后至少一个命中） → 0.3 + 0.7 × (命中数 / 总词数)</li>
  *   <li>无匹配 → 0.0</li>
- * </ul>
- *
- * <h3>扩展路径</h3>
- * <ul>
- *   <li>Phase 1 (当前)：SQL LIKE 关键词匹配</li>
- *   <li>Phase 2：PostgreSQL ts_vector 全文搜索（换 searchByKeyword 实现即可）</li>
- *   <li>Phase 3：pgvector 向量搜索（替换此类为 VectorChildSearchStrategy）</li>
  * </ul>
  */
 @Slf4j
@@ -147,9 +140,6 @@ public class DbChildSearchStrategy implements ChildSearchStrategy {
 
     /**
      * 简单分词 — 按空白/标点切分。
-     *
-     * <p>Day 1 足够使用：中文场景下查询通常短且明确，
-     * 后续可替换为 Jieba / ICU 分词。
      */
     private String[] tokenize(String text) {
         if (text == null || text.isBlank()) {

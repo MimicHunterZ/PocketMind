@@ -1,6 +1,6 @@
 {
   "project": "PocketMind Context Architecture",
-  "lastUpdated": "2026-03-09T18:55",
+  "lastUpdated": "2026-03-12T01:50",
   "phases": [
     {
       "id": "phase-0",
@@ -96,17 +96,17 @@
     {
       "id": "phase-5",
       "name": "Retrieval 双通道正式化",
-      "status": "not-started",
+      "status": "completed",
       "tasks": [
-        { "id": "5.1", "done": false, "desc": "IntentAnalyzer (prompt: retrieval/intent_analysis.st)" },
-        { "id": "5.2", "done": false, "desc": "TypedQuery 模型 (query, contextType, intent, priority)" },
-        { "id": "5.3", "done": false, "desc": "ResourceRetriever (pgvector 语义搜索)" },
-        { "id": "5.4", "done": false, "desc": "MemoryRetriever (pgvector + hotness 加权)" },
-        { "id": "5.5", "done": false, "desc": "SkillResolver (请求级解析, 已有基础)" },
-        { "id": "5.6", "done": false, "desc": "RetrievalOrchestrator (并发分发 TypedQuery)" },
-        { "id": "5.7", "done": false, "desc": "ContextAssembler 改为消费召回结果" },
-        { "id": "5.8", "done": false, "desc": "Token budget + 重复来源去重 + fallback 规则" },
-        { "id": "5.9", "done": false, "desc": "单元测试: IntentAnalyzer, RetrievalOrchestratorTest" }
+        { "id": "5.1", "done": true, "desc": "RuleBasedIntentAnalyzer (规则引擎, 停用词+问候检测+关键词抽取)" },
+        { "id": "5.2", "done": true, "desc": "ContextSnippet + OrchestratedContext 数据模型 (替代 TypedQuery)" },
+        { "id": "5.3", "done": true, "desc": "HierarchicalRetriever 接入 RetrievalOrchestrator 资源通道 (pgvector deferred to Phase 8)" },
+        { "id": "5.4", "done": true, "desc": "KeywordMemoryRetriever (关键词搜索 + log1p hotness 评分)" },
+        { "id": "5.5", "done": true, "desc": "TenantSkillToolResolver 已有实现, 无需额外工作" },
+        { "id": "5.6", "done": true, "desc": "RetrievalOrchestrator (CompletableFuture 并行双通道 + token budget 60/40)" },
+        { "id": "5.7", "done": true, "desc": "ContextAssembler 改造: global 路径走 Orchestrator, note-scoped 保持直接加载" },
+        { "id": "5.8", "done": true, "desc": "Token budget 4000 默认, greedy truncation by score, 通道隔离容错" },
+        { "id": "5.9", "done": true, "desc": "单元测试: RuleBasedIntentAnalyzerTest(8), RetrievalOrchestratorTest(6), 已有测试全部适配" }
       ]
     },
     {

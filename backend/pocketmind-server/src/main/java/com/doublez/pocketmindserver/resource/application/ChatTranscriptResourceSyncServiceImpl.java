@@ -8,11 +8,18 @@ import com.doublez.pocketmindserver.resource.domain.ResourceRecordEntity;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordRepository;
 import com.doublez.pocketmindserver.resource.domain.ResourceSourceType;
 import com.doublez.pocketmindserver.shared.domain.PageQuery;
+import com.doublez.pocketmindserver.shared.util.PromptBuilder;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 默认聊天转录 Resource 同步服务实现。
@@ -25,6 +32,10 @@ public class ChatTranscriptResourceSyncServiceImpl implements ChatTranscriptReso
     private final ResourceRecordRepository resourceRecordRepository;
     private final ResourceContextService resourceContextService;
     private final ResourceCatalogSyncService catalogSyncService;
+
+    /** 对话转录消息条目模板 */
+    @Value("classpath:prompts/chat/transcript_message.md")
+    private Resource transcriptMessageTemplate;
 
     public ChatTranscriptResourceSyncServiceImpl(ChatMessageRepository chatMessageRepository,
                                                  ChatSessionRepository chatSessionRepository,
@@ -104,15 +115,17 @@ public class ChatTranscriptResourceSyncServiceImpl implements ChatTranscriptReso
     }
 
     private String renderTranscript(List<ChatMessageEntity> messages) {
-        StringBuilder builder = new StringBuilder();
-        for (ChatMessageEntity message : messages) {
-            if (message.getRole() == ChatRole.USER) {
-                builder.append("用户：");
-            } else {
-                builder.append("助手：");
-            }
-            builder.append(message.getContent()).append("\n\n");
-        }
-        return builder.toString().trim();
+        return messages.stream()
+                .map(message -> {
+                    try {
+                        return PromptBuilder.render(transcriptMessageTemplate, Map.of(
+                                "role", message.getRole() == ChatRole.USER ? "用户" : "助手",
+                                "content", message.getContent()
+                        ));
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                })
+                .collect(Collectors.joining("\n"));
     }
 }

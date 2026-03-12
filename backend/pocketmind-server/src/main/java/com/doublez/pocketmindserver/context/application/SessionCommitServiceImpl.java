@@ -35,6 +35,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.stream.Collectors;
 
 /**
  * 会话提交服务实现 — 将对话压缩为结构化摘要并持久化到上下文体系。
@@ -71,6 +74,10 @@ public class SessionCommitServiceImpl implements SessionCommitService {
 
     @Value("classpath:prompts/compression/structured_summary_user.md")
     private Resource summaryUserTemplate;
+
+    /** 对话转录消息条目模板 */
+    @Value("classpath:prompts/chat/transcript_message.md")
+    private Resource transcriptMessageTemplate;
 
     public SessionCommitServiceImpl(ChatSessionRepository chatSessionRepository,
                                     ChatMessageRepository chatMessageRepository,
@@ -291,16 +298,18 @@ public class SessionCommitServiceImpl implements SessionCommitService {
     }
 
     private String renderTranscript(List<ChatMessageEntity> messages) {
-        StringBuilder builder = new StringBuilder();
-        for (ChatMessageEntity message : messages) {
-            if (message.getRole() == ChatRole.USER) {
-                builder.append("用户：");
-            } else {
-                builder.append("助手：");
-            }
-            builder.append(message.getContent()).append("\n\n");
-        }
-        return builder.toString().trim();
+        return messages.stream()
+                .map(message -> {
+                    try {
+                        return PromptBuilder.render(transcriptMessageTemplate, Map.of(
+                                "role", message.getRole() == ChatRole.USER ? "用户" : "助手",
+                                "content", message.getContent()
+                        ));
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                })
+                .collect(Collectors.joining("\n"));
     }
 
     private String truncate(String value, int maxChars) {

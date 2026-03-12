@@ -20,10 +20,12 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 记忆抽取器实现 — 使用 LLM 从对话摘要中提取用户长期记忆。
@@ -51,6 +53,10 @@ public class MemoryExtractorServiceImpl implements MemoryExtractorService {
 
     @Value("classpath:prompts/compression/memory_extraction_user.md")
     private Resource extractionUserTemplate;
+
+    /** 已有记忆条目渲染模板（供 LLM 去重参考） */
+    @Value("classpath:prompts/memory/existing_memory_item.md")
+    private Resource existingMemoryItemTemplate;
 
     public MemoryExtractorServiceImpl(MemoryRecordRepository memoryRecordRepository,
                                       ResourceRecordRepository resourceRecordRepository,
@@ -161,14 +167,19 @@ public class MemoryExtractorServiceImpl implements MemoryExtractorService {
         if (memories.isEmpty()) {
             return "（暂无已有记忆）";
         }
-        StringBuilder sb = new StringBuilder();
-        for (MemoryRecordEntity m : memories) {
-            sb.append("- [").append(m.getMemoryType().name()).append("] ")
-                    .append(m.getTitle())
-                    .append(" (mergeKey=").append(m.getMergeKey()).append(")")
-                    .append("\n");
-        }
-        return sb.toString();
+        return memories.stream()
+                .map(m -> {
+                    try {
+                        return PromptBuilder.render(existingMemoryItemTemplate, Map.of(
+                                "memoryType", m.getMemoryType().name(),
+                                "title", m.getTitle() != null ? m.getTitle() : "未命名",
+                                "mergeKey", m.getMergeKey() != null ? m.getMergeKey() : ""
+                        ));
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                })
+                .collect(Collectors.joining());
     }
 
     private MemoryExtractionResult callLlmExtraction(String sessionTitle, String summary, String existingMemories) {

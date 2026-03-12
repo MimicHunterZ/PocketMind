@@ -27,7 +27,12 @@ class MemoryToolSetTest {
         Resource browseTpl = new ClassPathResource("prompts/memory/browse_categories.md");
         Resource searchTpl = new ClassPathResource("prompts/memory/search_results.md");
         Resource detailTpl = new ClassPathResource("prompts/memory/memory_detail.md");
-        toolSet = new MemoryToolSet(1L, repository, browseTpl, searchTpl, detailTpl);
+        Resource statItemTpl = new ClassPathResource("prompts/memory/stat_item.md");
+        Resource topMemoryItemTpl = new ClassPathResource("prompts/memory/top_memory_item.md");
+        Resource searchResultItemTpl = new ClassPathResource("prompts/memory/search_result_item.md");
+        Resource evidenceItemTpl = new ClassPathResource("prompts/memory/evidence_item.md");
+        toolSet = new MemoryToolSet(1L, repository, browseTpl, searchTpl, detailTpl,
+                statItemTpl, topMemoryItemTpl, searchResultItemTpl, evidenceItemTpl);
     }
 
     // ─── browseMemoryCategories ──────────────────────────────

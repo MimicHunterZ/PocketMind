@@ -8,7 +8,7 @@ package com.doublez.pocketmindserver.ai.application.retrieval;
  *
  * <p>接口保持稳定，实现可自由切换：
  * <ul>
- *   <li>{@link DefaultHierarchicalRetriever} — DB + SQL 关键词（Day 1 默认）</li>
+ *   <li>{@link DefaultHierarchicalRetriever} — DB + SQL 关键词匹配</li>
  *   <li>未来：DB + pgvector 语义搜索</li>
  *   <li>未来：AGFS 文件系统 + 向量索引</li>
  * </ul>

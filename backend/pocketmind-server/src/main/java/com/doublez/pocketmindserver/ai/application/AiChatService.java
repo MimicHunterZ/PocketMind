@@ -26,8 +26,8 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * AI 对话服务层?
- * 负责：组装上下文（历史消?+ 笔记摘要 + 图片描述）→ 流式调用 AI 持久化消息
+ * AI 对话服务层
+ * 负责：组装上下文（历史消息+ 笔记摘要 + 图片描述）→ 流式调用 AI 持久化消息
  */
 @Slf4j
 @Service
@@ -57,7 +57,7 @@ public class AiChatService {
     
 
     /**
-     * 创建会话（全屢对话或关联某篇笔记）?
+     * 创建会话（全屢对话或关联某篇笔记
      */
     public ChatSessionEntity createSession(long userId, UUID noteUuid, String title) {
         UUID sessionUuid = UUID.randomUUID();
@@ -71,7 +71,7 @@ public class AiChatService {
     }
 
     /**
-     * 列出当前用户的会话列表，可按笔记过滤?
+     * 列出当前用户的会话列表，可按笔记过滤
      */
     public List<ChatSessionEntity> listSessions(long userId, UUID noteUuid, PageQuery pageQuery) {
         return noteUuid != null
@@ -80,24 +80,24 @@ public class AiChatService {
     }
 
     /**
-     * 查询单个会话详情?
+     * 查询单个会话详情
      */
     public ChatSessionEntity getSession(long userId, UUID sessionUuid) {
         return validateAndGetSession(sessionUuid, userId);
     }
 
     /**
-     * 重命名会话标题?
+     * 重命名会话标题
      */
     public void renameSession(long userId, UUID sessionUuid, String title) {
         ChatSessionEntity session = validateAndGetSession(sessionUuid, userId);
         session.updateTitle(title != null ? title : "");
         chatSessionRepository.update(session);
-        log.info("重命名会? userId={}, sessionUuid={}, title={}", userId, sessionUuid, title);
+        log.info("重命名会 userId={}, sessionUuid={}, title={}", userId, sessionUuid, title);
     }
 
     /**
-     * 软删除会话?
+     * 软删除会话
      */
     public void deleteSession(long userId, UUID sessionUuid) {
         validateAndGetSession(sessionUuid, userId);
@@ -107,8 +107,8 @@ public class AiChatService {
     }
 
     /**
-     * 列出会话下的消息列表?
-     * 若传?leafUuid，则返回从叶节点到链头的完整分支消息链（用于分支模式）?
+     * 列出会话下的消息列表
+     * 若传leafUuid，则返回从叶节点到链头的完整分支消息链（用于分支模式）
      */
     public List<ChatMessageEntity> listMessages(long userId, UUID sessionUuid, UUID leafUuid) {
         validateAndGetSession(sessionUuid, userId);
@@ -123,9 +123,9 @@ public class AiChatService {
     
 
     /**
-     * 接收用户消息，流式返?AI 回答?
-     * @param parentUuid 可非 null 时从该节点创建新分支（链式消息历史从此节点溯源）?
-     *                   null 时线性追加到当前会话末尾?
+     * 接收用户消息，流式返回AI 回答
+     * @param parentUuid 可非 null 时从该节点创建新分支（链式消息历史从此节点溯源）
+     *                   null 时线性追加到当前会话末尾
      */
     public Flux<ServerSentEvent<String>> streamReply(long userId,
                                                       UUID sessionUuid,
@@ -140,19 +140,19 @@ public class AiChatService {
         final List<ChatMessageEntity> history;
         final UUID effectiveParentUuid;
         if (parentUuid != null) {
-            // 分支模式：从指定节点向上递归获取完整历史?
+            // 分支模式：从指定节点向上递归获取完整历史
             history = chatMessageRepository.findChain(parentUuid, userId);
             effectiveParentUuid = parentUuid;
         } else {
-            // 线模式：取会话全部消息（朢?200 条）
+            // 线模式：取会话全部消息
             history = chatMessageRepository.findBySessionUuid(userId, sessionUuid, new PageQuery(200, 0));
             effectiveParentUuid = history.isEmpty() ? null : history.get(history.size() - 1).getUuid();
         }
 
-        // 3. 构建 system prompt（含笔记上下?+ 图片识别内容?
+        // 3. 构建 system prompt（含笔记上下+ 图片识别内容）
         String systemText = contextAssembler.buildSystemPrompt(userId, session, userPrompt);
 
-        // 4. 持久化用户消息（同步落库?
+        // 4. 持久化用户消息（同步落库
         UUID userMsgUuid = UUID.randomUUID();
         ChatMessageEntity userMsg = ChatMessageEntity.create(
                 userMsgUuid, userId, sessionUuid, effectiveParentUuid,
@@ -160,7 +160,7 @@ public class AiChatService {
         chatMessageRepository.save(userMsg);
         chatTranscriptResourceSyncService.syncSessionTranscript(userId, sessionUuid);
 
-        // 5. 棢测分叉：?parentUuid 非空，则本次是显式分岔操?
+        // 5. parentUuid 非空，则本次是显式分叉操作
         final boolean isFork = (parentUuid != null);
 
         // 6. 构建 Spring AI 历史消息列表
@@ -172,7 +172,7 @@ public class AiChatService {
     }
 
     /**
-     * streamReply 的无 parentUuid 重载（保持向后兼容）?
+     * streamReply 的无 parentUuid 重载
      */
     public Flux<ServerSentEvent<String>> streamReply(long userId,
                                                       UUID sessionUuid,
@@ -181,18 +181,9 @@ public class AiChatService {
         return streamReply(userId, sessionUuid, userPrompt, attachmentUuids, null, UUID.randomUUID().toString());
     }
 
-    
-    // 缂栬緫銆佸垹闄ゃ€侀噸鏂扮敓鎴?
-    
-
-    /**
-     * 编辑 USER 消息并删除紧随其后的 ASSISTANT 消息?
-     * 浣跨敤涓ゆ SQL 瀹屾垚锛歶pdateContent锛堝惈闅愬紡 USER 瑙掕壊鏍￠獙锛夈€乻oftDeleteAssistantChildren銆?
-     * 调用方（Controller）收到请求后，应随即触发丢?streamReply 以重新生?AI 回复?
-     */
     @Transactional(rollbackFor = Exception.class)
     public void editUserMessage(long userId, UUID messageUuid, String newContent) {
-        // 校验：仅允许编辑当前分支末尾?USER 消息，防止孤立下游对话链
+        // 校验：仅允许编辑当前分支末尾的USER 消息，防止孤立下游对话链
         List<ChatMessageEntity> assistantChildren =
                 chatMessageRepository.findChildrenByParentUuid(messageUuid, userId);
         for (ChatMessageEntity assistant : assistantChildren) {
@@ -203,9 +194,7 @@ public class AiChatService {
                         "仅允许编辑当前分支末尾的用户消息，请先切换到目标分支");
             }
         }
-        // updateContent 鐨?WHERE role = 'USER' 璧峰埌闅愬紡瑙掕壊鏍￠獙浣滅敤
         chatMessageRepository.updateContent(messageUuid, userId, newContent);
-        // 单次 SQL 清理?USER 消息的所?ASSISTANT 子消?
         chatMessageRepository.softDeleteAssistantChildren(messageUuid, userId);
         ChatMessageEntity edited = chatMessageRepository.findByUuidAndUserId(messageUuid, userId).orElse(null);
         if (edited != null) {
@@ -215,12 +204,12 @@ public class AiChatService {
     }
 
     /**
-     * 重新生成 AI 回复（SSE 流式）统丢入口，按消息角色分派?
+     * 重新生成 AI 回复（SSE 流式）统丢入口，按消息角色分派
      * <ul>
-     *   <li>传入 USER UUID（editAndResend 场景）：ASSISTANT 已由 editUserMessage 清除?
-     *       直接复用?USER 消息流式生成?ASSISTANT 回复?/li>
-     *   <li>传入 ASSISTANT UUID（标准重新生成）：先软删除目?ASSISTANT?
-     *       再以其父 USER 消息重新调用 AI?/li>
+     *   <li>传入 USER UUID（editAndResend 场景）：ASSISTANT 已由 editUserMessage 清除
+     *       直接复用USER 消息流式生成ASSISTANT 回复/li>
+     *   <li>传入 ASSISTANT UUID（标准重新生成）：先软删除目录 ASSISTANT
+     *       再以其父 USER 消息重新调用 AI/li>
      * </ul>
      */
     public Flux<ServerSentEvent<String>> regenerateReply(long userId,
@@ -235,15 +224,15 @@ public class AiChatService {
 
         final ChatMessageEntity userMsg;
         if (msg.getRole() == ChatRole.USER) {
-            // editAndResend 场景：ASSISTANT 已由 editUserMessage 软删除，直接复用?USER 消息
+            // editAndResend 场景：ASSISTANT 已由 editUserMessage 软删除，直接复用USER 消息
             userMsg = msg;
             log.info("editAndResend 继续生成: userId={}, sessionUuid={}, userMsgUuid={}", userId, sessionUuid, messageUuid);
         } else if (msg.getRole() == ChatRole.ASSISTANT) {
-            // 标准重新生成：软删除?ASSISTANT，找到父 USER
+            // 标准重新生成：软删除ASSISTANT，找到父 USER
             UUID userMsgUuid = msg.getParentUuid();
             if (userMsgUuid == null) {
                 throw new BusinessException(ApiCode.REQ_VALIDATION, HttpStatus.BAD_REQUEST,
-                        "ASSISTANT 消息没有关联?USER 消息");
+                        "ASSISTANT 消息没有关联的USER 消息");
             }
             chatMessageRepository.softDeleteByUuids(List.of(messageUuid), userId);
                 chatTranscriptResourceSyncService.syncSessionTranscript(userId, sessionUuid);
@@ -253,7 +242,7 @@ public class AiChatService {
             log.info("閲嶆柊鐢熸垚 AI 鍥炲: userId={}, sessionUuid={}, userMsgUuid={}", userId, sessionUuid, userMsgUuid);
         } else {
             throw new BusinessException(ApiCode.REQ_VALIDATION, HttpStatus.BAD_REQUEST,
-                    "仅支持对 USER ?ASSISTANT 消息操作");
+                    "仅支持对 USER ASSISTANT 消息操作");
         }
 
         // 重建历史：从用户消息的父节点向上溯源，不含刚删的 ASSISTANT
@@ -268,9 +257,7 @@ public class AiChatService {
             userMsg.getContent(), systemText, historyMessages, false, requestId);
     }
 
-    /**
-     * 鍋滄鎸囧畾 requestId 鐨勬祦寮忓洖澶嶃€?
-     */
+
     public void stopReply(long userId, UUID sessionUuid, String requestId) {
         validateAndGetSession(sessionUuid, userId);
         sseReplyService.stopReply(userId, sessionUuid, requestId);
@@ -281,8 +268,8 @@ public class AiChatService {
     
 
     /**
-     * 对消息评分（点赞/点踩/取消）?
-     * @param rating 1=点赞?=取消?1=点踩
+     * 对消息评分（点赞/点踩/取消）
+     * @param rating 1=点赞 0=取消 1=点踩
      */
     public void rateMessage(long userId, UUID messageUuid, int rating) {
         chatMessageRepository.findByUuidAndUserId(messageUuid, userId)
@@ -293,8 +280,7 @@ public class AiChatService {
     }
 
     /**
-     * 更新分支别名（用户手动编辑）?
-     * 闀垮害闄愬埗鐢辫皟鐢ㄦ柟锛圕ontroller @Valid锛夋牎楠屻€?
+     * 更新分支别名（用户手动编辑）
      */
     public void updateBranchAlias(long userId, UUID messageUuid, String alias) {
         chatMessageRepository.findByUuidAndUserId(messageUuid, userId)
@@ -309,10 +295,10 @@ public class AiChatService {
     
 
     /**
-     * 获取当前会话的全部分支摘要?
-     * 策略：找到所?有多个子节点的父节点"（分叉点），对每个分叉点的子节点
-     * 分别沿链追溯到最新的叶节点，提取朢后一?USER+ASSISTANT 内容?
-     * 前端通过 leafUuid 参数请求完整链消息?
+     * 获取当前会话的全部分支摘要
+     * 策略：找到所有有多个子节点的父节点"（分叉点），对每个分叉点的子节点
+     * 分别沿链追溯到最新的叶节点，提取后一 USER+ASSISTANT 内容
+     * 前端通过 leafUuid 参数请求完整链消息
      */
     public List<ChatBranchSummaryResponse> getBranches(long userId, UUID sessionUuid) {
         // 加载会话全量消息（用于分析分叉结构）
@@ -325,7 +311,6 @@ public class AiChatService {
         // 若只有一个叶节点，则没有分支
         if (leaves.size() <= 1) return List.of();
 
-        // 涓烘瘡涓彾鑺傜偣鐢熸垚鎽樿
         return leaves.stream()
                 .map(leaf -> buildBranchSummary(leaf, allMessages))
                 .filter(Objects::nonNull)
@@ -338,22 +323,20 @@ public class AiChatService {
     
 
     /**
-     * 为单个叶节点构建分支摘要?
+     * 为单个叶节点构建分支摘要
      */
     private ChatBranchSummaryResponse buildBranchSummary(ChatMessageEntity leaf,
                                                           List<ChatMessageEntity> allMessages) {
-        // 娌?parentUuid 閾惧悜涓婃壘鏈€杩戜竴杞?USER+ASSISTANT
         String lastUserContent = null;
         String lastAssistantContent = null;
         UUID cursor = leaf.getUuid();
 
-        // 鏋勫缓蹇€熸煡鎵?map
         java.util.Map<UUID, ChatMessageEntity> msgMap = new java.util.HashMap<>();
         for (ChatMessageEntity m : allMessages) {
             msgMap.put(m.getUuid(), m);
         }
 
-        // 向上遍历链，找最近的 ASSISTANT ?USER
+        // 向上遍历链，找最近的 ASSISTANT USER
         while (cursor != null) {
             ChatMessageEntity current = msgMap.get(cursor);
             if (current == null) break;
@@ -382,10 +365,10 @@ public class AiChatService {
     }
 
     /**
-     * 获取会话主链消息?
+     * 获取会话主链消息
      *
-     * 规则：当未指?leafUuid 时，取最后创建的叶子节点”作为当前主链叶子，
-     * 并返回该叶子的完整链路，避免把多分支全量混在丢起返回给前端?
+     * 规则：当未指定 leafUuid 时，取最后创建的叶子节点”作为当前主链叶子，
+     * 并返回该叶子的完整链路，避免把多分支全量混在丢起返回给前端
      */
     private List<ChatMessageEntity> listMainlineMessages(long userId, UUID sessionUuid) {
         List<ChatMessageEntity> allMessages = chatMessageRepository.findBySessionUuid(
@@ -406,9 +389,6 @@ public class AiChatService {
         return chatMessageRepository.findChain(latestLeaf.getUuid(), userId);
     }
 
-    /**
-     * 浠庡叏閲忔秷鎭腑鎵惧嚭鎵€鏈夊彾瀛愯妭鐐癸紙鏃犲瓙鑺傜偣锛夈€?
-     */
     private List<ChatMessageEntity> findLeafMessages(List<ChatMessageEntity> allMessages) {
         java.util.Set<UUID> parentUuids = allMessages.stream()
                 .map(ChatMessageEntity::getParentUuid)
@@ -421,7 +401,7 @@ public class AiChatService {
     }
 
     /**
-     * 校验会话归属权，不过则抛?404 异常?
+     * 校验会话归属权，不过则抛404 异常
      */
     private ChatSessionEntity validateAndGetSession(UUID sessionUuid, long userId) {
         return chatSessionRepository.findByUuidAndUserId(sessionUuid, userId)
@@ -434,8 +414,8 @@ public class AiChatService {
     
 
     /**
-     * 将领域消息列表转换为 Spring AI Message 对象列表?
-     * 仅转?TEXT 类型?USER/ASSISTANT 消息，跳过工具调用消息?
+     * 将领域消息列表转换为 Spring AI Message 对象列表
+     * 仅转TEXT 类型 USER/ASSISTANT 消息，跳过工具调用消息
      */
     private List<Message> toSpringAiMessages(List<ChatMessageEntity> entities) {
         return entities.stream()

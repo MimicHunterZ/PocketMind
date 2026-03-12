@@ -88,6 +88,8 @@ class SessionCommitServiceTest {
                 new ClassPathResource("prompts/compression/structured_summary_system.md"));
         ReflectionTestUtils.setField(service, "summaryUserTemplate",
                 new ClassPathResource("prompts/compression/structured_summary_user.md"));
+        ReflectionTestUtils.setField(service, "transcriptMessageTemplate",
+                new ClassPathResource("prompts/chat/transcript_message.md"));
     }
 
     @Test

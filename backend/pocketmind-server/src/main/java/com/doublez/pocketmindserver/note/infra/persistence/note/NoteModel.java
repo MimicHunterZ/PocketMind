@@ -39,8 +39,6 @@ public class NoteModel {
 
     private String summary;
 
-    private String memoryPath;
-
     @TableField(fill = FieldFill.INSERT)
     private Instant createdAt;
 

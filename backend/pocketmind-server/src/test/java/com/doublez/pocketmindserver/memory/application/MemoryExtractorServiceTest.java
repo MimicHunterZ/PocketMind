@@ -58,8 +58,11 @@ class MemoryExtractorServiceTest {
                 "你是记忆抽取专家。输出格式：<format>".getBytes());
         Resource userTemplate = new ByteArrayResource(
                 "会话标题：<sessionTitle>\n摘要：<summary>\n已有记忆：<existingMemories>\n<format>".getBytes());
+        Resource existingMemoryItemTemplate = new ByteArrayResource(
+                "- [<memoryType>] <title> (mergeKey=<mergeKey>)\n".getBytes());
         ReflectionTestUtils.setField(service, "extractionSystemTemplate", systemTemplate);
         ReflectionTestUtils.setField(service, "extractionUserTemplate", userTemplate);
+        ReflectionTestUtils.setField(service, "existingMemoryItemTemplate", existingMemoryItemTemplate);
     }
 
     @Test

@@ -12,6 +12,8 @@ import com.doublez.pocketmindserver.resource.application.NoOpResourceCatalogSync
 import com.doublez.pocketmindserver.shared.domain.PageQuery;
 import com.doublez.pocketmindserver.shared.domain.SyncCursorQuery;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -30,13 +32,19 @@ class ChatTranscriptResourceSyncServiceTest {
     private final InMemoryChatMessageRepository chatMessageRepository = new InMemoryChatMessageRepository();
     private final InMemoryChatSessionRepository chatSessionRepository = new InMemoryChatSessionRepository();
     private final InMemoryResourceRecordRepository resourceRecordRepository = new InMemoryResourceRecordRepository();
-    private final ChatTranscriptResourceSyncService service = new ChatTranscriptResourceSyncServiceImpl(
-            chatMessageRepository,
-            chatSessionRepository,
-            resourceRecordRepository,
-            new ResourceContextServiceImpl(),
-            new NoOpResourceCatalogSyncService()
-    );
+    private final ChatTranscriptResourceSyncServiceImpl service;
+
+    ChatTranscriptResourceSyncServiceTest() {
+        service = new ChatTranscriptResourceSyncServiceImpl(
+                chatMessageRepository,
+                chatSessionRepository,
+                resourceRecordRepository,
+                new ResourceContextServiceImpl(),
+                new NoOpResourceCatalogSyncService()
+        );
+        ReflectionTestUtils.setField(service, "transcriptMessageTemplate",
+                new ByteArrayResource("<role>：<content>\n".getBytes()));
+    }
 
     @Test
     void shouldCreateTranscriptResourceFromMessages() {

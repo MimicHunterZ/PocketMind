@@ -77,6 +77,13 @@ class AiChatServicePauseTest {
         chatStreamCancellationManager = new ChatStreamCancellationManager();
         objectMapper = new ObjectMapper();
         chatSseEventFactory = new ChatSseEventFactory(objectMapper);
+        var intentAnalyzer = mock(com.doublez.pocketmindserver.ai.application.retrieval.IntentAnalyzer.class);
+        var retrievalOrchestrator = mock(com.doublez.pocketmindserver.ai.application.retrieval.RetrievalOrchestrator.class);
+        // 全局对话路径需要 IntentAnalyzer 和 RetrievalOrchestrator 返回有效值
+        when(intentAnalyzer.analyze(anyString())).thenReturn(
+                com.doublez.pocketmindserver.ai.application.retrieval.AnalyzedIntent.passthrough("test"));
+        when(retrievalOrchestrator.retrieve(anyLong(), anyString())).thenReturn(
+                com.doublez.pocketmindserver.ai.application.retrieval.OrchestratedContext.empty());
         contextAssembler = new ContextAssembler(
                 noteRepository,
                 attachmentVisionRepository,
@@ -91,7 +98,9 @@ class AiChatServicePauseTest {
                     public ContextUri userMemoryByType(long userId, MemoryType memoryType) {
                         return ContextUri.userMemoriesRoot(userId).child(memoryType.name().toLowerCase());
                     }
-                }, new InMemoryMemoryRecordRepository())
+                }, new InMemoryMemoryRecordRepository()),
+                retrievalOrchestrator,
+                intentAnalyzer
         );
         sseReplyService = new SseReplyService(
                 aiFailoverRouter,
@@ -160,6 +169,16 @@ class AiChatServicePauseTest {
             contextAssembler,
             "memorySectionTemplate",
             new ByteArrayResource("<memoryContext>".getBytes(StandardCharsets.UTF_8))
+        );
+        ReflectionTestUtils.setField(
+            contextAssembler,
+            "resourceSnippetsSectionTemplate",
+            new ByteArrayResource("## 相关资料\n\n<snippets>".getBytes(StandardCharsets.UTF_8))
+        );
+        ReflectionTestUtils.setField(
+            contextAssembler,
+            "resourceSnippetItemTemplate",
+            new ByteArrayResource("### <title>\n<abstractText>".getBytes(StandardCharsets.UTF_8))
         );
         ReflectionTestUtils.setField(
             sseReplyService,

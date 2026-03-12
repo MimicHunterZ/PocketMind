@@ -4,15 +4,22 @@ import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
 import com.doublez.pocketmindserver.memory.application.MemoryContextService;
 import com.doublez.pocketmindserver.memory.domain.MemoryRecordEntity;
 import com.doublez.pocketmindserver.memory.domain.MemoryRecordRepository;
+import com.doublez.pocketmindserver.shared.util.PromptBuilder;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 长期记忆查询实现 — 从 memory_records 检索与当前对话相关的记忆，组装为上下文文本。
  *
- * <p>Phase 4 实现：关键词匹配 + 热度排序。Phase 5 升级为 pgvector 语义检索。
+ * <p>基于关键词匹配 + 热度排序检索相关记忆。
  */
 @Slf4j
 @Service
@@ -22,6 +29,14 @@ public class MemoryQueryServiceImpl implements MemoryQueryService {
 
     private final MemoryContextService memoryContextService;
     private final MemoryRecordRepository memoryRecordRepository;
+
+    /** 记忆上下文外层模板（包裹所有记忆条目） */
+    @Value("classpath:prompts/memory/memory_context.md")
+    private Resource memoryContextTemplate;
+
+    /** 单条记忆条目渲染模板 */
+    @Value("classpath:prompts/memory/memory_context_item.md")
+    private Resource memoryContextItemTemplate;
 
     public MemoryQueryServiceImpl(MemoryContextService memoryContextService,
                                   MemoryRecordRepository memoryRecordRepository) {
@@ -36,7 +51,6 @@ public class MemoryQueryServiceImpl implements MemoryQueryService {
                 session.getUuid(),
                 memoryContextService.userMemoryRoot(userId));
 
-        // 使用用户提问作为关键词检索记忆
         List<MemoryRecordEntity> memories = memoryRecordRepository
                 .searchByKeyword(userId, userPrompt, null, MAX_MEMORY_RESULTS);
 
@@ -45,26 +59,28 @@ public class MemoryQueryServiceImpl implements MemoryQueryService {
             return "";
         }
 
-        // 递增热度并组装文本
-        StringBuilder sb = new StringBuilder();
-        for (MemoryRecordEntity m : memories) {
-            memoryRecordRepository.incrementActiveCount(m.getUuid());
-
-            sb.append("### [").append(m.getMemoryType().name()).append("] ").append(m.getTitle()).append("\n");
-            if (m.getAbstractText() != null) {
-                sb.append(m.getAbstractText()).append("\n");
-            }
-            if (m.getContent() != null) {
-                // 截取前 500 字符避免 token 溢出
-                String content = m.getContent().length() > 500
-                        ? m.getContent().substring(0, 500) + "..."
-                        : m.getContent();
-                sb.append(content).append("\n");
-            }
-            sb.append("\n");
-        }
+        // 逐条递增热度并渲染为模板文本，不截断 content
+        String items = memories.stream()
+                .map(m -> {
+                    memoryRecordRepository.incrementActiveCount(m.getUuid());
+                    try {
+                        return PromptBuilder.render(memoryContextItemTemplate, Map.of(
+                                "memoryType", m.getMemoryType().name(),
+                                "title", m.getTitle() != null ? m.getTitle() : "未命名",
+                                "abstractText", m.getAbstractText() != null ? m.getAbstractText() : "",
+                                "content", m.getContent() != null ? m.getContent() : ""
+                        ));
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                })
+                .collect(Collectors.joining("\n"));
 
         log.info("[memory] 检索到 {} 条相关记忆: userId={}", memories.size(), userId);
-        return sb.toString().trim();
+        try {
+            return PromptBuilder.render(memoryContextTemplate, Map.of("memories", items));
+        } catch (IOException e) {
+            throw new UncheckedIOException("加载记忆上下文模板失败", e);
+        }
     }
 }
