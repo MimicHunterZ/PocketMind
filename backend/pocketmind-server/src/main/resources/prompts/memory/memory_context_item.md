@@ -1,4 +1,0 @@
-### [<memoryType>] <title>
-<abstractText>
-<content>
-

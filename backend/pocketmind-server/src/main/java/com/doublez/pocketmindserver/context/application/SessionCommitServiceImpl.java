@@ -169,7 +169,7 @@ public class SessionCommitServiceImpl implements SessionCommitService {
                 summaryResult.abstractText()
         );
 
-        // 9. 异步触发记忆抽取（虚拟线程，不阻塞事务）
+        // 9. 异步触发记忆抽取
         final SessionCommitResult commitResult = result;
         Thread.ofVirtual().name("memory-extract-" + sessionUuid)
                 .start(() -> {

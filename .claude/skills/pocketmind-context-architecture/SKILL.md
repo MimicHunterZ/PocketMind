@@ -1,4 +1,4 @@
----
+﻿---
 name: pocketmind-context-architecture
 description: 设计、重构和实现 PocketMind 项目中的整体上下文架构（Context Architecture），用于统一规划和落地 resources、user memories、agent memories、tenant skills、session、retrieval、ingestion、storage 与现有 Note/Chat/Asset 的边界。当用户要求为 PocketMind 新增长期记忆、重构 AI 上下文体系、借鉴 OpenViking 的上下文类型/层级/URI/存储/检索/会话思想，或需要分阶段实施 Context Service 时使用。
 ---

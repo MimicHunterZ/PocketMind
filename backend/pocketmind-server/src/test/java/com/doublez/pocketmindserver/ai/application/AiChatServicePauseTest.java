@@ -1,6 +1,7 @@
 package com.doublez.pocketmindserver.ai.application;
 
 import com.doublez.pocketmindserver.ai.application.context.ContextAssembler;
+import com.doublez.pocketmindserver.ai.application.embedding.EmbeddingService;
 import com.doublez.pocketmindserver.ai.application.memory.MemoryInjector;
 import com.doublez.pocketmindserver.ai.application.memory.MemoryQueryServiceImpl;
 import com.doublez.pocketmindserver.ai.application.stream.ChatSseEventFactory;
@@ -89,7 +90,7 @@ class AiChatServicePauseTest {
                 noteRepository,
                 attachmentVisionRepository,
                 resourceRecordRepository,
-                new MemoryQueryServiceImpl(new MemoryContextService() {
+                new MemoryQueryServiceImpl(mock(EmbeddingService.class), new MemoryContextService() {
                     @Override
                     public ContextUri userMemoryRoot(long userId) {
                         return ContextUri.userMemoriesRoot(userId);

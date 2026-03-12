@@ -3,4 +3,8 @@
 以下是该用户的长期记忆摘要。回答问题时可参考这些记忆来个性化回复。
 如需了解更多细节，可通过 Memory 工具获取完整内容。
 
-<memoryContext>
+### 当前命中记忆（<hitCount>）
+<hitItems>
+
+### 全量记忆概览（<allCount>）
+<allItems>

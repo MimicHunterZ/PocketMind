@@ -149,7 +149,7 @@ public class AiChatService {
             effectiveParentUuid = history.isEmpty() ? null : history.get(history.size() - 1).getUuid();
         }
 
-        // 3. 构建 system prompt（含笔记上下+ 图片识别内容）
+        // 3. 构建 system prompt
         String systemText = contextAssembler.buildSystemPrompt(userId, session, userPrompt);
 
         // 4. 持久化用户消息（同步落库

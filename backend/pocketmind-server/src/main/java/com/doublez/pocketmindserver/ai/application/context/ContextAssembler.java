@@ -10,6 +10,7 @@ import com.doublez.pocketmindserver.ai.application.retrieval.RetrievalOrchestrat
 import com.doublez.pocketmindserver.attachment.domain.vision.AttachmentVisionEntity;
 import com.doublez.pocketmindserver.attachment.domain.vision.AttachmentVisionRepository;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
+import com.doublez.pocketmindserver.memory.domain.MemoryRecordEntity;
 import com.doublez.pocketmindserver.note.domain.note.NoteEntity;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordEntity;
@@ -133,23 +134,23 @@ public class ContextAssembler {
 
         // 双通道并行检索
         OrchestratedContext ctx = retrievalOrchestrator.retrieve(userId, intent.queryText());
-        String allMemorySection = memoryInjector.buildAllMemorySection(userId);
+        List<MemoryRecordEntity> allMemories = memoryInjector.queryAllMemories(userId);
+        String memorySection = renderMemorySection(ctx.memorySnippets(), allMemories);
         if (ctx.isEmpty()) {
-            if (!hasText(allMemorySection)) {
+            if (!hasText(memorySection)) {
                 return systemText;
             }
             return PromptBuilder.render(
                     systemWithExtraSectionTemplate,
-                    Map.of("systemText", systemText, "extraSection", allMemorySection)
+                    Map.of("systemText", systemText, "extraSection", memorySection)
             );
         }
 
         // 分别渲染 Memory 和 Resource 片段为文本段落
-        String memorySection = renderMemorySectionFromSnippets(ctx.memorySnippets());
         String resourceSection = renderResourceSnippetsSection(ctx.resourceSnippets());
 
         // 合并为 extraSection 注入系统提示
-        String extraSection = joinSections(allMemorySection, memorySection, resourceSection);
+        String extraSection = joinSections(memorySection, resourceSection);
         if (!hasText(extraSection)) {
             return systemText;
         }
@@ -163,14 +164,13 @@ public class ContextAssembler {
      * 笔记对话：直接加载绑定 Note 的 Resource + OCR，搭配 MemoryQueryService 查记忆。
      */
     private String buildNoteScopedPrompt(long userId, ChatSessionEntity session, String userPrompt) throws IOException {
-        String memoryContext = memoryQueryService.buildMemoryContext(userId, session, userPrompt);
-        String memorySection = renderMemorySection(memoryContext);
-        String allMemorySection = memoryInjector.buildAllMemorySection(userId);
-        String mergedMemorySection = joinSections(memorySection, allMemorySection);
+        List<MemoryRecordEntity> relevantMemories = memoryQueryService.queryRelevantMemories(userId, session, userPrompt);
+        List<MemoryRecordEntity> allMemories = memoryInjector.queryAllMemories(userId);
+        String memorySection = renderMemorySection(relevantMemories, allMemories);
 
-        String noteContext = buildNoteContext(userId, session.getScopeNoteUuid(), mergedMemorySection);
+        String noteContext = buildNoteContext(userId, session.getScopeNoteUuid(), memorySection);
         if (!hasText(noteContext)) {
-            return renderFallbackGlobalPrompt(mergedMemorySection);
+            return renderFallbackGlobalPrompt(memorySection);
         }
         return PromptBuilder.render(
                 noteSystemTemplate,
@@ -281,33 +281,76 @@ public class ContextAssembler {
         );
     }
 
-    private String renderMemorySection(String memoryContext) throws IOException {
-        if (!hasText(memoryContext)) {
+        private String renderMemorySection(List<MemoryRecordEntity> relevantMemories,
+                           List<MemoryRecordEntity> allMemories) throws IOException {
+        String hitItems = toMemoryHitItems(relevantMemories);
+        String allItems = toMemoryAllItems(allMemories);
+        if (!hasText(hitItems) && !hasText(allItems)) {
             return "";
         }
         return PromptBuilder.render(
                 memorySectionTemplate,
-                Map.of("memoryContext", memoryContext)
+            Map.of(
+                "hitCount", String.valueOf(relevantMemories == null ? 0 : relevantMemories.size()),
+                "allCount", String.valueOf(allMemories == null ? 0 : allMemories.size()),
+                "hitItems", hitItems,
+                "allItems", allItems
+            )
         );
     }
 
     /**
-     * 从检索编排器返回的 Memory 片段渲染记忆段落（复用 memory_section.md 模板）。
+         * 全局检索场景：使用检索片段 + 全量记忆渲染记忆段落。
      */
-    private String renderMemorySectionFromSnippets(List<ContextSnippet> memorySnippets) throws IOException {
-        if (memorySnippets == null || memorySnippets.isEmpty()) {
+        private String renderMemorySection(List<ContextSnippet> memorySnippets,
+                           List<MemoryRecordEntity> allMemories) throws IOException {
+        String hitItems = toMemoryHitItemsFromSnippets(memorySnippets);
+        String allItems = toMemoryAllItems(allMemories);
+        if (!hasText(hitItems) && !hasText(allItems)) {
             return "";
         }
-        // 将检索到的记忆片段组装为与 MemoryQueryService 相同格式的文本
-        String memoryContext = memorySnippets.stream()
-                .map(s -> "### " + safeText(s.title()) + "\n" + safeText(s.abstractText())
-                        + (hasText(s.content()) ? "\n" + s.content() : ""))
-                .collect(Collectors.joining("\n\n"));
         return PromptBuilder.render(
                 memorySectionTemplate,
-                Map.of("memoryContext", memoryContext)
+            Map.of(
+                "hitCount", String.valueOf(memorySnippets == null ? 0 : memorySnippets.size()),
+                "allCount", String.valueOf(allMemories == null ? 0 : allMemories.size()),
+                "hitItems", hitItems,
+                "allItems", allItems
+            )
         );
     }
+
+        private String toMemoryHitItems(List<MemoryRecordEntity> memories) {
+        if (memories == null || memories.isEmpty()) {
+            return "";
+        }
+        return memories.stream()
+            .map(m -> "- [" + m.getMemoryType().name() + "] " + safeText(m.getTitle())
+                + "\n  摘要：" + safeText(m.getAbstractText())
+                + (hasText(m.getContent()) ? "\n  内容：" + m.getContent() : ""))
+            .collect(Collectors.joining("\n"));
+        }
+
+        private String toMemoryHitItemsFromSnippets(List<ContextSnippet> snippets) {
+        if (snippets == null || snippets.isEmpty()) {
+            return "";
+        }
+        return snippets.stream()
+            .map(s -> "- [MEMORY] " + safeText(s.title())
+                + "\n  摘要：" + safeText(s.abstractText())
+                + (hasText(s.content()) ? "\n  内容：" + s.content() : ""))
+            .collect(Collectors.joining("\n"));
+        }
+
+        private String toMemoryAllItems(List<MemoryRecordEntity> memories) {
+        if (memories == null || memories.isEmpty()) {
+            return "";
+        }
+        return memories.stream()
+            .map(m -> "- [" + m.getMemoryType().name() + "] " + safeText(m.getTitle())
+                + "\n  摘要：" + safeText(m.getAbstractText()))
+            .collect(Collectors.joining("\n"));
+        }
 
     /**
      * 渲染检索到的 Resource 片段为可注入系统提示的段落。
