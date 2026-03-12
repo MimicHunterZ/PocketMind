@@ -1,6 +1,7 @@
 package com.doublez.pocketmindserver.ai.application;
 
 import com.doublez.pocketmindserver.ai.application.context.ContextAssembler;
+import com.doublez.pocketmindserver.ai.application.memory.MemoryInjector;
 import com.doublez.pocketmindserver.ai.application.memory.MemoryQueryServiceImpl;
 import com.doublez.pocketmindserver.ai.application.stream.ChatSseEventFactory;
 import com.doublez.pocketmindserver.ai.application.stream.ChatStreamCancellationManager;
@@ -99,6 +100,7 @@ class AiChatServicePauseTest {
                         return ContextUri.userMemoriesRoot(userId).child(memoryType.name().toLowerCase());
                     }
                 }, new InMemoryMemoryRecordRepository()),
+                mock(MemoryInjector.class),
                 retrievalOrchestrator,
                 intentAnalyzer
         );

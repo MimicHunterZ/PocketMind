@@ -1,5 +1,6 @@
 package com.doublez.pocketmindserver.ai.application.context;
 
+import com.doublez.pocketmindserver.ai.application.memory.MemoryInjector;
 import com.doublez.pocketmindserver.ai.application.memory.MemoryQueryService;
 import com.doublez.pocketmindserver.ai.application.retrieval.AnalyzedIntent;
 import com.doublez.pocketmindserver.ai.application.retrieval.ContextSnippet;
@@ -48,6 +49,7 @@ public class ContextAssembler {
     private final AttachmentVisionRepository attachmentVisionRepository;
     private final ResourceRecordRepository resourceRecordRepository;
     private final MemoryQueryService memoryQueryService;
+    private final MemoryInjector memoryInjector;
     private final RetrievalOrchestrator retrievalOrchestrator;
     private final IntentAnalyzer intentAnalyzer;
 
@@ -87,12 +89,14 @@ public class ContextAssembler {
                             AttachmentVisionRepository attachmentVisionRepository,
                             ResourceRecordRepository resourceRecordRepository,
                             MemoryQueryService memoryQueryService,
+                            MemoryInjector memoryInjector,
                             RetrievalOrchestrator retrievalOrchestrator,
                             IntentAnalyzer intentAnalyzer) {
         this.noteRepository = noteRepository;
         this.attachmentVisionRepository = attachmentVisionRepository;
         this.resourceRecordRepository = resourceRecordRepository;
         this.memoryQueryService = memoryQueryService;
+        this.memoryInjector = memoryInjector;
         this.retrievalOrchestrator = retrievalOrchestrator;
         this.intentAnalyzer = intentAnalyzer;
     }
@@ -129,8 +133,15 @@ public class ContextAssembler {
 
         // 双通道并行检索
         OrchestratedContext ctx = retrievalOrchestrator.retrieve(userId, intent.queryText());
+        String allMemorySection = memoryInjector.buildAllMemorySection(userId);
         if (ctx.isEmpty()) {
-            return systemText;
+            if (!hasText(allMemorySection)) {
+                return systemText;
+            }
+            return PromptBuilder.render(
+                    systemWithExtraSectionTemplate,
+                    Map.of("systemText", systemText, "extraSection", allMemorySection)
+            );
         }
 
         // 分别渲染 Memory 和 Resource 片段为文本段落
@@ -138,7 +149,7 @@ public class ContextAssembler {
         String resourceSection = renderResourceSnippetsSection(ctx.resourceSnippets());
 
         // 合并为 extraSection 注入系统提示
-        String extraSection = joinSections(memorySection, resourceSection);
+        String extraSection = joinSections(allMemorySection, memorySection, resourceSection);
         if (!hasText(extraSection)) {
             return systemText;
         }
@@ -154,10 +165,12 @@ public class ContextAssembler {
     private String buildNoteScopedPrompt(long userId, ChatSessionEntity session, String userPrompt) throws IOException {
         String memoryContext = memoryQueryService.buildMemoryContext(userId, session, userPrompt);
         String memorySection = renderMemorySection(memoryContext);
+        String allMemorySection = memoryInjector.buildAllMemorySection(userId);
+        String mergedMemorySection = joinSections(memorySection, allMemorySection);
 
-        String noteContext = buildNoteContext(userId, session.getScopeNoteUuid(), memorySection);
+        String noteContext = buildNoteContext(userId, session.getScopeNoteUuid(), mergedMemorySection);
         if (!hasText(noteContext)) {
-            return renderFallbackGlobalPrompt(memorySection);
+            return renderFallbackGlobalPrompt(mergedMemorySection);
         }
         return PromptBuilder.render(
                 noteSystemTemplate,

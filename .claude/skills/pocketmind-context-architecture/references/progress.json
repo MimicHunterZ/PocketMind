@@ -1,6 +1,6 @@
 {
   "project": "PocketMind Context Architecture",
-  "lastUpdated": "2026-03-12T01:50",
+  "lastUpdated": "2026-03-12T22:45",
   "phases": [
     {
       "id": "phase-0",
@@ -50,7 +50,7 @@
         { "id": "2.15", "done": false, "desc": "Web clip -> Resource 规范化接入 (deferred)" },
         { "id": "2.16", "done": false, "desc": "OCR/PDF/音视频转写 -> Resource 统一入口 (deferred)" },
         { "id": "2.17", "done": false, "desc": "Resource hash/version/state 规则统一 (deferred)" },
-        { "id": "2.18", "done": false, "desc": "resource_records + context_catalog 增加 embedding vector 列 (Phase8前置)" }
+        { "id": "2.18", "done": true, "desc": "resource_records + context_catalog 增加 embedding vector 列 (Phase8前置)" }
       ]
     },
     {
@@ -98,15 +98,15 @@
       "name": "Retrieval 双通道正式化",
       "status": "completed",
       "tasks": [
-        { "id": "5.1", "done": true, "desc": "RuleBasedIntentAnalyzer (规则引擎, 停用词+问候检测+关键词抽取)" },
+        { "id": "5.1", "done": true, "desc": "LlmIntentAnalyzer (LLM 意图分析, 替代规则引擎)" },
         { "id": "5.2", "done": true, "desc": "ContextSnippet + OrchestratedContext 数据模型 (替代 TypedQuery)" },
         { "id": "5.3", "done": true, "desc": "HierarchicalRetriever 接入 RetrievalOrchestrator 资源通道 (pgvector deferred to Phase 8)" },
-        { "id": "5.4", "done": true, "desc": "KeywordMemoryRetriever (关键词搜索 + log1p hotness 评分)" },
+        { "id": "5.4", "done": true, "desc": "MemoryRetriever SPI (初版关键词实现, 后续 Phase8 向量化替换)" },
         { "id": "5.5", "done": true, "desc": "TenantSkillToolResolver 已有实现, 无需额外工作" },
-        { "id": "5.6", "done": true, "desc": "RetrievalOrchestrator (CompletableFuture 并行双通道 + token budget 60/40)" },
+        { "id": "5.6", "done": true, "desc": "RetrievalOrchestrator (CompletableFuture 并行双通道 + 通道隔离容错)" },
         { "id": "5.7", "done": true, "desc": "ContextAssembler 改造: global 路径走 Orchestrator, note-scoped 保持直接加载" },
-        { "id": "5.8", "done": true, "desc": "Token budget 4000 默认, greedy truncation by score, 通道隔离容错" },
-        { "id": "5.9", "done": true, "desc": "单元测试: RuleBasedIntentAnalyzerTest(8), RetrievalOrchestratorTest(6), 已有测试全部适配" }
+        { "id": "5.8", "done": true, "desc": "移除 token budget 与 truncation, 保留双通道并行与容错" },
+        { "id": "5.9", "done": true, "desc": "单元测试: LlmIntentAnalyzerTest, RetrievalOrchestratorTest, 已有测试全部适配" }
       ]
     },
     {
@@ -132,12 +132,16 @@
     {
       "id": "phase-8",
       "name": "检索实现升级 (接口不变)",
-      "status": "not-started",
+      "status": "in-progress",
       "tasks": [
-        { "id": "8.1", "done": false, "desc": "VectorChildSearchStrategy implements ChildSearchStrategy (pgvector)" },
-        { "id": "8.2", "done": false, "desc": "@ConditionalOnProperty 切换 keyword→vector 实现" },
-        { "id": "8.3", "done": false, "desc": "pgvector 索引优化 (IVFFlat/HNSW)" },
-        { "id": "8.4", "done": false, "desc": "resource_chunk 独立建模评估" }
+        { "id": "8.1", "done": true, "desc": "VectorChildSearchStrategy implements ChildSearchStrategy (pgvector)" },
+        { "id": "8.2", "done": true, "desc": "移除 @ConditionalOnProperty 过渡切换, 直接向量实现" },
+        { "id": "8.3", "done": true, "desc": "pgvector HNSW 索引 + 向量 SQL 检索 + EmbeddingModel 接入" },
+        { "id": "8.4", "done": false, "desc": "resource_chunk 独立建模评估" },
+        { "id": "8.5", "done": true, "desc": "ResourceCatalogSyncService 同步时写入 context_catalog.embedding" },
+        { "id": "8.6", "done": true, "desc": "MemoryExtractorService 抽取后写入 memory_records.embedding" },
+        { "id": "8.7", "done": true, "desc": "VectorMemoryRetriever 替换关键词检索并接入 RetrievalOrchestrator" },
+        { "id": "8.8", "done": true, "desc": "ContextAssembler 接入全量记忆注入 (MemoryInjector + prompt 模板)" }
       ]
     },
     {
