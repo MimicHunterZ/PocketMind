@@ -15,6 +15,7 @@ import com.doublez.pocketmindserver.ai.api.dto.chat.UpdateSessionRequest;
 import com.doublez.pocketmindserver.ai.application.AiChatService;
 import com.doublez.pocketmindserver.ai.application.AiChatTitleService;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
+import com.doublez.pocketmindserver.chat.domain.message.ChatMessageType;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
 import com.doublez.pocketmindserver.shared.domain.PageQuery;
 import com.doublez.pocketmindserver.shared.security.UserContext;
@@ -310,14 +311,14 @@ public class ChatController {
      */
     private ToolCallData parseToolCallData(ChatMessageEntity m) {
         String type = m.getMessageType();
-        if (!ChatMessageEntity.TYPE_TOOL_CALL.equals(type) && !ChatMessageEntity.TYPE_TOOL_RESULT.equals(type)) {
+        if (!ChatMessageType.TOOL_CALL.getValue().equals(type) && !ChatMessageType.TOOL_RESULT.getValue().equals(type)) {
             return null;
         }
         try {
             JsonNode node = objectMapper.readTree(m.getContent());
             String toolCallId = node.path("toolCallId").asText(null);
             String toolName   = node.path("name").asText(null);
-            if (ChatMessageEntity.TYPE_TOOL_CALL.equals(type)) {
+            if (ChatMessageType.TOOL_CALL.getValue().equals(type)) {
                 String arguments = node.path("arguments").asText(null);
                 return new ToolCallData(toolCallId, toolName, arguments, null);
             } else {

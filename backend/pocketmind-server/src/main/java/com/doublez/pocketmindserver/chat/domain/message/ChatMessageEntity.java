@@ -16,10 +16,6 @@ import java.util.UUID;
 @EqualsAndHashCode(of = "uuid")
 public class ChatMessageEntity {
 
-    public static final String TYPE_TEXT = "TEXT";
-    public static final String TYPE_TOOL_CALL = "TOOL_CALL";
-    public static final String TYPE_TOOL_RESULT = "TOOL_RESULT";
-
     private final UUID uuid;
     private final long userId;
     private final UUID sessionUuid;
@@ -70,7 +66,7 @@ public class ChatMessageEntity {
         this.userId = userId;
         this.sessionUuid = Objects.requireNonNull(sessionUuid, "sessionUuid 不能为空");
         this.parentUuid = parentUuid;
-        this.messageType = messageType != null ? messageType : TYPE_TEXT;
+        this.messageType = messageType != null ? messageType : ChatMessageType.TEXT.getValue();
         this.role = Objects.requireNonNull(role, "role 不能为空");
         this.content = content != null ? content : "";
         this.attachmentUuids = attachmentUuids != null ? List.copyOf(attachmentUuids) : Collections.emptyList();
@@ -131,7 +127,7 @@ public class ChatMessageEntity {
             userId,
             sessionUuid,
             parentUuid,
-            messageType != null ? messageType : TYPE_TEXT,
+            messageType != null ? messageType : ChatMessageType.TEXT.getValue(),
             role,
             content,
             List.of(),

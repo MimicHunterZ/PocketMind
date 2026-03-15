@@ -1,9 +1,7 @@
-package com.doublez.pocketmindserver.note.api;
+﻿package com.doublez.pocketmindserver.note.api;
 
-import com.doublez.pocketmindserver.asset.application.AssetQueryService;
 import com.doublez.pocketmindserver.note.api.dto.PostResponse;
-import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
-import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
+import com.doublez.pocketmindserver.note.application.PostService;
 import com.doublez.pocketmindserver.shared.security.UserContext;
 import com.doublez.pocketmind.common.web.ApiCode;
 import com.doublez.pocketmind.common.web.BusinessException;
@@ -14,7 +12,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -22,45 +19,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PostController {
 
-    private final NoteRepository noteRepository;
-    private final ChatSessionRepository chatSessionRepository;
+    private final PostService postService;
 
     @GetMapping("/{uuid}")
     public PostResponse getPost(@PathVariable("uuid") UUID uuid) {
         long userId = parseUserId(UserContext.getRequiredUserId());
-        var note = noteRepository.findByUuidAndUserId(uuid, userId)
-                .orElseThrow(() -> new BusinessException(ApiCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, "uuid=" + uuid));
-
-        String aiStatus = computeAiStatus(note);
-        UUID sessionUuid = chatSessionRepository.findByNoteUuid(userId, uuid)
-                .stream()
-                .findFirst()
-                .map(s -> s.getUuid())
-                .orElse(null);
-
-        List<String> tags = noteRepository.findTagNamesByUuid(uuid, userId);
-
-        return new PostResponse(
-                note.getUuid(),
-                note.getSourceUrl(),
-                aiStatus,
-                note.getSummary(),
-                sessionUuid,
-                note.getResourceStatus(),
-                note.getPreviewTitle(),
-                note.getPreviewDescription(),
-                tags
-        );
-    }
-
-    private String computeAiStatus(com.doublez.pocketmindserver.note.domain.note.NoteEntity note) {
-        if (note.getSummary() != null && !note.getSummary().isBlank()) {
-            return "COMPLETED";
-        }
-        if (note.getResourceStatus() == com.doublez.pocketmindserver.note.domain.note.NoteResourceStatus.FAILED) {
-            return "FAILED";
-        }
-        return "PROCESSING";
+        return postService.getPost(uuid, userId);
     }
 
     private long parseUserId(String userId) {
@@ -71,4 +35,5 @@ public class PostController {
         }
     }
 }
+
 

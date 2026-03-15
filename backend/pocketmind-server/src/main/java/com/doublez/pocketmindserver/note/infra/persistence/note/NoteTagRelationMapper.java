@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * note_tag_relation 表 MyBatis Mapper（复合主键，不继承 BaseMapper）
+ * note_tag_relation 表 MyBatis Mapper
  */
 @Mapper
 public interface NoteTagRelationMapper {
@@ -33,9 +33,24 @@ public interface NoteTagRelationMapper {
               JOIN tags t ON t.id = r.tag_id
              WHERE r.note_uuid = #{noteUuid}
                AND t.user_id = #{userId}
-                                                         AND t.is_deleted = FALSE
+               AND t.is_deleted = FALSE
             """)
     List<Long> findTagIdsByNoteUuid(@Param("userId") long userId, @Param("noteUuid") UUID noteUuid);
+
+    @Select("""
+            <script>
+            SELECT r.note_uuid as noteUuid, r.tag_id as tagId
+              FROM note_tag_relation r
+              JOIN tags t ON t.id = r.tag_id
+             WHERE t.user_id = #{userId}
+               AND t.is_deleted = FALSE
+               AND r.note_uuid IN
+               <foreach item='uuid' collection='noteUuids' open='(' separator=',' close=')'>
+                 #{uuid}
+               </foreach>
+            </script>
+            """)
+    List<NoteTagIdTuple> findTagIdsByNoteUuids(@Param("userId") long userId, @Param("noteUuids") List<UUID> noteUuids);
 
     /**
      * 查询某条笔记关联的所有标签（JOIN tags 表过滤 userId 防止越权）

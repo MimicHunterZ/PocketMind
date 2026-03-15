@@ -10,14 +10,9 @@ import com.doublez.pocketmindserver.note.domain.tag.TagRepository;
 import com.doublez.pocketmindserver.shared.domain.SyncCursorQuery;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
-
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
+import java.util.*;
 
 @Repository
 public class MybatisNoteRepository implements NoteRepository {
@@ -43,8 +38,7 @@ public class MybatisNoteRepository implements NoteRepository {
         NoteModel model = noteConverter.toModel(note);
         int rows = noteMapper.insert(model);
         if (rows != 1) {
-            throw new BusinessException(ApiCode.NOTE_SAVE_FAILED, HttpStatus.INTERNAL_SERVER_ERROR,
-                    "uuid=" + note.getUuid());
+            throw new BusinessException(ApiCode.NOTE_SAVE_FAILED, HttpStatus.INTERNAL_SERVER_ERROR, "uuid=" + note.getUuid());
         }
         persistTagRelations(note);
     }
@@ -57,11 +51,9 @@ public class MybatisNoteRepository implements NoteRepository {
                 .eq(NoteModel::getUuid, note.getUuid())
                 .eq(NoteModel::getUserId, note.getUserId()));
         if (rows != 1) {
-            throw new BusinessException(ApiCode.NOTE_UPDATE_FAILED, HttpStatus.INTERNAL_SERVER_ERROR,
-                    "uuid=" + note.getUuid());
+            throw new BusinessException(ApiCode.NOTE_UPDATE_FAILED, HttpStatus.INTERNAL_SERVER_ERROR, "uuid=" + note.getUuid());
         }
 
-        // 简化策略：重建标签关联
         relationMapper.deleteByNoteUuid(note.getUuid());
         persistTagRelations(note);
     }
@@ -76,8 +68,23 @@ public class MybatisNoteRepository implements NoteRepository {
 
     @Override
     public List<NoteEntity> findChangedSince(long userId, SyncCursorQuery query) {
-        return noteMapper.findChangedSince(userId, query.cursor(), query.limit())
-                .stream().map(this::toDomainWithTags).toList();
+        List<NoteModel> models = noteMapper.findChangedSince(userId, query.cursor(), query.limit());
+        if (models.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> noteUuids = models.stream().map(NoteModel::getUuid).toList();
+        List<NoteTagIdTuple> tagTuples = relationMapper.findTagIdsByNoteUuids(userId, noteUuids);
+
+        Map<UUID, List<NoteTag>> tagsByNote = new HashMap<>();
+        for (NoteTagIdTuple tuple : tagTuples) {
+            tagsByNote.computeIfAbsent(tuple.getNoteUuid(), k -> new ArrayList<>())
+                      .add(new NoteTag(tuple.getTagId()));
+        }
+
+        return models.stream()
+                .map(m -> noteConverter.toDomain(m, tagsByNote.getOrDefault(m.getUuid(), List.of())))
+                .toList();
     }
 
     @Override
@@ -93,8 +100,7 @@ public class MybatisNoteRepository implements NoteRepository {
     @Override
     public void updateAiFields(UUID uuid, long userId, String aiSummary, String resourceStatus,
                                String previewTitle, String previewDescription, String previewContent) {
-        noteMapper.updateAiFields(uuid, userId, aiSummary, resourceStatus,
-                previewTitle, previewDescription, previewContent);
+        noteMapper.updateAiFields(uuid, userId, aiSummary, resourceStatus, previewTitle, previewDescription, previewContent);
     }
 
     @Override
@@ -138,3 +144,4 @@ public class MybatisNoteRepository implements NoteRepository {
         }
     }
 }
+

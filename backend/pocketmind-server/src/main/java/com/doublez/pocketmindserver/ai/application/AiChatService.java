@@ -5,6 +5,7 @@ import com.doublez.pocketmindserver.ai.application.stream.SseReplyService;
 import com.doublez.pocketmindserver.ai.api.dto.chat.ChatBranchSummaryResponse;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
+import com.doublez.pocketmindserver.chat.domain.message.ChatMessageType;
 import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
@@ -441,7 +442,7 @@ public class AiChatService {
      */
     private List<Message> toSpringAiMessages(List<ChatMessageEntity> entities) {
         return entities.stream()
-                .filter(e -> ChatMessageEntity.TYPE_TEXT.equals(e.getMessageType()))
+                .filter(e -> ChatMessageType.TEXT.getValue().equals(e.getMessageType()))
                 .filter(e -> e.getRole() == ChatRole.USER || e.getRole() == ChatRole.ASSISTANT)
                 .map(e -> {
                     if (e.getRole() == ChatRole.USER) {
