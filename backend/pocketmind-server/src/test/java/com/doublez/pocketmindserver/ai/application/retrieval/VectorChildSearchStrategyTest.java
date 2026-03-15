@@ -170,5 +170,7 @@ class VectorChildSearchStrategyTest {
         @Override public void upsert(ContextNode node, Long userId) {}
         @Override public void incrementActiveCount(String uri) {}
         @Override public void incrementActiveCountBatch(List<String> uris) {}
+        @Override public void deleteByUri(String uri) {}
     }
+
 }

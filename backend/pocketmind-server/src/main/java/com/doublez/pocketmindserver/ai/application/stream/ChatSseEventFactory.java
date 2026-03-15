@@ -14,7 +14,7 @@ import java.util.UUID;
  *
  * 统一负责 payload 序列化和标准事件帧构建，避免手写 JSON 与重复样板代码。
  */
-@Component
+@Component("streamChatSseEventFactory")
 public class ChatSseEventFactory {
 
     private final ObjectMapper objectMapper;

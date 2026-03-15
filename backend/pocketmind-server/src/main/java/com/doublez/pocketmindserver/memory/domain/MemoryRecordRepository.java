@@ -47,7 +47,7 @@ public interface MemoryRecordRepository {
     /**
      * 递增 active_count。
      */
-    void incrementActiveCount(UUID uuid);
+    void incrementActiveCount(UUID uuid, long userId);
 
     /**
      * 按用户分组统计各类型记忆数量。
@@ -67,7 +67,7 @@ public interface MemoryRecordRepository {
     /**
      * 更新指定记忆的向量嵌入。
      */
-    void updateEmbedding(UUID uuid, float[] embedding);
+    void updateEmbedding(UUID uuid, long userId, float[] embedding);
 
     /**
      * 记忆类型统计结果。

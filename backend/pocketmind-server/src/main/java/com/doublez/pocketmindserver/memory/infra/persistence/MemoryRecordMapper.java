@@ -19,8 +19,8 @@ public interface MemoryRecordMapper extends BaseMapper<MemoryRecordModel> {
     /**
      * 原子递增 active_count。
      */
-    @Update("UPDATE memory_records SET active_count = active_count + 1 WHERE uuid = #{uuid} AND is_deleted = false")
-    int incrementActiveCount(@Param("uuid") UUID uuid);
+    @Update("UPDATE memory_records SET active_count = active_count + 1 WHERE uuid = #{uuid} AND user_id = #{userId} AND is_deleted = false")
+    int incrementActiveCount(@Param("uuid") UUID uuid, @Param("userId") long userId);
 
     /**
      * pgvector 余弦相似度搜索记忆。
@@ -44,6 +44,6 @@ public interface MemoryRecordMapper extends BaseMapper<MemoryRecordModel> {
     /**
      * 更新指定记忆的向量嵌入。
      */
-    @Update("UPDATE memory_records SET embedding = #{embedding}::vector WHERE uuid = #{uuid} AND is_deleted = false")
-    int updateEmbedding(@Param("uuid") UUID uuid, @Param("embedding") String embedding);
+    @Update("UPDATE memory_records SET embedding = #{embedding}::vector WHERE uuid = #{uuid} AND user_id = #{userId} AND is_deleted = false")
+    int updateEmbedding(@Param("uuid") UUID uuid, @Param("userId") long userId, @Param("embedding") String embedding);
 }

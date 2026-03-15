@@ -61,8 +61,11 @@ public interface ContextCatalogRepository {
      */
     void incrementActiveCountBatch(List<String> uris);
 
-    /**
-     * 向量相似度搜索 — 返回最相关的节点及其余弦相似度。
+    /**     * Delete catalog node by uri.
+     */
+    void deleteByUri(String uri);
+
+    /**     * 向量相似度搜索 — 返回最相关的节点及其余弦相似度。
      *
      * @param queryVector 查询向量
      * @param userId      用户 ID

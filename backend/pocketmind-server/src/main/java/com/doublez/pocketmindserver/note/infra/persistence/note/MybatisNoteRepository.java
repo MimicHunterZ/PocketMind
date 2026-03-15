@@ -11,6 +11,8 @@ import com.doublez.pocketmindserver.shared.domain.SyncCursorQuery;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +38,7 @@ public class MybatisNoteRepository implements NoteRepository {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void save(NoteEntity note) {
         NoteModel model = noteConverter.toModel(note);
         int rows = noteMapper.insert(model);
@@ -47,6 +50,7 @@ public class MybatisNoteRepository implements NoteRepository {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void update(NoteEntity note) {
         NoteModel model = noteConverter.toModel(note);
         int rows = noteMapper.update(model, new LambdaQueryWrapper<NoteModel>()
@@ -102,6 +106,7 @@ public class MybatisNoteRepository implements NoteRepository {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void replaceTagNames(UUID noteUuid, long userId, List<String> tagNames) {
         relationMapper.deleteByNoteUuid(noteUuid);
 

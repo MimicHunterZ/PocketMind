@@ -3,7 +3,6 @@ package com.doublez.pocketmindserver.note.api;
 import com.doublez.pocketmindserver.asset.application.AssetQueryService;
 import com.doublez.pocketmindserver.note.api.dto.PostResponse;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
-import com.doublez.pocketmindserver.note.infra.persistence.note.NoteTagRelationMapper;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
 import com.doublez.pocketmindserver.shared.security.UserContext;
 import com.doublez.pocketmind.common.web.ApiCode;
@@ -25,7 +24,6 @@ public class PostController {
 
     private final NoteRepository noteRepository;
     private final ChatSessionRepository chatSessionRepository;
-    private final NoteTagRelationMapper noteTagRelationMapper;
 
     @GetMapping("/{uuid}")
     public PostResponse getPost(@PathVariable("uuid") UUID uuid) {
@@ -40,11 +38,7 @@ public class PostController {
                 .map(s -> s.getUuid())
                 .orElse(null);
 
-        // 鏌ヨ AI 鏍囩
-        List<String> tags = noteTagRelationMapper.findTagsByNoteUuid(userId, uuid)
-                .stream()
-                .map(t -> t.getName())
-                .toList();
+        List<String> tags = noteRepository.findTagNamesByUuid(uuid, userId);
 
         return new PostResponse(
                 note.getUuid(),
@@ -66,7 +60,6 @@ public class PostController {
         if (note.getResourceStatus() == com.doublez.pocketmindserver.note.domain.note.NoteResourceStatus.FAILED) {
             return "FAILED";
         }
-        // 宸插彈鐞嗕絾鏈啓 summary锛岀粺涓€瑙嗕负澶勭悊涓?
         return "PROCESSING";
     }
 

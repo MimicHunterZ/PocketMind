@@ -20,7 +20,7 @@ public interface NoteMapper extends BaseMapper<NoteModel> {
     @Select("""
             SELECT id, uuid, user_id, title, content, source_url, category_id,
                    note_time, preview_title, preview_description, preview_content,
-                   resource_status, summary, memory_path, created_at, updated_at, is_deleted, server_version
+                   resource_status, summary, created_at, updated_at, is_deleted, server_version
               FROM notes
              WHERE user_id = #{userId}
                AND is_deleted = FALSE
@@ -46,7 +46,7 @@ public interface NoteMapper extends BaseMapper<NoteModel> {
     @Select("""
             SELECT id, uuid, user_id, title, content, source_url, category_id,
                    note_time, preview_title, preview_description, preview_content,
-                   resource_status, summary, memory_path, created_at, updated_at, is_deleted, server_version
+                   resource_status, summary, created_at, updated_at, is_deleted, server_version
               FROM notes
              WHERE user_id = #{userId}
                AND updated_at > #{cursor}

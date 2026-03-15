@@ -94,6 +94,13 @@ class PocketmindServerApplicationTests {
     @MockitoBean ChatSessionMapper chatSessionMapper;
     @MockitoBean ChatMessageMapper chatMessageMapper;
     @MockitoBean SyncChangeLogMapper syncChangeLogMapper;
+    @MockitoBean com.doublez.pocketmindserver.memory.infra.persistence.MemoryRecordMapper memoryRecordMapper;
+    @MockitoBean com.doublez.pocketmindserver.resource.infra.persistence.ResourceRecordMapper resourceRecordMapper;
+    @MockitoBean com.doublez.pocketmindserver.context.infra.persistence.ContextCatalogMapper contextCatalogMapper;
+    @MockitoBean com.doublez.pocketmindserver.context.infra.persistence.ContextRefMapper contextRefMapper;
+    @MockitoBean com.doublez.pocketmindserver.asset.domain.AssetMapper assetMapper;
+    @MockitoBean(name = "embeddingModel") org.springframework.ai.embedding.EmbeddingModel embeddingModel;
+    @MockitoBean(name = "chatModel") org.springframework.ai.chat.model.ChatModel chatModel;
 
     @TestConfiguration
     static class TestOverrides {
@@ -101,6 +108,11 @@ class PocketmindServerApplicationTests {
         @Bean
         JavaMailSender javaMailSender() {
             return Mockito.mock(JavaMailSender.class);
+        }
+
+        @Bean
+        org.springframework.transaction.support.TransactionTemplate transactionTemplate() {
+            return Mockito.mock(org.springframework.transaction.support.TransactionTemplate.class);
         }
 
         @Bean

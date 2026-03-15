@@ -215,6 +215,11 @@ class ResourceCatalogSyncServiceTest {
         @Override
         public void updateEmbedding(String uri, float[] embedding) {
         }
+
+        @Override
+        public void deleteByUri(String uri) {
+            storage.removeIf(n -> n.uri().value().equals(uri));
+        }
     }
 
     /**

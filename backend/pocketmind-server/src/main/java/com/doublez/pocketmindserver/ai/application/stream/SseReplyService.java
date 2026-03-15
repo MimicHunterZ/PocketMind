@@ -120,8 +120,8 @@ public class SseReplyService {
                         return Flux.just(chatSseEventFactory.paused(effectiveRequestId, null));
                     }
                     log.error("AI 流式回复异常: userId={}, sessionUuid={}", userId, sessionUuid, e);
-                    String safeMsg = e.getMessage() != null ? e.getMessage() : "AI 服务异常";
-                    return Flux.just(chatSseEventFactory.error(effectiveRequestId, safeMsg));
+                    // 安全修复：不向前端透传详细异常栈，避免内部凭证/路径泄露，仅返回通用错误提示
+                    return Flux.just(chatSseEventFactory.error(effectiveRequestId, "AI服务异常_ERR_500"));
                 })
                 .doFinally(signalType -> chatStreamCancellationManager.cleanup(streamKey));
     }

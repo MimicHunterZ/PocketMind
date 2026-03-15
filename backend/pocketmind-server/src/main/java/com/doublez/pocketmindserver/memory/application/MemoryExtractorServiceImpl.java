@@ -128,7 +128,7 @@ public class MemoryExtractorServiceImpl implements MemoryExtractorService {
                     record.updateContent(candidate.title(), candidate.abstractText(), candidate.content());
                     record.addEvidence(MemoryEvidence.of(sourceContextUri, candidate.title()));
                     memoryRecordRepository.update(record);
-                    embedMemory(record.getUuid(), candidate.content());
+                    embedMemory(record.getUuid(), record.getUserId(), candidate.content());
                     log.debug("[memory-extractor] 合并已有记忆: mergeKey={}", candidate.mergeKey());
                     savedCount++;
                     continue;
@@ -148,7 +148,7 @@ public class MemoryExtractorServiceImpl implements MemoryExtractorService {
                     candidate.mergeKey()
             );
             memoryRecordRepository.save(newRecord);
-            embedMemory(newRecord.getUuid(), candidate.content());
+            embedMemory(newRecord.getUuid(), newRecord.getUserId(), candidate.content());
             savedCount++;
             log.debug("[memory-extractor] 保存新记忆: type={}, title={}", memoryType, candidate.title());
         }
@@ -223,11 +223,11 @@ public class MemoryExtractorServiceImpl implements MemoryExtractorService {
     /**
      * 为记忆生成并存储向量嵌入。
      */
-    private void embedMemory(UUID uuid, String text) {
+    private void embedMemory(UUID uuid, long userId, String text) {
         try {
             float[] embedding = embeddingService.embed(text);
             if (embedding != null) {
-                memoryRecordRepository.updateEmbedding(uuid, embedding);
+                memoryRecordRepository.updateEmbedding(uuid, userId, embedding);
             }
         } catch (Exception e) {
             log.warn("[memory-extractor] 记忆向量嵌入失败, 不影响保存: uuid={}, error={}", uuid, e.getMessage());

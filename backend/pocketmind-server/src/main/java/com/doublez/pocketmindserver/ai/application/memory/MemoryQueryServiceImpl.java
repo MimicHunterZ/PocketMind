@@ -44,7 +44,7 @@ public class MemoryQueryServiceImpl implements MemoryQueryService {
         if (vectorOrFallbackMemories.isEmpty()) {
             log.debug("[memory] 未找到相关记忆: userId={}", userId);
         }
-        vectorOrFallbackMemories.forEach(m -> memoryRecordRepository.incrementActiveCount(m.getUuid()));
+        vectorOrFallbackMemories.forEach(m -> memoryRecordRepository.incrementActiveCount(m.getUuid(), userId));
         log.info("[memory] 检索到 {} 条相关记忆: userId={}", vectorOrFallbackMemories.size(), userId);
         return vectorOrFallbackMemories;
     }

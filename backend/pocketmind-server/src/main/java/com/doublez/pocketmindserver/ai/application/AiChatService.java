@@ -113,6 +113,8 @@ public class AiChatService {
     public List<ChatMessageEntity> listMessages(long userId, UUID sessionUuid, UUID leafUuid) {
         validateAndGetSession(sessionUuid, userId);
         if (leafUuid != null) {
+            ChatMessageEntity leaf = requireUserMessage(leafUuid, userId, "leafUuid");
+            ensureMessageBelongsToSession(leaf, sessionUuid, "leafUuid");
             return chatMessageRepository.findChain(leafUuid, userId);
         }
         return listMainlineMessages(userId, sessionUuid);
@@ -140,9 +142,11 @@ public class AiChatService {
         final List<ChatMessageEntity> history;
         final UUID effectiveParentUuid;
         if (parentUuid != null) {
+            ChatMessageEntity parent = requireUserMessage(parentUuid, userId, "parentUuid");
+            ensureMessageBelongsToSession(parent, sessionUuid, "parentUuid");
             // 分支模式：从指定节点向上递归获取完整历史
-            history = chatMessageRepository.findChain(parentUuid, userId);
-            effectiveParentUuid = parentUuid;
+            history = chatMessageRepository.findChain(parent.getUuid(), userId);
+            effectiveParentUuid = parent.getUuid();
         } else {
             // 线模式：取会话全部消息
             history = chatMessageRepository.findBySessionUuid(userId, sessionUuid, new PageQuery(200, 0));
@@ -221,6 +225,7 @@ public class AiChatService {
         ChatMessageEntity msg = chatMessageRepository.findByUuidAndUserId(messageUuid, userId)
                 .orElseThrow(() -> new BusinessException(
                         ApiCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, "messageUuid=" + messageUuid));
+        ensureMessageBelongsToSession(msg, sessionUuid, "messageUuid");
 
         final ChatMessageEntity userMsg;
         if (msg.getRole() == ChatRole.USER) {
@@ -239,6 +244,7 @@ public class AiChatService {
             userMsg = chatMessageRepository.findByUuidAndUserId(userMsgUuid, userId)
                     .orElseThrow(() -> new BusinessException(
                             ApiCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, "userMsgUuid=" + userMsgUuid));
+            ensureMessageBelongsToSession(userMsg, sessionUuid, "userMsgUuid");
             log.info("閲嶆柊鐢熸垚 AI 鍥炲: userId={}, sessionUuid={}, userMsgUuid={}", userId, sessionUuid, userMsgUuid);
         } else {
             throw new BusinessException(ApiCode.REQ_VALIDATION, HttpStatus.BAD_REQUEST,
@@ -409,6 +415,22 @@ public class AiChatService {
                         ApiCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, "sessionUuid=" + sessionUuid));
     }
 
+    private ChatMessageEntity requireUserMessage(UUID messageUuid, long userId, String fieldName) {
+        return chatMessageRepository.findByUuidAndUserId(messageUuid, userId)
+                .orElseThrow(() -> new BusinessException(
+                        ApiCode.RESOURCE_NOT_FOUND, HttpStatus.NOT_FOUND, fieldName + "=" + messageUuid));
+    }
+
+    private void ensureMessageBelongsToSession(ChatMessageEntity message, UUID sessionUuid, String fieldName) {
+        if (!sessionUuid.equals(message.getSessionUuid())) {
+            throw new BusinessException(
+                    ApiCode.REQ_VALIDATION,
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    fieldName + " 不属于该会话: sessionUuid=" + sessionUuid + ", messageUuid=" + message.getUuid()
+            );
+        }
+    }
+
     
     // 私有辅助方法
     
@@ -419,7 +441,7 @@ public class AiChatService {
      */
     private List<Message> toSpringAiMessages(List<ChatMessageEntity> entities) {
         return entities.stream()
-                .filter(e -> "TEXT".equals(e.getMessageType()))
+                .filter(e -> ChatMessageEntity.TYPE_TEXT.equals(e.getMessageType()))
                 .filter(e -> e.getRole() == ChatRole.USER || e.getRole() == ChatRole.ASSISTANT)
                 .map(e -> {
                     if (e.getRole() == ChatRole.USER) {

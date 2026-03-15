@@ -10,6 +10,7 @@ import org.redisson.api.RedissonClient;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -21,8 +22,9 @@ class RedisAutoConfigurationTest {
                     PocketmindRedisConfig.class,
                     RedisServiceAutoConfiguration.class,
                     RedissonLockAutoConfiguration.class))
-                    .withBean(RedisConnectionFactory.class, () -> mock(RedisConnectionFactory.class))
+            .withBean(RedisConnectionFactory.class, () -> mock(RedisConnectionFactory.class))
             .withBean(RedissonClient.class, () -> mock(RedissonClient.class))
+            .withBean(ObjectMapper.class, ObjectMapper::new)
             .withPropertyValues("spring.data.redis.host=127.0.0.1", "spring.data.redis.port=6379");
 
     @Test

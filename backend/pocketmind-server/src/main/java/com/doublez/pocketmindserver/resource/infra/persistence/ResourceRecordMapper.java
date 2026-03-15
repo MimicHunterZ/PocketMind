@@ -12,7 +12,7 @@ import java.util.UUID;
 public interface ResourceRecordMapper extends BaseMapper<ResourceRecordModel> {
 
     @Select("""
-            SELECT id, uuid, user_id, source_type, root_uri, title, content, source_url,
+            SELECT id, uuid, user_id, source_type, root_uri, title, abstract_text, summary_text, content, source_url,
                    note_uuid, session_uuid, asset_uuid, status, created_at, updated_at, is_deleted
               FROM resource_records
              WHERE user_id = #{userId}
@@ -24,7 +24,7 @@ public interface ResourceRecordMapper extends BaseMapper<ResourceRecordModel> {
                                              @Param("noteUuid") UUID noteUuid);
 
     @Select("""
-            SELECT id, uuid, user_id, source_type, root_uri, title, content, source_url,
+            SELECT id, uuid, user_id, source_type, root_uri, title, abstract_text, summary_text, content, source_url,
                    note_uuid, session_uuid, asset_uuid, status, created_at, updated_at, is_deleted
               FROM resource_records
              WHERE user_id = #{userId}
@@ -36,7 +36,7 @@ public interface ResourceRecordMapper extends BaseMapper<ResourceRecordModel> {
                                                 @Param("sessionUuid") UUID sessionUuid);
 
     @Select("""
-            SELECT id, uuid, user_id, source_type, root_uri, title, content, source_url,
+            SELECT id, uuid, user_id, source_type, root_uri, title, abstract_text, summary_text, content, source_url,
                    note_uuid, session_uuid, asset_uuid, status, created_at, updated_at, is_deleted
               FROM resource_records
              WHERE user_id = #{userId}

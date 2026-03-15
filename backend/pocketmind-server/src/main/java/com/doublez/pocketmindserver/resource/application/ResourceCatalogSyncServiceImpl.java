@@ -77,9 +77,8 @@ public class ResourceCatalogSyncServiceImpl implements ResourceCatalogSyncServic
 
     @Override
     public void removeFromCatalog(ResourceRecordEntity resource) {
-        // 当前阶段通过 context_catalog 的逻辑删除实现，
-        // 后续可扩展为真正的级联清理。
-        log.debug("[resource-catalog-sync] 资源已删除, 目录条目暂保留: uri={}", resource.getRootUri().value());
+        log.debug("[resource-catalog-sync] 资源已删除, 同步级联逻辑删除 context_catalog 条目: uri={}", resource.getRootUri().value());
+        catalogRepository.deleteByUri(resource.getRootUri().value());
     }
 
     /**

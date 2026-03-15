@@ -7,7 +7,6 @@ import com.doublez.pocketmindserver.chat.application.ChatPersistenceContextHolde
 import com.doublez.pocketmindserver.note.domain.note.NoteEntity;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
 import com.doublez.pocketmindserver.note.domain.tag.TagRepository;
-import com.doublez.pocketmindserver.note.infra.persistence.note.NoteTagRelationMapper;
 import com.doublez.pocketmindserver.mq.CrawlerProducer;
 import com.doublez.pocketmindserver.mq.event.CrawlerRequestEvent;
 import com.doublez.pocketmindserver.resource.application.NoteResourceSyncService;
@@ -43,7 +42,6 @@ public class AiAnalysePollingService {
     private final AiFailoverRouter failoverRouter;
     private final AiAnalyseChatSessionService chatSessionService;
     private final TagRepository tagRepository;
-    private final NoteTagRelationMapper noteTagRelationMapper;
     private final TaskExecutor taskExecutor;
     private final NoteResourceSyncService noteResourceSyncService;
 
@@ -59,7 +57,6 @@ public class AiAnalysePollingService {
                                    AiFailoverRouter failoverRouter,
                                    AiAnalyseChatSessionService chatSessionService,
                                    TagRepository tagRepository,
-                                   NoteTagRelationMapper noteTagRelationMapper,
                                    @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
                                    NoteResourceSyncService noteResourceSyncService) {
         this.noteRepository = noteRepository;
@@ -68,7 +65,6 @@ public class AiAnalysePollingService {
         this.failoverRouter = failoverRouter;
         this.chatSessionService = chatSessionService;
         this.tagRepository = tagRepository;
-        this.noteTagRelationMapper = noteTagRelationMapper;
         this.taskExecutor = taskExecutor;
         this.noteResourceSyncService = noteResourceSyncService;
     }
@@ -263,17 +259,18 @@ public class AiAnalysePollingService {
         if (tags == null || tags.isEmpty()) {
             return;
         }
-        for (String tagName : tags) {
-            if (tagName == null || tagName.isBlank()) {
-                continue;
+        try {
+            List<String> existingTags = noteRepository.findTagNamesByUuid(noteUuid, userId);
+            Set<String> newTags = new HashSet<>(existingTags);
+            for (String tagName : tags) {
+                if (tagName != null && !tagName.isBlank()) {
+                    newTags.add(tagName.trim());
+                }
             }
-            try {
-                var tagEntity = tagRepository.findOrCreate(userId, tagName.trim());
-                noteTagRelationMapper.insert(noteUuid, tagEntity.getId());
-            } catch (Exception e) {
-                // 标签写入失败不影响主流程
-                log.warn("tag write failed, noteUuid={}, tag={}", noteUuid, tagName, e);
-            }
+            noteRepository.replaceTagNames(noteUuid, userId, new ArrayList<>(newTags));
+        } catch (Exception e) {
+            // 标签写入失败不影响主流程
+            log.warn("tag write failed, noteUuid={}", noteUuid, e);
         }
     }
 

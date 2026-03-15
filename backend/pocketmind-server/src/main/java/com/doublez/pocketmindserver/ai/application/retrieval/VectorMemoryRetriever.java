@@ -45,7 +45,7 @@ public class VectorMemoryRetriever implements MemoryRetriever {
                 .toList();
 
         // 批量递增热度
-        entries.forEach(e -> memoryRecordRepository.incrementActiveCount(e.entity().getUuid()));
+        entries.forEach(e -> memoryRecordRepository.incrementActiveCount(e.entity().getUuid(), userId));
 
         log.debug("[vector-memory-retriever] 检索到 {} 条记忆: userId={}", snippets.size(), userId);
         return snippets;

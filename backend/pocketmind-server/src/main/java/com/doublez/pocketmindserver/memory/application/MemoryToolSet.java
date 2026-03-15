@@ -130,7 +130,7 @@ public class MemoryToolSet {
         // 渲染搜索结果条目
         String resultsText = results.stream()
                 .map(m -> {
-                    memoryRecordRepository.incrementActiveCount(m.getUuid());
+                    memoryRecordRepository.incrementActiveCount(m.getUuid(), m.getUserId());
                     return renderItem(searchResultItemTemplate, Map.of(
                             "memoryType", m.getMemoryType().name(),
                             "title", m.getTitle() != null ? m.getTitle() : "未命名",
@@ -167,7 +167,7 @@ public class MemoryToolSet {
         }
 
         MemoryRecordEntity m = opt.get();
-        memoryRecordRepository.incrementActiveCount(m.getUuid());
+        memoryRecordRepository.incrementActiveCount(m.getUuid(), m.getUserId());
 
         // 渲染来源证据条目
         String evidenceText;

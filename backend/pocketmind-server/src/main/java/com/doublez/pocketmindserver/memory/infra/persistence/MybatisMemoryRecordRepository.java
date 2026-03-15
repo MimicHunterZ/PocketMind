@@ -123,8 +123,8 @@ public class MybatisMemoryRecordRepository implements MemoryRecordRepository {
     }
 
     @Override
-    public void incrementActiveCount(UUID uuid) {
-        mapper.incrementActiveCount(uuid);
+    public void incrementActiveCount(UUID uuid, long userId) {
+        mapper.incrementActiveCount(uuid, userId);
     }
 
     @Override
@@ -171,9 +171,9 @@ public class MybatisMemoryRecordRepository implements MemoryRecordRepository {
     }
 
     @Override
-    public void updateEmbedding(UUID uuid, float[] embedding) {
+    public void updateEmbedding(UUID uuid, long userId, float[] embedding) {
         if (embedding == null) return;
-        mapper.updateEmbedding(uuid, toVectorString(embedding));
+        mapper.updateEmbedding(uuid, userId, toVectorString(embedding));
     }
 
     private ScoredMemoryEntry toScoredEntry(java.util.Map<String, Object> row) {

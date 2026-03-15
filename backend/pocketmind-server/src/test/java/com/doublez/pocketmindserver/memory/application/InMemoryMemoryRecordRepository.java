@@ -74,7 +74,7 @@ public class InMemoryMemoryRecordRepository implements MemoryRecordRepository {
     }
 
     @Override
-    public void incrementActiveCount(UUID uuid) {
+    public void incrementActiveCount(UUID uuid, long userId) {
         findByUuid(uuid).ifPresent(MemoryRecordEntity::incrementActiveCount);
     }
 
@@ -100,6 +100,6 @@ public class InMemoryMemoryRecordRepository implements MemoryRecordRepository {
     }
 
     @Override
-    public void updateEmbedding(UUID uuid, float[] embedding) {
+    public void updateEmbedding(UUID uuid, long userId, float[] embedding) {
     }
 }

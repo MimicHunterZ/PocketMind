@@ -177,6 +177,11 @@ public class MybatisContextCatalogRepository implements ContextCatalogRepository
                 .setSql("active_count = active_count + 1"));
     }
 
+    @Override
+    public void deleteByUri(String uri) {
+        mapper.delete(new LambdaQueryWrapper<ContextCatalogModel>().eq(ContextCatalogModel::getUri, uri));
+    }
+
     // ─── 转换 ──────────────────────────────────────────────────
 
     private ContextNode toNode(ContextCatalogModel model) {
