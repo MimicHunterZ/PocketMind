@@ -26,8 +26,10 @@ spring:
     chat:
       client:
         observations:
-          log-prompt: true
-          log-completion: true
+          include-input: true
+      observations:
+        include-prompt: true
+        include-completion: true
     openai:
       api-key: your_api_key # 替换为你的 API Key
       base-url: your_base_url # 替换为你的 Base URL 不需要 /v1
@@ -91,6 +93,11 @@ logging:
     org.springframework.ai: DEBUG
 
 management:
+  observations:
+    http:
+      server:
+        requests:
+          enabled: false
   otlp:
     metrics:
       export:

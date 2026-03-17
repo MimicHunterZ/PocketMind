@@ -55,6 +55,14 @@ public class MybatisResourceRecordRepository implements ResourceRecordRepository
     }
 
     @Override
+    public Optional<ResourceRecordEntity> findByRootUriAndUserId(String rootUri, long userId) {
+        ResourceRecordModel model = mapper.selectOne(new LambdaQueryWrapper<ResourceRecordModel>()
+                .eq(ResourceRecordModel::getRootUri, rootUri)
+                .eq(ResourceRecordModel::getUserId, userId));
+        return Optional.ofNullable(model).map(structMapper::toDomain);
+    }
+
+    @Override
     public List<ResourceRecordEntity> findByNoteUuid(long userId, UUID noteUuid) {
         return mapper.findByNoteUuid(userId, noteUuid).stream().map(structMapper::toDomain).toList();
     }

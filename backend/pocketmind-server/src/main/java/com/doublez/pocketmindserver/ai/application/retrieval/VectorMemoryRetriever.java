@@ -57,7 +57,7 @@ public class VectorMemoryRetriever implements MemoryRetriever {
                 m.getRootUri() != null ? m.getRootUri().value() : "pm://memories/" + m.getUuid(),
                 m.getTitle(),
                 m.getAbstractText(),
-                m.getContent(),
+                null, // L2 content 按需加载 (由 LLM 决定是否调用 Memory 工具获取)
                 entry.similarity(),
                 SnippetSource.MEMORY
         );

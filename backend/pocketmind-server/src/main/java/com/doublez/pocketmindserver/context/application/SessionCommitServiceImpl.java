@@ -7,8 +7,6 @@ import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
 import com.doublez.pocketmindserver.context.domain.ContextCatalogRepository;
-import com.doublez.pocketmindserver.context.domain.ContextRefEntity;
-import com.doublez.pocketmindserver.context.domain.ContextRefRepository;
 import com.doublez.pocketmindserver.context.domain.ContextUri;
 import com.doublez.pocketmindserver.memory.application.MemoryExtractorService;
 import com.doublez.pocketmindserver.resource.application.ChatTranscriptResourceSyncService;
@@ -48,7 +46,6 @@ import java.util.stream.Collectors;
  *   <li>同步对话转录 Resource（CHAT_TRANSCRIPT）</li>
  *   <li>调用 LLM 生成结构化摘要</li>
  *   <li>创建 CHAT_STAGE_SUMMARY Resource → 同步 context_catalog</li>
- *   <li>写入 ContextRef 关联</li>
  *   <li>递增 catalog 热度</li>
  * </ol>
  */
@@ -64,7 +61,6 @@ public class SessionCommitServiceImpl implements SessionCommitService {
     private final ResourceRecordRepository resourceRecordRepository;
     private final ResourceContextService resourceContextService;
     private final ResourceCatalogSyncService catalogSyncService;
-    private final ContextRefRepository contextRefRepository;
     private final ContextCatalogRepository contextCatalogRepository;
     private final AiFailoverRouter aiFailoverRouter;
     private final MemoryExtractorService memoryExtractorService;
@@ -85,7 +81,6 @@ public class SessionCommitServiceImpl implements SessionCommitService {
                                     ResourceRecordRepository resourceRecordRepository,
                                     ResourceContextService resourceContextService,
                                     ResourceCatalogSyncService catalogSyncService,
-                                    ContextRefRepository contextRefRepository,
                                     ContextCatalogRepository contextCatalogRepository,
                                     AiFailoverRouter aiFailoverRouter,
                                     MemoryExtractorService memoryExtractorService) {
@@ -95,7 +90,6 @@ public class SessionCommitServiceImpl implements SessionCommitService {
         this.resourceRecordRepository = resourceRecordRepository;
         this.resourceContextService = resourceContextService;
         this.catalogSyncService = catalogSyncService;
-        this.contextRefRepository = contextRefRepository;
         this.contextCatalogRepository = contextCatalogRepository;
         this.aiFailoverRouter = aiFailoverRouter;
         this.memoryExtractorService = memoryExtractorService;
@@ -144,15 +138,6 @@ public class SessionCommitServiceImpl implements SessionCommitService {
                 userId, sessionUuid, summaryUri, sessionTitle,
                 summaryResult.abstractText(), summaryResult.summaryText(), transcript
         );
-
-        // 7. 创建 ContextRef 关联（会话 → 摘要资源）
-        ContextRefEntity ref = ContextRefEntity.ofSession(
-                userId,
-                summaryUri,
-                sessionUuid,
-                "CHAT_STAGE_SUMMARY"
-        );
-        contextRefRepository.upsert(ref);
 
         // 8. 递增 catalog 热度
         contextCatalogRepository.incrementActiveCount(summaryUri.value());

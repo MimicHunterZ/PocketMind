@@ -105,6 +105,11 @@ class AiChatServicePauseTest {
                 retrievalOrchestrator,
                 intentAnalyzer
         );
+        com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet.ResourceToolSetFactory resourceToolSetFactory = mock(com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet.ResourceToolSetFactory.class);
+        com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet mockResourceToolSet = mock(com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet.class);
+        lenient().when(mockResourceToolSet.toToolCallbacks()).thenReturn(new org.springframework.ai.tool.ToolCallback[0]);
+        lenient().when(resourceToolSetFactory.createForUser(anyLong())).thenReturn(mockResourceToolSet);
+
         sseReplyService = new SseReplyService(
                 aiFailoverRouter,
                 chatMessageRepository,
@@ -114,7 +119,8 @@ class AiChatServicePauseTest {
                 chatTranscriptResourceSyncService,
                 new com.doublez.pocketmindserver.memory.application.MemoryToolSet.MemoryToolSetFactory(
                         new InMemoryMemoryRecordRepository()),
-                null  // SessionCommitService — 单元测试不触发会话提交
+                null,  // SessionCommitService — 单元测试不触发会话提交
+                resourceToolSetFactory
         );
 
         when(tenantSkillToolResolver.resolveForUser(anyLong(), anyString()))

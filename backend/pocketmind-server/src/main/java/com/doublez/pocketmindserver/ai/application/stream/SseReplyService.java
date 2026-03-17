@@ -8,11 +8,13 @@ import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
 import com.doublez.pocketmindserver.context.application.SessionCommitService;
 import com.doublez.pocketmindserver.memory.application.MemoryToolSet;
 import com.doublez.pocketmindserver.resource.application.ChatTranscriptResourceSyncService;
+import com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet;
 import com.doublez.pocketmindserver.shared.util.PromptBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.http.codec.ServerSentEvent;
@@ -21,6 +23,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -43,6 +47,7 @@ public class SseReplyService {
     private final ChatTranscriptResourceSyncService chatTranscriptResourceSyncService;
     private final MemoryToolSet.MemoryToolSetFactory memoryToolSetFactory;
     private final SessionCommitService sessionCommitService;
+    private final ResourceToolSet.ResourceToolSetFactory resourceToolSetFactory;
 
     @Value("classpath:prompts/chat/branch_alias_system.md")
     private Resource branchAliasSystemTemplate;
@@ -57,7 +62,8 @@ public class SseReplyService {
                            TenantSkillToolResolver tenantSkillToolResolver,
                            ChatTranscriptResourceSyncService chatTranscriptResourceSyncService,
                            MemoryToolSet.MemoryToolSetFactory memoryToolSetFactory,
-                           SessionCommitService sessionCommitService) {
+                           SessionCommitService sessionCommitService,
+                           ResourceToolSet.ResourceToolSetFactory resourceToolSetFactory) {
         this.aiFailoverRouter = aiFailoverRouter;
         this.chatMessageRepository = chatMessageRepository;
         this.chatStreamCancellationManager = chatStreamCancellationManager;
@@ -66,6 +72,7 @@ public class SseReplyService {
         this.chatTranscriptResourceSyncService = chatTranscriptResourceSyncService;
         this.memoryToolSetFactory = memoryToolSetFactory;
         this.sessionCommitService = sessionCommitService;
+        this.resourceToolSetFactory = resourceToolSetFactory;
     }
 
     public Flux<ServerSentEvent<String>> streamReply(long userId,
@@ -145,7 +152,19 @@ public class SseReplyService {
 
         // 构建请求级记忆工具
         MemoryToolSet memoryToolSet = memoryToolSetFactory.createForUser(userId);
-        org.springframework.ai.tool.ToolCallback[] memoryCallbacks = memoryToolSet.toToolCallbacks();
+        ToolCallback[] memoryCallbacks = memoryToolSet.toToolCallbacks();
+        
+        // 构建请求级资源工具
+        ResourceToolSet resourceToolSet = resourceToolSetFactory.createForUser(userId);
+        ToolCallback[] resourceCallbacks = resourceToolSet.toToolCallbacks();
+
+        List<ToolCallback> allCallbacks = new ArrayList<>();
+        allCallbacks.addAll(Arrays.asList(memoryCallbacks));
+        allCallbacks.addAll(Arrays.asList(resourceCallbacks));
+        
+        if (resolvedSkillTool.skillCallback() != null) {
+            allCallbacks.addAll(Arrays.asList(resolvedSkillTool.skillCallback()));
+        }
 
         return aiFailoverRouter.executeChatStream(
                 "streamReply",
@@ -156,21 +175,14 @@ public class SseReplyService {
                             .messages(historyMessages.toArray(new Message[0]))
                             .user(userPrompt);
 
-                    // 注入记忆工具
-                    if (memoryCallbacks.length > 0) {
-                        requestSpec = requestSpec.toolCallbacks(memoryCallbacks);
-                        log.info("[memory-tool] 对话请求注入记忆工具: userId={}, toolCount={}",
-                                userId, memoryCallbacks.length);
+                    // 注入所有合并后的工具
+                    if (!allCallbacks.isEmpty()) {
+                        requestSpec = requestSpec.toolCallbacks(allCallbacks.toArray(new ToolCallback[0]));
+                        log.info("[tool] 对话请求注入工具: userId={}, toolCount={}", userId, allCallbacks.size());
+                    } else {
+                        log.info("[tool] 对话请求未注入任何工具: userId={}", userId);
                     }
 
-                    if (resolvedSkillTool.skillCallback() != null) {
-                        log.info("[skill] 对话请求注入 tenant skill: userId={}, tenantKey={}, agentKey={}",
-                                userId, resolvedSkillTool.tenantKey(), resolvedSkillTool.agentKey());
-                        requestSpec = requestSpec.toolCallbacks(resolvedSkillTool.skillCallback());
-                    } else {
-                        log.info("[skill] 对话请求未注入 tenant skill（无可用技能）: userId={}, tenantKey={}, agentKey={}",
-                                userId, resolvedSkillTool.tenantKey(), resolvedSkillTool.agentKey());
-                    }
                     return requestSpec.stream().content();
                 }
         );

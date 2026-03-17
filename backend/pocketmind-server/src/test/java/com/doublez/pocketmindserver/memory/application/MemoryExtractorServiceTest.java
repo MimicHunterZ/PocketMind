@@ -238,8 +238,14 @@ class MemoryExtractorServiceTest {
         @Override public void update(ResourceRecordEntity r) {}
         @Override public Optional<ResourceRecordEntity> findByUuidAndUserId(UUID uuid, long userId) {
             return storage.stream()
-                    .filter(r -> r.getUuid().equals(uuid) && r.getUserId() == userId)
-                    .findFirst();
+                .filter(r -> r.getUuid().equals(uuid) && r.getUserId() == userId)
+                .findFirst();
+        }
+        @Override
+        public Optional<ResourceRecordEntity> findByRootUriAndUserId(String rootUri, long userId) {
+            return storage.stream()
+                .filter(r -> java.util.Objects.equals(r.getRootUri(), rootUri) && r.getUserId() == userId)
+                .findFirst();
         }
         @Override public List<ResourceRecordEntity> findByNoteUuid(long userId, UUID noteUuid) { return List.of(); }
         @Override public List<ResourceRecordEntity> findBySessionUuid(long userId, UUID uuid) { return List.of(); }

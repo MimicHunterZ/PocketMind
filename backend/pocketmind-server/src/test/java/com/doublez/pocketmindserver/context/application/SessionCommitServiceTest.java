@@ -8,8 +8,6 @@ import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
 import com.doublez.pocketmindserver.context.domain.ContextCatalogRepository;
 import com.doublez.pocketmindserver.context.domain.ContextLayer;
 import com.doublez.pocketmindserver.context.domain.ContextNode;
-import com.doublez.pocketmindserver.context.domain.ContextRefEntity;
-import com.doublez.pocketmindserver.context.domain.ContextRefRepository;
 import com.doublez.pocketmindserver.context.domain.ContextType;
 import com.doublez.pocketmindserver.context.domain.ContextUri;
 import com.doublez.pocketmindserver.resource.application.ChatTranscriptResourceSyncService;
@@ -58,7 +56,6 @@ class SessionCommitServiceTest {
     private final InMemoryChatMessageRepository messageRepo = new InMemoryChatMessageRepository();
     private final InMemoryChatSessionRepository sessionRepo = new InMemoryChatSessionRepository();
     private final InMemoryResourceRecordRepository resourceRepo = new InMemoryResourceRecordRepository();
-    private final InMemoryContextRefRepository refRepo = new InMemoryContextRefRepository();
     private final InMemoryContextCatalogRepository catalogRepo = new InMemoryContextCatalogRepository();
     private final ResourceContextService contextService = new ResourceContextServiceImpl();
     private final NoOpCatalogSyncService catalogSyncService = new NoOpCatalogSyncService();
@@ -78,7 +75,6 @@ class SessionCommitServiceTest {
                 resourceRepo,
                 contextService,
                 catalogSyncService,
-                refRepo,
                 catalogRepo,
                 aiFailoverRouter,
                 (userId, sessionUuid, commitResult) -> 0  // no-op memory extractor for unit test
@@ -137,10 +133,6 @@ class SessionCommitServiceTest {
         assertThat(summaries).hasSize(1);
         assertThat(summaries.getFirst().getAbstractText()).contains("Spring AI");
         assertThat(summaries.getFirst().getSummaryText()).contains("讨论主题");
-
-        // 验证 ContextRef 被创建
-        assertThat(refRepo.storage).hasSize(1);
-        assertThat(refRepo.storage.getFirst().sessionUuid()).isEqualTo(sessionUuid);
 
         // 验证 transcript sync 被调用
         assertThat(transcriptSyncService.syncCalled).isTrue();
@@ -266,6 +258,13 @@ class SessionCommitServiceTest {
             }
             storage.add(resourceRecord);
         }
+
+        @Override
+        public Optional<ResourceRecordEntity> findByRootUriAndUserId(String rootUri, long userId) {
+            return storage.stream()
+                .filter(r -> java.util.Objects.equals(r.getRootUri(), rootUri) && r.getUserId() == userId)
+                .findFirst();
+        }
         @Override public Optional<ResourceRecordEntity> findByUuidAndUserId(UUID uuid, long userId) {
             return storage.stream().filter(r -> r.getUuid().equals(uuid) && r.getUserId() == userId).findFirst();
         }
@@ -276,35 +275,6 @@ class SessionCommitServiceTest {
                     .toList();
         }
         @Override public List<ResourceRecordEntity> findByAssetUuid(long userId, UUID assetUuid) { return List.of(); }
-    }
-
-    private static final class InMemoryContextRefRepository implements ContextRefRepository {
-        final List<ContextRefEntity> storage = new ArrayList<>();
-
-        @Override public void save(ContextRefEntity entity) { storage.add(entity); }
-        @Override public void saveBatch(List<ContextRefEntity> entities) { storage.addAll(entities); }
-        @Override public void upsert(ContextRefEntity entity) {
-            storage.removeIf(e -> e.contextUri().equals(entity.contextUri())
-                    && e.bizType().equals(entity.bizType())
-                    && e.userId() == entity.userId());
-            storage.add(entity);
-        }
-        @Override public List<ContextRefEntity> findByContextUri(String contextUri, long userId) {
-            return storage.stream().filter(e -> e.contextUri().value().equals(contextUri) && e.userId() == userId).toList();
-        }
-        @Override public List<ContextRefEntity> findBySessionUuid(UUID sessionUuid, long userId) {
-            return storage.stream().filter(e -> sessionUuid.equals(e.sessionUuid()) && e.userId() == userId).toList();
-        }
-        @Override public List<ContextRefEntity> findByNoteUuid(UUID noteUuid, long userId) {
-            return storage.stream().filter(e -> noteUuid.equals(e.noteUuid()) && e.userId() == userId).toList();
-        }
-        @Override public Optional<ContextRefEntity> findByUuid(UUID uuid) {
-            return storage.stream().filter(e -> e.uuid().equals(uuid)).findFirst();
-        }
-        @Override public void softDelete(UUID uuid) {
-            // 简化实现：直接移除
-            storage.removeIf(e -> e.uuid().equals(uuid));
-        }
     }
 
     private static final class InMemoryContextCatalogRepository implements ContextCatalogRepository {

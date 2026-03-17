@@ -97,7 +97,6 @@ class PocketmindServerApplicationTests {
     @MockitoBean com.doublez.pocketmindserver.memory.infra.persistence.MemoryRecordMapper memoryRecordMapper;
     @MockitoBean com.doublez.pocketmindserver.resource.infra.persistence.ResourceRecordMapper resourceRecordMapper;
     @MockitoBean com.doublez.pocketmindserver.context.infra.persistence.ContextCatalogMapper contextCatalogMapper;
-    @MockitoBean com.doublez.pocketmindserver.context.infra.persistence.ContextRefMapper contextRefMapper;
     @MockitoBean com.doublez.pocketmindserver.asset.domain.AssetMapper assetMapper;
     @MockitoBean(name = "embeddingModel") org.springframework.ai.embedding.EmbeddingModel embeddingModel;
     @MockitoBean(name = "chatModel") org.springframework.ai.chat.model.ChatModel chatModel;

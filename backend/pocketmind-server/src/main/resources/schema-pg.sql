@@ -249,30 +249,6 @@ CREATE INDEX IF NOT EXISTS idx_context_catalog_parent    ON context_catalog(pare
 CREATE INDEX IF NOT EXISTS idx_context_catalog_embedding ON context_catalog
     USING hnsw (embedding vector_cosine_ops) WHERE embedding IS NOT NULL;
 
--- ============================================================
--- 9. context_ref（业务对象与上下文对象关联）
--- ============================================================
-CREATE TABLE IF NOT EXISTS context_ref (
-    id               BIGSERIAL    PRIMARY KEY,
-    uuid             UUID         NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    user_id          BIGINT       NOT NULL,
-    context_uri      TEXT         NOT NULL,
-    biz_type         VARCHAR(30)  NOT NULL,
-    biz_id           TEXT,
-    note_uuid        UUID,
-    session_uuid     UUID,
-    message_uuid     UUID,
-    asset_uuid       UUID,
-    source_url       TEXT,
-    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at       BIGINT       NOT NULL DEFAULT 0,
-    is_deleted       BOOLEAN      NOT NULL DEFAULT FALSE
-);
-
-CREATE INDEX IF NOT EXISTS idx_context_ref_user_biz     ON context_ref(user_id, biz_type, updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_context_ref_note_uuid    ON context_ref(note_uuid);
-CREATE INDEX IF NOT EXISTS idx_context_ref_session_uuid ON context_ref(session_uuid);
-CREATE INDEX IF NOT EXISTS idx_context_ref_asset_uuid   ON context_ref(asset_uuid);
 
 -- ============================================================
 -- 10. resource_records（AI 可读资源记录）

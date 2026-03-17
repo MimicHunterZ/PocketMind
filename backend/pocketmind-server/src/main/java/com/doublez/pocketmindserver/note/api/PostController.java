@@ -1,4 +1,4 @@
-﻿package com.doublez.pocketmindserver.note.api;
+package com.doublez.pocketmindserver.note.api;
 
 import com.doublez.pocketmindserver.note.api.dto.PostResponse;
 import com.doublez.pocketmindserver.note.application.PostService;

@@ -175,6 +175,13 @@ class NoteResourceSyncServiceTest {
         }
 
         @Override
+        public Optional<ResourceRecordEntity> findByRootUriAndUserId(String rootUri, long userId) {
+            return storage.stream()
+                    .filter(r -> java.util.Objects.equals(r.getRootUri(), rootUri) && r.getUserId() == userId)
+                    .findFirst();
+        }
+
+        @Override
         public Optional<ResourceRecordEntity> findByUuidAndUserId(UUID uuid, long userId) {
             return storage.stream()
                     .filter(resource -> resource.getUuid().equals(uuid) && resource.getUserId() == userId)

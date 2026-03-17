@@ -15,6 +15,8 @@ public interface ResourceRecordRepository {
 
     Optional<ResourceRecordEntity> findByUuidAndUserId(UUID uuid, long userId);
 
+    Optional<ResourceRecordEntity> findByRootUriAndUserId(String rootUri, long userId);
+
     List<ResourceRecordEntity> findByNoteUuid(long userId, UUID noteUuid);
 
     List<ResourceRecordEntity> findBySessionUuid(long userId, UUID sessionUuid);
