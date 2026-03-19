@@ -94,6 +94,8 @@ class PocketmindServerApplicationTests {
     @MockitoBean ChatSessionMapper chatSessionMapper;
     @MockitoBean ChatMessageMapper chatMessageMapper;
     @MockitoBean SyncChangeLogMapper syncChangeLogMapper;
+    @MockitoBean com.doublez.pocketmindserver.user.infra.persistence.UserSettingMapper userSettingMapper;
+    @MockitoBean com.doublez.pocketmindserver.user.infra.persistence.UserPersonaMapper userPersonaMapper;
     @MockitoBean com.doublez.pocketmindserver.memory.infra.persistence.MemoryRecordMapper memoryRecordMapper;
     @MockitoBean com.doublez.pocketmindserver.resource.infra.persistence.ResourceRecordMapper resourceRecordMapper;
     @MockitoBean com.doublez.pocketmindserver.context.infra.persistence.ContextCatalogMapper contextCatalogMapper;
