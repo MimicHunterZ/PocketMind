@@ -56,10 +56,6 @@ public class MemoryExtractorServiceImpl implements MemoryExtractorService {
     @Value("classpath:prompts/compression/memory_extraction_user.md")
     private Resource extractionUserTemplate;
 
-    /** 已有记忆条目渲染模板（供 LLM 去重参考） */
-    @Value("classpath:prompts/memory/existing_memory_item.md")
-    private Resource existingMemoryItemTemplate;
-
     public MemoryExtractorServiceImpl(MemoryRecordRepository memoryRecordRepository,
                                       ResourceRecordRepository resourceRecordRepository,
                                       MemoryContextService memoryContextService,
@@ -85,15 +81,13 @@ public class MemoryExtractorServiceImpl implements MemoryExtractorService {
 
         // 2. 查询已有记忆（用于 LLM 去重参考）
         List<MemoryRecordEntity> existingMemories = memoryRecordRepository.findActiveByUserId(userId, 50);
-        String existingMemoriesText = renderExistingMemories(existingMemories);
-
         // 3. 调用 LLM 抽取
         MemoryExtractionResult result;
         try {
             result = callLlmExtraction(
                     commitResult.abstractText() != null ? commitResult.abstractText() : "未命名对话",
                     summary,
-                    existingMemoriesText
+                    existingMemories
             );
         } catch (Exception e) {
             log.error("[memory-extractor] LLM 抽取失败: userId={}, error={}", userId, e.getMessage(), e);
@@ -169,26 +163,7 @@ public class MemoryExtractorServiceImpl implements MemoryExtractorService {
                 .orElse(null);
     }
 
-    private String renderExistingMemories(List<MemoryRecordEntity> memories) {
-        if (memories.isEmpty()) {
-            return "（暂无已有记忆）";
-        }
-        return memories.stream()
-                .map(m -> {
-                    try {
-                        return PromptBuilder.render(existingMemoryItemTemplate, Map.of(
-                                "memoryType", m.getMemoryType().name(),
-                                "title", m.getTitle() != null ? m.getTitle() : "未命名",
-                                "mergeKey", m.getMergeKey() != null ? m.getMergeKey() : ""
-                        ));
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                })
-                .collect(Collectors.joining());
-    }
-
-    private MemoryExtractionResult callLlmExtraction(String sessionTitle, String summary, String existingMemories) {
+    private MemoryExtractionResult callLlmExtraction(String sessionTitle, String summary, List<MemoryRecordEntity> existingMemories) {
         BeanOutputConverter<MemoryExtractionResult> outputConverter =
                 new BeanOutputConverter<>(MemoryExtractionResult.class);
 
