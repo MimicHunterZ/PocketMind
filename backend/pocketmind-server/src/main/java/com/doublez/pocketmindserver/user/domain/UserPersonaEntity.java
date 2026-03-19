@@ -8,23 +8,23 @@ import java.time.OffsetDateTime;
 
 @Data
 @Accessors(chain = true)
-@TableName("user_settings")
-public class UserSettingEntity {
+@TableName("user_personas")
+public class UserPersonaEntity {
 
-    /**
-     * 用户ID (主键)
-     */
-    @TableId(type = IdType.INPUT)
+    @TableId(type = IdType.AUTO)
+    private Long id;
+
     private Long userId;
 
-    /**
-     * 当前生效的人格 ID
-     */
-    private Long activePersonaId;
+    private String name;
+
+    private String systemPrompt;
 
     @TableField(fill = FieldFill.INSERT)
     private OffsetDateTime createdAt;
 
-    @TableField(fill = FieldFill.INSERT_UPDATE)
-    private OffsetDateTime updatedAt;
+    private Long updatedAt;
+
+    @TableLogic
+    private Boolean isDeleted;
 }

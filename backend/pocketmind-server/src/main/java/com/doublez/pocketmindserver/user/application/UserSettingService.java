@@ -10,12 +10,12 @@ public interface UserSettingService {
     UserSettingDto getSettings(long userId);
 
     /**
-     * 更新用户的自定义提示词
+     * 设置当前生效的人格
      */
-    void updateCustomSystemPrompt(long userId, String customSystemPrompt);
+    void setActivePersona(long userId, Long personaId);
 
     /**
-     * 获取用户的自定义提示词(内部调用, 带有缓存等优化)
+     * 获取用户当前生效的人格 Prompt(内部调用, 带有缓存等优化)
      */
-    String getCustomSystemPrompt(long userId);
+    String getActivePersonaPrompt(long userId);
 }

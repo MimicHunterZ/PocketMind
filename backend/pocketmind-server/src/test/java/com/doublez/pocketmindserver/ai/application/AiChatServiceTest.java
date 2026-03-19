@@ -4,6 +4,9 @@ import com.doublez.pocketmindserver.ai.application.context.ContextAssembler;
 import com.doublez.pocketmindserver.ai.application.embedding.EmbeddingService;
 import com.doublez.pocketmindserver.ai.application.memory.MemoryInjector;
 import com.doublez.pocketmindserver.ai.application.memory.MemoryQueryServiceImpl;
+import com.doublez.pocketmindserver.ai.application.retrieval.AnalyzedIntent;
+import com.doublez.pocketmindserver.ai.application.retrieval.IntentAnalyzer;
+import com.doublez.pocketmindserver.ai.application.retrieval.RetrievalOrchestrator;
 import com.doublez.pocketmindserver.ai.application.stream.ChatSseEventFactory;
 import com.doublez.pocketmindserver.ai.application.stream.ChatStreamCancellationManager;
 import com.doublez.pocketmindserver.ai.application.stream.SseReplyService;
@@ -16,6 +19,7 @@ import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
+import com.doublez.pocketmindserver.user.application.UserSettingService;
 import com.doublez.pocketmindserver.memory.application.InMemoryMemoryRecordRepository;
 import com.doublez.pocketmindserver.resource.application.ChatTranscriptResourceSyncService;
 import com.doublez.pocketmind.common.web.BusinessException;
@@ -59,6 +63,9 @@ class AiChatServiceTest {
         private ChatSseEventFactory chatSseEventFactory;
                 private ContextAssembler contextAssembler;
                 private SseReplyService sseReplyService;
+        private UserSettingService userSettingService;
+        private IntentAnalyzer intentAnalyzer;
+        private RetrievalOrchestrator retrievalOrchestrator;
 
     private static final long   USER_ID            = 100L;
     private static final UUID   SESSION_UUID       = UUID.randomUUID();
@@ -69,6 +76,11 @@ class AiChatServiceTest {
     void setUp() throws Exception {
         chatStreamCancellationManager = new ChatStreamCancellationManager();
         chatSseEventFactory = new ChatSseEventFactory(new ObjectMapper());
+        userSettingService = org.mockito.Mockito.mock(UserSettingService.class);
+        lenient().when(userSettingService.getActivePersonaPrompt(anyLong())).thenReturn("");
+        intentAnalyzer = mock(IntentAnalyzer.class);
+        retrievalOrchestrator = mock(RetrievalOrchestrator.class);
+        lenient().when(intentAnalyzer.analyze(anyString())).thenReturn(AnalyzedIntent.skip("单元测试默认跳过检索"));
         contextAssembler = new ContextAssembler(
                 noteRepository,
                 attachmentVisionRepository,
@@ -87,8 +99,9 @@ class AiChatServiceTest {
                     }
                 }, new InMemoryMemoryRecordRepository()),
                 mock(MemoryInjector.class),
-                mock(com.doublez.pocketmindserver.ai.application.retrieval.RetrievalOrchestrator.class),
-                mock(com.doublez.pocketmindserver.ai.application.retrieval.IntentAnalyzer.class)
+                retrievalOrchestrator,
+                intentAnalyzer,
+                userSettingService
         );
         com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet.ResourceToolSetFactory resourceToolSetFactory = mock(com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet.ResourceToolSetFactory.class);
         com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet mockResourceToolSet = mock(com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet.class);
@@ -120,17 +133,36 @@ class AiChatServiceTest {
                         null,
                         java.util.Map.of("tenantKey", "user-100", "agentKey", "claude")
                 ));
-        injectResource(contextAssembler, "globalSystemTemplate", "global system prompt");
-        injectResource(contextAssembler, "noteSystemTemplate", "<noteContext>");
-        injectResource(contextAssembler, "systemWithExtraSectionTemplate", "<systemText>\n\n<extraSection>");
-        injectResource(contextAssembler, "noteContextTemplate", "<noteTextSection><webClipSection><ocrSection><memorySection>");
-        injectResource(contextAssembler, "noteTextSectionTemplate", "<title>\n<content>");
-        injectResource(contextAssembler, "webClipSectionTemplate", "<title>\n<sourceUrl>\n<content>");
-        injectResource(contextAssembler, "ocrSectionTemplate", "<imageTexts>");
-        injectResource(contextAssembler, "memorySectionTemplate", "<memoryContext>");
+        injectResource(contextAssembler, "globalSystemTemplate", "<persona>\n## ⚠️ 强制底层行为准则");
+                injectResource(contextAssembler, "noteSystemTemplate", "<persona>\n<noteSection>");
+                injectResource(contextAssembler, "defaultGlobalPersonaTemplate", "默认全局人设");
+                injectResource(contextAssembler, "defaultNotePersonaTemplate", "默认笔记人设");
+                injectResource(contextAssembler, "superpowersFallbackTemplate", "默认全局人设");
         injectResource(sseReplyService, "branchAliasSystemTemplate", "branch alias system prompt");
         injectResource(sseReplyService, "branchAliasUserTemplate", "<contextPrefix>user: <userMessage>");
     }
+        @Nested
+        class SystemPersonaTest {
+
+                @Test
+                void customPersona_shouldOverrideDefaultPersona() {
+                        when(userSettingService.getActivePersonaPrompt(USER_ID)).thenReturn("用户自定义人设");
+
+                        String systemPrompt = contextAssembler.buildSystemPrompt(USER_ID, makeSession(), "你好");
+
+                        assertTrue(systemPrompt.contains("用户自定义人设"));
+                }
+
+                @Test
+                void emptyCustomPersona_shouldFallbackToDefaultGlobalPersona() {
+                        when(userSettingService.getActivePersonaPrompt(USER_ID)).thenReturn("   ");
+
+                        String systemPrompt = contextAssembler.buildSystemPrompt(USER_ID, makeSession(), "你好");
+
+                        assertTrue(systemPrompt.contains("默认全局人设"));
+                        assertTrue(systemPrompt.contains("## ⚠️ 强制底层行为准则"));
+                }
+        }
 
         private void injectResource(Object target, String fieldName, String content) throws Exception {
                 Field field = target.getClass().getDeclaredField(fieldName);

@@ -17,6 +17,7 @@ import com.doublez.pocketmindserver.resource.domain.ResourceRecordEntity;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordRepository;
 import com.doublez.pocketmindserver.resource.domain.ResourceSourceType;
 import com.doublez.pocketmindserver.shared.util.PromptBuilder;
+import com.doublez.pocketmindserver.user.application.UserSettingService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -25,22 +26,12 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
  * 聊天上下文装配器。
- *
- * <p>负责从 Resource / Note / OCR / Memory 组装聊天所需上下文，避免由聊天服务直接拼字段。
- *
- * <p>全局对话走 {@link RetrievalOrchestrator} 双通道检索（Resource + Memory），
- * 由 {@link IntentAnalyzer} 决定是否需要资源检索。
- * 笔记对话保持直接加载绑定笔记的 Resource，记忆由 {@link MemoryQueryService} 提供。
+ * <p>负责从 Resource / Note / OCR / Memory 以及 UserSettings 组装聊天所需上下文。</p>
  */
 @Slf4j
 @Service
@@ -55,6 +46,7 @@ public class ContextAssembler {
     private final MemoryInjector memoryInjector;
     private final RetrievalOrchestrator retrievalOrchestrator;
     private final IntentAnalyzer intentAnalyzer;
+    private final UserSettingService userSettingService;
 
     @Value("classpath:prompts/chat/global_system.md")
     private Resource globalSystemTemplate;
@@ -62,29 +54,21 @@ public class ContextAssembler {
     @Value("classpath:prompts/chat/note_system.md")
     private Resource noteSystemTemplate;
 
-    @Value("classpath:prompts/chat/context/system_with_extra_section.md")
-    private Resource systemWithExtraSectionTemplate;
+    @Value("classpath:prompts/chat/note_section.md")
+    private Resource noteSectionTemplate;
 
-    @Value("classpath:prompts/chat/context/note_context.md")
-    private Resource noteContextTemplate;
+    @Value("classpath:prompts/chat/persona/global_default.md")
+    private Resource defaultGlobalPersonaTemplate;
 
-    @Value("classpath:prompts/chat/context/note_text_section.md")
-    private Resource noteTextSectionTemplate;
+    @Value("classpath:prompts/chat/persona/note_default.md")
+    private Resource defaultNotePersonaTemplate;
 
-    @Value("classpath:prompts/chat/context/web_clip_section.md")
-    private Resource webClipSectionTemplate;
+    @Value("classpath:prompts/chat/persona/superpowers_fallback.st")
+    private Resource superpowersFallbackTemplate;
 
-    @Value("classpath:prompts/chat/context/ocr_section.md")
-    private Resource ocrSectionTemplate;
+    @Value("classpath:prompts/chat/context/memory_l0_item.md")
+    private Resource memoryL0ItemTemplate;
 
-    @Value("classpath:prompts/chat/context/memory_section.md")
-    private Resource memorySectionTemplate;
-
-    /** 检索到的资料片段外层包裹模板 */
-    @Value("classpath:prompts/chat/context/resource_snippets_section.md")
-    private Resource resourceSnippetsSectionTemplate;
-
-    /** 单条资料片段渲染模板 */
     @Value("classpath:prompts/chat/context/resource_snippet_item.md")
     private Resource resourceSnippetItemTemplate;
 
@@ -94,7 +78,8 @@ public class ContextAssembler {
                             MemoryQueryService memoryQueryService,
                             MemoryInjector memoryInjector,
                             RetrievalOrchestrator retrievalOrchestrator,
-                            IntentAnalyzer intentAnalyzer) {
+                            IntentAnalyzer intentAnalyzer,
+                            UserSettingService userSettingService) {
         this.noteRepository = noteRepository;
         this.attachmentVisionRepository = attachmentVisionRepository;
         this.resourceRecordRepository = resourceRecordRepository;
@@ -102,268 +87,234 @@ public class ContextAssembler {
         this.memoryInjector = memoryInjector;
         this.retrievalOrchestrator = retrievalOrchestrator;
         this.intentAnalyzer = intentAnalyzer;
+        this.userSettingService = userSettingService;
     }
 
     /**
      * 组装 system prompt。
-     *
-     * <p>全局对话走双通道检索；笔记对话保持直接加载。
      */
     public String buildSystemPrompt(long userId, ChatSessionEntity session, String userPrompt) {
         try {
-            // 笔记对话：直接加载绑定笔记的 Resource + 记忆
             if (session.getScopeNoteUuid() != null) {
                 return buildNoteScopedPrompt(userId, session, userPrompt);
             }
-            // 全局对话：走 RetrievalOrchestrator 双通道检索
             return buildGlobalPrompt(userId, session, userPrompt);
         } catch (IOException e) {
             throw new UncheckedIOException("加载对话系统提示词模板失败", e);
         }
     }
 
-    /**
-     * 全局对话：IntentAnalyzer 分析 → RetrievalOrchestrator 双通道检索 → 组装。
-     */
     private String buildGlobalPrompt(long userId, ChatSessionEntity session, String userPrompt) throws IOException {
         AnalyzedIntent intent = intentAnalyzer.analyze(userPrompt);
-        String systemText = globalSystemTemplate.getContentAsString(StandardCharsets.UTF_8);
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("persona", resolvePersona(userId, defaultGlobalPersonaTemplate));
 
-        if (!intent.needsRetrieval()) {
-            log.debug("[context] 意图分析跳过检索: userId={}", userId);
-            return systemText;
-        }
+        // 2. 意图分析与全系统检索
+        List<ContextSnippet> memorySnippets = Collections.emptyList();
+        List<ContextSnippet> resourceSnippets = Collections.emptyList();
 
-        // 双通道并行检索
-        OrchestratedContext ctx = retrievalOrchestrator.retrieve(userId, intent.queryText());
-        List<MemoryRecordEntity> allMemories = memoryInjector.queryAllMemories(userId);
-        String memorySection = renderMemorySectionFromSnippets(ctx.memorySnippets(), allMemories);
-        if (ctx.isEmpty()) {
-            if (!hasText(memorySection)) {
-                return systemText;
+        if (intent.needsRetrieval()) {
+            OrchestratedContext ctx = retrievalOrchestrator.retrieve(userId, intent.queryText());
+            memorySnippets = ctx.memorySnippets() != null ? ctx.memorySnippets() : Collections.emptyList();
+            resourceSnippets = ctx.resourceSnippets() != null ? ctx.resourceSnippets() : Collections.emptyList();
+            
+            if (!resourceSnippets.isEmpty()) {
+                variables.put("resources", renderResourceSnippets(resourceSnippets));
             }
-            return PromptBuilder.render(
-                    systemWithExtraSectionTemplate,
-                    Map.of("systemText", systemText, "extraSection", memorySection)
-            );
+        } else {
+            log.debug("[context] 意图分析跳过检索: userId={}", userId);
         }
 
-        // 分别渲染 Memory 和 Resource 片段为文本段落
-        String resourceSection = renderResourceSnippetsSection(ctx.resourceSnippets());
-
-        // 合并为 extraSection 注入系统提示
-        String extraSection = joinSections(memorySection, resourceSection);
-        if (!hasText(extraSection)) {
-            return systemText;
+        // 3. 记忆合并与去重 (命中记忆 + 全量记忆) -> 形成单一 L0 展示
+        List<MemoryRecordEntity> allMemories = memoryInjector.queryAllMemories(userId);
+        String deduplicatedMemories = mergeAndFormatL0Memories(memorySnippets, allMemories);
+        if (hasText(deduplicatedMemories)) {
+            variables.put("memories", deduplicatedMemories);
         }
-        return PromptBuilder.render(
-                systemWithExtraSectionTemplate,
-                Map.of("systemText", systemText, "extraSection", extraSection)
-        );
+
+        return PromptBuilder.render(globalSystemTemplate, variables);
     }
 
-    /**
-     * 笔记对话：直接加载绑定 Note 的 Resource + OCR，搭配 MemoryQueryService 查记忆。
-     */
     private String buildNoteScopedPrompt(long userId, ChatSessionEntity session, String userPrompt) throws IOException {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("persona", resolvePersona(userId, defaultNotePersonaTemplate));
+
+        // 2. 相关记忆 (命中记忆 + 全量记忆去重)
         List<MemoryRecordEntity> relevantMemories = memoryQueryService.queryRelevantMemories(userId, session, userPrompt);
         List<MemoryRecordEntity> allMemories = memoryInjector.queryAllMemories(userId);
-        String memorySection = renderMemorySection(relevantMemories, allMemories);
-
-        String noteContext = buildNoteContext(userId, session.getScopeNoteUuid(), memorySection);
-        if (!hasText(noteContext)) {
-            return renderFallbackGlobalPrompt(memorySection);
+        
+        Set<UUID> seenUuids = new HashSet<>();
+        List<String> combinedMemories = new ArrayList<>();
+        
+        if (relevantMemories != null) {
+            for (MemoryRecordEntity m : relevantMemories) {
+                if (seenUuids.add(m.getUuid())) {
+                    combinedMemories.add(formatMemoryL0(m, ""));
+                }
+            }
         }
-        return PromptBuilder.render(
-                noteSystemTemplate,
-                Map.of("noteContext", noteContext)
-        );
-    }
-
-    /**
-     * 兜底：笔记对话找不到笔记时，降级为全局 + 已检索的记忆。
-     */
-    private String renderFallbackGlobalPrompt(String memorySection) throws IOException {
-        String systemText = globalSystemTemplate.getContentAsString(StandardCharsets.UTF_8);
-        if (!hasText(memorySection)) {
-            return systemText;
+        if (allMemories != null) {
+            for (MemoryRecordEntity m : allMemories) {
+                if (seenUuids.add(m.getUuid())) {
+                    combinedMemories.add(formatMemoryL0(m, ""));
+                }
+            }
         }
-        return PromptBuilder.render(
-                systemWithExtraSectionTemplate,
-                Map.of("systemText", systemText, "extraSection", memorySection)
-        );
-    }
+        
+        if (!combinedMemories.isEmpty()) {
+            variables.put("memories", String.join("\n", combinedMemories));
+        }
 
-    private String buildNoteContext(long userId, UUID noteUuid, String memorySection) throws IOException {
+        // 3. 填充核心笔记上下文
+        UUID noteUuid = session.getScopeNoteUuid();
         List<ResourceRecordEntity> resources = resourceRecordRepository.findByNoteUuid(userId, noteUuid).stream()
                 .filter(resource -> !resource.isDeleted())
                 .sorted(Comparator.comparing(ResourceRecordEntity::getUpdatedAt).reversed())
                 .toList();
 
-        String noteTextSection = buildNoteTextSection(userId, noteUuid, resources);
-        String webClipSection = buildWebClipSection(resources);
-        String ocrSection = buildOcrSection(userId, noteUuid);
-
-        return PromptBuilder.render(
-                noteContextTemplate,
-                Map.of(
-                        "noteTextSection", noteTextSection,
-                        "webClipSection", webClipSection,
-                        "ocrSection", ocrSection,
-                        "memorySection", memorySection
-                )
-        ).trim();
-    }
-
-    private String buildNoteTextSection(long userId,
-                                        UUID noteUuid,
-                                        List<ResourceRecordEntity> resources) throws IOException {
+        // 3.1 Note Text
         Optional<ResourceRecordEntity> noteText = resources.stream()
-                .filter(resource -> resource.getSourceType() == ResourceSourceType.NOTE_TEXT)
+                .filter(r -> r.getSourceType() == ResourceSourceType.NOTE_TEXT)
                 .findFirst();
-
+        
         if (noteText.isPresent()) {
-            return renderNoteTextSection(noteText.get().getTitle(), noteText.get().getContent());
+            variables.put("noteTitle", safeText(noteText.get().getTitle()));
+            if (hasText(noteText.get().getContent())) {
+                variables.put("noteContent", sanitizeUntrustedText(noteText.get().getContent()));
+            }
+        } else {
+            NoteEntity note = noteRepository.findByUuidAndUserId(noteUuid, userId).orElse(null);
+            if (note != null) {
+                log.debug("[context] note={} 尚无 Resource 投影，回退到 Note 直读", noteUuid);
+                variables.put("noteTitle", safeText(note.getTitle()));
+                String bodyContent = hasText(note.getContent()) ? note.getContent() : note.getPreviewContent();
+                if (hasText(bodyContent)) {
+                    variables.put("noteContent", sanitizeUntrustedText(bodyContent));
+                }
+            }
         }
 
-        NoteEntity note = noteRepository.findByUuidAndUserId(noteUuid, userId).orElse(null);
-        if (note == null) {
-            return "";
-        }
+        // 3.2 Web Clip
+        resources.stream()
+                .filter(r -> r.getSourceType() == ResourceSourceType.WEB_CLIP)
+                .findFirst()
+                .ifPresent(clip -> {
+                    variables.put("webSourceUrl", sanitizeUrl(clip.getSourceUrl()));
+                    variables.put("webClipContent", sanitizeUntrustedText(clip.getContent()));
+                });
 
-        log.debug("[context] note={} 尚无 Resource 投影，回退到 Note 直读", noteUuid);
-        String bodyContent = hasText(note.getContent()) ? note.getContent() : note.getPreviewContent();
-        return renderNoteTextSection(note.getTitle(), bodyContent);
-    }
-
-    private String renderNoteTextSection(String title, String content) throws IOException {
-        if (!hasText(title) && !hasText(content)) {
-            return "";
-        }
-        return PromptBuilder.render(
-                noteTextSectionTemplate,
-                Map.of(
-                        "title", safeText(title),
-                        "content", wrapUntrustedDataBlock(content)
-                )
-        );
-    }
-
-    private String buildWebClipSection(List<ResourceRecordEntity> resources) throws IOException {
-        Optional<ResourceRecordEntity> webClip = resources.stream()
-                .filter(resource -> resource.getSourceType() == ResourceSourceType.WEB_CLIP)
-                .findFirst();
-        if (webClip.isEmpty()) {
-            return "";
-        }
-
-        ResourceRecordEntity resource = webClip.get();
-        return PromptBuilder.render(
-                webClipSectionTemplate,
-                Map.of(
-                        "title", safeText(resource.getTitle()),
-                        "sourceUrl", sanitizeUrl(resource.getSourceUrl()),
-                        "content", wrapUntrustedDataBlock(resource.getContent())
-                )
-        );
-    }
-
-    private String buildOcrSection(long userId, UUID noteUuid) throws IOException {
+        // 3.3 OCR Texts
         List<String> imageTexts = attachmentVisionRepository.findDoneByNoteUuid(userId, noteUuid).stream()
                 .map(AttachmentVisionEntity::getContent)
                 .filter(Objects::nonNull)
                 .filter(this::hasText)
                 .map(this::sanitizeUntrustedText)
                 .toList();
-        if (imageTexts.isEmpty()) {
-            return "";
+        if (!imageTexts.isEmpty()) {
+            variables.put("ocrTexts", "- " + String.join("\n- ", imageTexts));
         }
-        return PromptBuilder.render(
-                ocrSectionTemplate,
-                Map.of("imageTexts", imageTexts)
-        );
+
+        // 如果笔记被删了完全没有元数据，走兜底全局模板
+        if (!variables.containsKey("noteTitle") && !variables.containsKey("noteContent")) {
+            return PromptBuilder.render(globalSystemTemplate, variables);
+        }
+
+        variables.put("noteSection", renderNoteSection(variables));
+
+        return PromptBuilder.render(noteSystemTemplate, variables);
     }
 
-        private String renderMemorySection(List<MemoryRecordEntity> relevantMemories,
-                           List<MemoryRecordEntity> allMemories) throws IOException {
-        String hitItems = toMemoryHitItems(relevantMemories);
-        String allItems = toMemoryAllItems(allMemories);
-        if (!hasText(hitItems) && !hasText(allItems)) {
-            return "";
+    private String resolvePersona(long userId, Resource defaultPersonaResource) {
+        String activePrompt = userSettingService.getActivePersonaPrompt(userId);
+        if (hasText(activePrompt)) {
+            return activePrompt.trim();
         }
-        return PromptBuilder.render(
-                memorySectionTemplate,
-            Map.of(
-                "hitCount", String.valueOf(relevantMemories == null ? 0 : relevantMemories.size()),
-                "allCount", String.valueOf(allMemories == null ? 0 : allMemories.size()),
-                "hitItems", hitItems,
-                "allItems", allItems
-            )
-        );
+        return readTemplateOrEmpty(superpowersFallbackTemplate);
     }
 
-    /**
-         * 全局检索场景：使用检索片段 + 全量记忆渲染记忆段落。
-     */
-    private String renderMemorySectionFromSnippets(List<ContextSnippet> memorySnippets,
-                                                   List<MemoryRecordEntity> allMemories) throws IOException {
-        String hitItems = toMemoryHitItemsFromSnippets(memorySnippets);
-        String allItems = toMemoryAllItems(allMemories);
-        if (!hasText(hitItems) && !hasText(allItems)) {
+    private String renderNoteSection(Map<String, Object> sourceVariables) throws IOException {
+        if (noteSectionTemplate == null) {
             return "";
         }
-        return PromptBuilder.render(
-                memorySectionTemplate,
-            Map.of(
-                "hitCount", String.valueOf(memorySnippets == null ? 0 : memorySnippets.size()),
-                "allCount", String.valueOf(allMemories == null ? 0 : allMemories.size()),
-                "hitItems", hitItems,
-                "allItems", allItems
-            )
-        );
+        Map<String, Object> noteVariables = new HashMap<>();
+        copyIfPresent(sourceVariables, noteVariables, "noteTitle");
+        copyIfPresent(sourceVariables, noteVariables, "noteContent");
+        copyIfPresent(sourceVariables, noteVariables, "webSourceUrl");
+        copyIfPresent(sourceVariables, noteVariables, "webClipContent");
+        copyIfPresent(sourceVariables, noteVariables, "ocrTexts");
+        return PromptBuilder.render(noteSectionTemplate, noteVariables);
     }
 
-        private String toMemoryHitItems(List<MemoryRecordEntity> memories) {
-        if (memories == null || memories.isEmpty()) {
-            return "";
+    private void copyIfPresent(Map<String, Object> source, Map<String, Object> target, String key) {
+        if (source.containsKey(key)) {
+            target.put(key, source.get(key));
         }
-        return memories.stream()
-            .map(m -> "- [" + m.getMemoryType().name() + "] " + safeText(m.getTitle())
-                + "\n  ID: " + m.getUuid().toString()
-                + "\n  摘要：" + safeText(m.getAbstractText()))
-            .collect(Collectors.joining("\n"));
     }
 
-    private String toMemoryHitItemsFromSnippets(List<ContextSnippet> snippets) {
-        if (snippets == null || snippets.isEmpty()) {
+    private String readTemplateOrEmpty(Resource template) {
+        if (template == null) {
             return "";
         }
-        return snippets.stream()
-            .map(s -> "- [MEMORY] " + safeText(s.title())
-                + "\n  ID: " + safeText(s.uri().replace("pm://memories/", ""))
-                + "\n  摘要：" + safeText(s.abstractText()))
-            .collect(Collectors.joining("\n"));
-    }
-
-    private String toMemoryAllItems(List<MemoryRecordEntity> memories) {
-        if (memories == null || memories.isEmpty()) {
+        try {
+            return template.getContentAsString(StandardCharsets.UTF_8).trim();
+        } catch (IOException e) {
+            log.warn("[context] 读取默认人设模板失败: {}", template, e);
             return "";
         }
-        return memories.stream()
-            .map(m -> "- [MEMORY] " + safeText(m.getTitle())
-                + "\n  ID: " + m.getUuid().toString()
-                + "\n  摘要：" + safeText(m.getAbstractText()))
-            .collect(Collectors.joining("\n"));
     }
 
     /**
-     * 渲染检索到的 Resource 片段为可注入系统提示的段落。
+     * 将通过Snippet检索到的记忆和全量记忆合并去重，转为单行 L0 显示
      */
-    private String renderResourceSnippetsSection(List<ContextSnippet> resourceSnippets) throws IOException {
+    private String mergeAndFormatL0Memories(List<ContextSnippet> snippets, List<MemoryRecordEntity> allMemories) throws IOException {
+        Set<String> seenIds = new HashSet<>();
+        List<String> combined = new ArrayList<>();
+
+        if (snippets != null) {
+            for (ContextSnippet s : snippets) {
+                // Snippet 的 ID 形如 pm://memories/<uuid>
+                String rawId = safeText(s.uri()).replace("pm://memories/", "");
+                if (seenIds.add(rawId)) {
+                    combined.add(PromptBuilder.render(memoryL0ItemTemplate, Map.of(
+                            "id", rawId,
+                            "memoryType", "Hit",
+                            "title", safeText(s.title()),
+                            "abstractText", safeText(s.abstractText())
+                    )));
+                }
+            }
+        }
+
+        if (allMemories != null) {
+            for (MemoryRecordEntity m : allMemories) {
+                String id = m.getUuid().toString();
+                if (seenIds.add(id)) {
+                    combined.add(formatMemoryL0(m, id));
+                }
+            }
+        }
+
+        if (combined.isEmpty()) {
+            return "";
+        }
+        return String.join("\n", combined);
+    }
+
+    private String formatMemoryL0(MemoryRecordEntity m, String id) throws IOException {
+        String memoryId = hasText(id) ? id : m.getUuid().toString();
+        return PromptBuilder.render(memoryL0ItemTemplate, Map.of(
+                "id", memoryId,
+                "memoryType", m.getMemoryType().name(),
+                "title", safeText(m.getTitle()),
+                "abstractText", safeText(m.getAbstractText())
+        ));
+    }
+
+    private String renderResourceSnippets(List<ContextSnippet> resourceSnippets) throws IOException {
         if (resourceSnippets == null || resourceSnippets.isEmpty()) {
             return "";
         }
-        String items = resourceSnippets.stream()
+        return resourceSnippets.stream()
                 .map(s -> {
                     try {
                         return PromptBuilder.render(resourceSnippetItemTemplate, Map.of(
@@ -375,27 +326,7 @@ public class ContextAssembler {
                         throw new UncheckedIOException(e);
                     }
                 })
-                .collect(Collectors.joining("\n"));
-        return PromptBuilder.render(
-                resourceSnippetsSectionTemplate,
-                Map.of("snippets", items)
-        );
-    }
-
-    /**
-     * 合并多个段落文本（跳过空白段落）。
-     */
-    private String joinSections(String... sections) {
-        StringBuilder sb = new StringBuilder();
-        for (String section : sections) {
-            if (hasText(section)) {
-                if (!sb.isEmpty()) {
-                    sb.append("\n\n");
-                }
-                sb.append(section);
-            }
-        }
-        return sb.toString();
+                .collect(Collectors.joining("\n\n"));
     }
 
     private String safeText(String text) {
@@ -409,8 +340,7 @@ public class ContextAssembler {
         String normalized = text
                 .replace("\r\n", "\n")
                 .replace("\r", "\n")
-                .replace("<", "＜")
-                .replace(">", "＞")
+                // 防御 markdown 本身的闭合逃逸风险
                 .replace("```", "` ` `")
                 .trim();
         if (normalized.length() <= MAX_UNTRUSTED_TEXT_CHARS) {
@@ -419,19 +349,8 @@ public class ContextAssembler {
         return normalized.substring(0, MAX_UNTRUSTED_TEXT_CHARS) + "\n...(内容已截断)";
     }
 
-    private String wrapUntrustedDataBlock(String text) {
-        String sanitized = sanitizeUntrustedText(text);
-        if (!hasText(sanitized)) {
-            return "";
-        }
-        return "[UNTRUSTED_DATA_BEGIN]\n" + sanitized + "\n[UNTRUSTED_DATA_END]";
-    }
-
     private String sanitizeUrl(String sourceUrl) {
-        String sanitized = sanitizeUntrustedText(sourceUrl);
-        if (!hasText(sanitized)) {
-            return "";
-        }
+        String sanitized = safeText(sourceUrl).trim();
         if (sanitized.startsWith("https://") || sanitized.startsWith("http://")) {
             return sanitized;
         }

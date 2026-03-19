@@ -4,5 +4,5 @@ import lombok.Data;
 
 @Data
 public class UserSettingDto {
-    private String customSystemPrompt;
+    private Long activePersonaId;
 }

@@ -103,7 +103,8 @@ class AiChatServicePauseTest {
                 }, new InMemoryMemoryRecordRepository()),
                 mock(MemoryInjector.class),
                 retrievalOrchestrator,
-                intentAnalyzer
+                intentAnalyzer,
+                org.mockito.Mockito.mock(com.doublez.pocketmindserver.user.application.UserSettingService.class)
         );
         com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet.ResourceToolSetFactory resourceToolSetFactory = mock(com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet.ResourceToolSetFactory.class);
         com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet mockResourceToolSet = mock(com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet.class);
@@ -148,56 +149,6 @@ class AiChatServicePauseTest {
             contextAssembler,
             "noteSystemTemplate",
             new ByteArrayResource("<noteContext>".getBytes(StandardCharsets.UTF_8))
-        );
-        ReflectionTestUtils.setField(
-            contextAssembler,
-            "systemWithExtraSectionTemplate",
-            new ByteArrayResource("<systemText>\n\n<extraSection>".getBytes(StandardCharsets.UTF_8))
-        );
-        ReflectionTestUtils.setField(
-            contextAssembler,
-            "noteContextTemplate",
-            new ByteArrayResource("<noteTextSection><webClipSection><ocrSection><memorySection>".getBytes(StandardCharsets.UTF_8))
-        );
-        ReflectionTestUtils.setField(
-            contextAssembler,
-            "noteTextSectionTemplate",
-            new ByteArrayResource("<title>\n<content>".getBytes(StandardCharsets.UTF_8))
-        );
-        ReflectionTestUtils.setField(
-            contextAssembler,
-            "webClipSectionTemplate",
-            new ByteArrayResource("<title>\n<sourceUrl>\n<content>".getBytes(StandardCharsets.UTF_8))
-        );
-        ReflectionTestUtils.setField(
-            contextAssembler,
-            "ocrSectionTemplate",
-            new ByteArrayResource("<imageTexts>".getBytes(StandardCharsets.UTF_8))
-        );
-        ReflectionTestUtils.setField(
-            contextAssembler,
-            "memorySectionTemplate",
-            new ByteArrayResource("<memoryContext>".getBytes(StandardCharsets.UTF_8))
-        );
-        ReflectionTestUtils.setField(
-            contextAssembler,
-            "resourceSnippetsSectionTemplate",
-            new ByteArrayResource("## 相关资料\n\n<snippets>".getBytes(StandardCharsets.UTF_8))
-        );
-        ReflectionTestUtils.setField(
-            contextAssembler,
-            "resourceSnippetItemTemplate",
-            new ByteArrayResource("### <title>\n<abstractText>".getBytes(StandardCharsets.UTF_8))
-        );
-        ReflectionTestUtils.setField(
-            sseReplyService,
-            "branchAliasSystemTemplate",
-            new ByteArrayResource("system".getBytes(StandardCharsets.UTF_8))
-        );
-        ReflectionTestUtils.setField(
-            sseReplyService,
-            "branchAliasUserTemplate",
-            new ByteArrayResource("<contextPrefix><userMessage>".getBytes(StandardCharsets.UTF_8))
         );
     }
 

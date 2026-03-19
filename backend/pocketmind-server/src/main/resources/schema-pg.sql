@@ -363,3 +363,29 @@ CREATE TABLE IF NOT EXISTS sync_change_log (
 
 -- (user_id, id) 复合索引：Pull 查询 WHERE user_id=? AND id > sinceVersion ORDER BY id 直接命中
 CREATE INDEX IF NOT EXISTS idx_sync_log_user_version ON sync_change_log(user_id, id);
+
+
+-- ============================================================
+-- 14. user_settings
+-- ============================================================
+CREATE TABLE IF NOT EXISTS user_settings (
+    user_id              BIGINT       PRIMARY KEY,
+    active_persona_id    BIGINT       NULL,
+    created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+-- ============================================================
+-- 15. user_personas
+-- ============================================================
+CREATE TABLE IF NOT EXISTS user_personas (
+    id            BIGSERIAL   PRIMARY KEY,
+    user_id       BIGINT      NOT NULL,
+    name          VARCHAR(100) NOT NULL,
+    system_prompt TEXT        NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    BIGINT      NOT NULL DEFAULT 0,
+    is_deleted    BOOLEAN     NOT NULL DEFAULT FALSE
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_personas_user_id ON user_personas(user_id);
