@@ -12,14 +12,24 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class PromptBuilder {
 
-    /**
-     * 将包含 <xxx> 的 Resource 模板动态渲染为纯文本 String
-     */
+    private static final Map<Resource, String> templateCache = new ConcurrentHashMap<>();
+
+    private static String getCachedTemplateString(Resource template) throws IOException {
+        String content = templateCache.get(template);
+        if (content != null) {
+            return content;
+        }
+        content = template.getContentAsString(StandardCharsets.UTF_8);
+        templateCache.put(template, content);
+        return content;
+    }
+
     public static String render(Resource template, Map<String, Object> variables) throws IOException {
-        String templateString = template.getContentAsString(StandardCharsets.UTF_8);
+        String templateString = getCachedTemplateString(template);
 
         PromptTemplate promptTemplate = PromptTemplate.builder()
                 .renderer(StTemplateRenderer.builder().startDelimiterToken('<').endDelimiterToken('>').build())
@@ -33,15 +43,12 @@ public class PromptBuilder {
      * 直接组装静态的 System 消息和动态的 User 消息，生成完整的 Prompt 对象
      */
     public static Prompt build(Resource systemTemplate, Resource userTemplate, Map<String, Object> userVariables) throws IOException {
-        // 1. 读取系统提示词
-        String systemContent = systemTemplate.getContentAsString(StandardCharsets.UTF_8);
+        String systemContent = getCachedTemplateString(systemTemplate);
         SystemMessage systemMessage = new SystemMessage(systemContent);
 
-        // 2. 动态渲染用户提示词 (替换 <key>)
         String userContent = render(userTemplate, userVariables);
         UserMessage userMessage = new UserMessage(userContent);
 
-        // 3. 组合并返回最终的 Prompt
         return new Prompt(List.of(systemMessage, userMessage));
     }
 
@@ -52,7 +59,7 @@ public class PromptBuilder {
                                Resource userTemplate,
                                Map<String, Object> userVariables,
                                ChatOptions options) throws IOException {
-        String systemContent = systemTemplate.getContentAsString(StandardCharsets.UTF_8);
+        String systemContent = getCachedTemplateString(systemTemplate);
         SystemMessage systemMessage = new SystemMessage(systemContent);
 
         String userContent = render(userTemplate, userVariables);

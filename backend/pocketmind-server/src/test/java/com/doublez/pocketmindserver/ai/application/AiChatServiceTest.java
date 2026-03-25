@@ -81,7 +81,7 @@ class AiChatServiceTest {
         intentAnalyzer = mock(IntentAnalyzer.class);
         retrievalOrchestrator = mock(RetrievalOrchestrator.class);
         lenient().when(intentAnalyzer.analyze(anyString())).thenReturn(AnalyzedIntent.skip("单元测试默认跳过检索"));
-        contextAssembler = new ContextAssembler(
+        com.doublez.pocketmindserver.ai.application.context.ContextDataRetriever retriever = new com.doublez.pocketmindserver.ai.application.context.ContextDataRetriever(
                 noteRepository,
                 attachmentVisionRepository,
                 resourceRecordRepository,
@@ -98,9 +98,11 @@ class AiChatServiceTest {
                                 .child(memoryType.name().toLowerCase());
                     }
                 }, new InMemoryMemoryRecordRepository()),
-                mock(MemoryInjector.class),
                 retrievalOrchestrator,
-                intentAnalyzer,
+                intentAnalyzer
+        );
+        contextAssembler = new ContextAssembler(
+                retriever,
                 userSettingService
         );
         com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet.ResourceToolSetFactory resourceToolSetFactory = mock(com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet.ResourceToolSetFactory.class);
@@ -133,11 +135,8 @@ class AiChatServiceTest {
                         null,
                         java.util.Map.of("tenantKey", "user-100", "agentKey", "claude")
                 ));
-        injectResource(contextAssembler, "globalSystemTemplate", "<persona>\n## ⚠️ 强制底层行为准则");
-                injectResource(contextAssembler, "noteSystemTemplate", "<persona>\n<noteSection>");
-                injectResource(contextAssembler, "defaultGlobalPersonaTemplate", "默认全局人设");
-                injectResource(contextAssembler, "defaultNotePersonaTemplate", "默认笔记人设");
-                injectResource(contextAssembler, "superpowersFallbackTemplate", "默认全局人设");
+        injectResource(contextAssembler, "globalSystemTemplate", "<if(persona)><persona><else>你是 PocketMind 的 AI 助手，是用户的第二大脑伙伴。<endif>\n## ⚠️ 强制底层行为准则");
+                injectResource(contextAssembler, "noteSystemTemplate", "<if(persona)><persona><else>你是 PocketMind 的 AI 笔记助手，是用户的第二大脑伙伴。<endif>\n<if(noteTitle)><noteTitle><endif>");
         injectResource(sseReplyService, "branchAliasSystemTemplate", "branch alias system prompt");
         injectResource(sseReplyService, "branchAliasUserTemplate", "<contextPrefix>user: <userMessage>");
     }
@@ -159,7 +158,7 @@ class AiChatServiceTest {
 
                         String systemPrompt = contextAssembler.buildSystemPrompt(USER_ID, makeSession(), "你好");
 
-                        assertTrue(systemPrompt.contains("默认全局人设"));
+                        assertTrue(systemPrompt.contains("第二大脑"));
                         assertTrue(systemPrompt.contains("## ⚠️ 强制底层行为准则"));
                 }
         }

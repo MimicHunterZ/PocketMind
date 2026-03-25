@@ -1,4 +1,5 @@
-会话标题：<sessionTitle>
+会话标题：
+<sessionTitle>
 
 对话记录：
 <transcript>

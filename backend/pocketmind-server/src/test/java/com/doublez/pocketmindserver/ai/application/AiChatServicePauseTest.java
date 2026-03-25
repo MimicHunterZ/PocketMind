@@ -86,7 +86,7 @@ class AiChatServicePauseTest {
                 com.doublez.pocketmindserver.ai.application.retrieval.AnalyzedIntent.passthrough("test"));
         when(retrievalOrchestrator.retrieve(anyLong(), anyString())).thenReturn(
                 com.doublez.pocketmindserver.ai.application.retrieval.OrchestratedContext.empty());
-        contextAssembler = new ContextAssembler(
+        com.doublez.pocketmindserver.ai.application.context.ContextDataRetriever retriever = new com.doublez.pocketmindserver.ai.application.context.ContextDataRetriever(
                 noteRepository,
                 attachmentVisionRepository,
                 resourceRecordRepository,
@@ -101,9 +101,12 @@ class AiChatServicePauseTest {
                         return ContextUri.userMemoriesRoot(userId).child(memoryType.name().toLowerCase());
                     }
                 }, new InMemoryMemoryRecordRepository()),
-                mock(MemoryInjector.class),
                 retrievalOrchestrator,
-                intentAnalyzer,
+                intentAnalyzer
+        );
+
+        contextAssembler = new ContextAssembler(
+                retriever,
                 org.mockito.Mockito.mock(com.doublez.pocketmindserver.user.application.UserSettingService.class)
         );
         com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet.ResourceToolSetFactory resourceToolSetFactory = mock(com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet.ResourceToolSetFactory.class);

@@ -34,6 +34,11 @@ public class MemoryQueryServiceImpl implements MemoryQueryService {
     }
 
     @Override
+    public List<MemoryRecordEntity> queryMemoriesByType(long userId, com.doublez.pocketmindserver.memory.domain.MemoryType memoryType, int limit) {
+        return memoryRecordRepository.findByUserIdAndType(userId, memoryType, limit);
+    }
+
+    @Override
     public List<MemoryRecordEntity> queryRelevantMemories(long userId, ChatSessionEntity session, String userPrompt) {
         log.debug("[memory] 查询用户记忆: userId={}, sessionUuid={}, memoryRoot={}",
                 userId,
