@@ -11,7 +11,7 @@ import java.util.UUID;
 
 @Repository
 @RequiredArgsConstructor
-public class MybatisSyncChangeLogRepository implements SyncChangeLogRepository {
+public class SyncChangeLogRepositoryImpl implements SyncChangeLogRepository {
 
     private final SyncChangeLogMapper mapper;
 

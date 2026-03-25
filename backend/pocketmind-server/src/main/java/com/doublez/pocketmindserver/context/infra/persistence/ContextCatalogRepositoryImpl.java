@@ -13,15 +13,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * 基于 MyBatis-Plus 的 ContextCatalog 仓库实现。
- */
 @Repository
-public class MybatisContextCatalogRepository implements ContextCatalogRepository {
+public class ContextCatalogRepositoryImpl implements ContextCatalogRepository {
 
     private final ContextCatalogMapper mapper;
 
-    public MybatisContextCatalogRepository(ContextCatalogMapper mapper) {
+    public ContextCatalogRepositoryImpl(ContextCatalogMapper mapper) {
         this.mapper = mapper;
     }
 

@@ -13,13 +13,13 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public class MybatisResourceRecordRepository implements ResourceRecordRepository {
+public class ResourceRecordRepositoryImpl implements ResourceRecordRepository {
 
     private final ResourceRecordMapper mapper;
     private final ResourceRecordStructMapper structMapper;
 
-    public MybatisResourceRecordRepository(ResourceRecordMapper mapper,
-                                           ResourceRecordStructMapper structMapper) {
+    public ResourceRecordRepositoryImpl(ResourceRecordMapper mapper,
+                                        ResourceRecordStructMapper structMapper) {
         this.mapper = mapper;
         this.structMapper = structMapper;
     }

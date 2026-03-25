@@ -5,18 +5,17 @@ import com.doublez.pocketmindserver.note.domain.tag.TagEntity;
 import com.doublez.pocketmindserver.note.domain.tag.TagRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 
 @Repository
-public class MybatisTagRepository implements TagRepository {
+public class TagRepositoryImpl implements TagRepository {
 
     private final TagMapper tagMapper;
     private final TagStructMapper structMapper;
 
-    public MybatisTagRepository(TagMapper tagMapper, TagStructMapper structMapper) {
+    public TagRepositoryImpl(TagMapper tagMapper, TagStructMapper structMapper) {
         this.tagMapper = tagMapper;
         this.structMapper = structMapper;
     }

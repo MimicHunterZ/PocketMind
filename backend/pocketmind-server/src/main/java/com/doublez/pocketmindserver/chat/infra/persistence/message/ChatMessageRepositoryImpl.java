@@ -15,16 +15,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * ChatMessageRepository 鐨?MyBatis-Plus 瀹炵幇
- */
 @Repository
-public class MybatisChatMessageRepository implements ChatMessageRepository {
+public class ChatMessageRepositoryImpl implements ChatMessageRepository {
 
     private final ChatMessageMapper mapper;
     private final ChatStructMapper chatStructMapper;
 
-    public MybatisChatMessageRepository(ChatMessageMapper mapper, ChatStructMapper chatStructMapper) {
+    public ChatMessageRepositoryImpl(ChatMessageMapper mapper, ChatStructMapper chatStructMapper) {
         this.mapper = mapper;
         this.chatStructMapper = chatStructMapper;
     }

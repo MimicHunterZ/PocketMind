@@ -19,12 +19,12 @@ import java.util.UUID;
 
 
 @Repository
-public class MybatisChatSessionRepository implements ChatSessionRepository {
+public class ChatSessionRepositoryImpl implements ChatSessionRepository {
 
     private final ChatSessionMapper mapper;
     private final ChatStructMapper chatStructMapper;
 
-    public MybatisChatSessionRepository(ChatSessionMapper mapper, ChatStructMapper chatStructMapper) {
+    public ChatSessionRepositoryImpl(ChatSessionMapper mapper, ChatStructMapper chatStructMapper) {
         this.mapper = mapper;
         this.chatStructMapper = chatStructMapper;
     }

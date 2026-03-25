@@ -11,18 +11,16 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * 长期记忆仓储 MyBatis-Plus 实现。
- */
+
 @Slf4j
 @Repository
-public class MybatisMemoryRecordRepository implements MemoryRecordRepository {
+public class MemoryRecordRepositoryImpl implements MemoryRecordRepository {
 
     private final MemoryRecordMapper mapper;
     private final MemoryRecordStructMapper structMapper;
 
-    public MybatisMemoryRecordRepository(MemoryRecordMapper mapper,
-                                         MemoryRecordStructMapper structMapper) {
+    public MemoryRecordRepositoryImpl(MemoryRecordMapper mapper,
+                                      MemoryRecordStructMapper structMapper) {
         this.mapper = mapper;
         this.structMapper = structMapper;
     }

@@ -16,12 +16,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public class MybatisAttachmentRepository implements AttachmentRepository {
+public class AttachmentRepositoryImpl implements AttachmentRepository {
 
     private final AttachmentMapper mapper;
     private final AttachmentStructMapper structMapper;
 
-    public MybatisAttachmentRepository(AttachmentMapper mapper, AttachmentStructMapper structMapper) {
+    public AttachmentRepositoryImpl(AttachmentMapper mapper, AttachmentStructMapper structMapper) {
         this.mapper = mapper;
         this.structMapper = structMapper;
     }

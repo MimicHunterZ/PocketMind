@@ -15,17 +15,17 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 
 @Repository
-public class MybatisNoteRepository implements NoteRepository {
+public class NoteRepositoryImpl implements NoteRepository {
 
     private final NoteMapper noteMapper;
     private final NoteStructMapper noteConverter;
     private final NoteTagRelationMapper relationMapper;
     private final TagRepository tagRepository;
 
-    public MybatisNoteRepository(NoteMapper noteMapper,
-                                 NoteStructMapper noteConverter,
-                                 NoteTagRelationMapper relationMapper,
-                                 TagRepository tagRepository) {
+    public NoteRepositoryImpl(NoteMapper noteMapper,
+                              NoteStructMapper noteConverter,
+                              NoteTagRelationMapper relationMapper,
+                              TagRepository tagRepository) {
         this.noteMapper = noteMapper;
         this.noteConverter = noteConverter;
         this.relationMapper = relationMapper;
