@@ -74,7 +74,7 @@ https://github.com/user-attachments/assets/67c92ac7-dd09-41ac-a08a-35ee215b5ee4
 
 ### 如何抓取数据？
 目前一共有四种策略，逐级递减
-1. 参考 [MediaCrawler](https://github.com/NanmiCoder/MediaCrawler) 的爬虫策略，进行 dart 的无头浏览器版本实现，目前实现了小红书、知乎的抓取，此为最完整的抓取
+1. 参考 [MediaCrawler](https://github.com/NanmiCoder/MediaCrawler) 的爬虫策略，进行 dart 的无头浏览器版本实现，目前实现了小红书、知乎、b站的抓取，此为最完整的抓取
 <img width="349" height="717" alt="image" src="https://github.com/user-attachments/assets/5a165a31-8bda-4bc0-9e33-89d364832e21" />
 
 2. 后端进行抓取，此流程目前是负责抓取 x 的内容
@@ -82,10 +82,12 @@ https://github.com/user-attachments/assets/67c92ac7-dd09-41ac-a08a-35ee215b5ee4
 4. anylinkpreivew 本地预览库进行最后的兜底工作，同样也是抓取基本的预览信息，用于国内所有网站
 >抓取失败后，会显示预览失败，但是会保留基本的 url 供跳转使用
 
-### ai分析
-目前ai分析为有两钟
-1. 总结模式：如果分享界面没有在 ai 标签页下面输入问题，那么就会进入总结模式，ai 将返回对帖子内容的总结和 tag 标签的生成
-2. 问题模式：分享界面输入问题后，ai会对问题进行回复。
+### ai对话
+1. 支持基本的curd
+2. 支持对话分支fork，不污染上下文
+3. 支持对话分支切换
+<img width="384.3" height="791" alt="image" src="https://github.com/user-attachments/assets/185e2af3-fb84-48e3-80b0-a9ca78ecdd1b" />
+
 > 需要先在设置里面进行登录才能使用
 <img width="352" height="672" alt="image" src="https://github.com/user-attachments/assets/e0b96a3b-0804-40cd-a6a4-84ad5d766805" />
 
@@ -116,10 +118,12 @@ https://github.com/user-attachments/assets/67c92ac7-dd09-41ac-a08a-35ee215b5ee4
 - [x] 美化uxi
 - [x] 增加 win 的适配，处理数据的传输
 - [x] ai对笔记内容的基本分析
-- [ ] 优化爬虫（已经支持 小红书、知乎）
+- [ ] 优化爬虫（已经支持 小红书、知乎、B站）
+- [x] AI对话的CRUD,fork 分支
+- [x] AI基础记忆
 - [ ] 支持视频、文件的转存
 - [ ] 添加智能的提醒功能(基础提醒已经完成)
-- [ ] 完善 AI 的支持
+- [ ] AI其他的支持
 
 
 ## 开发初衷
