@@ -107,6 +107,13 @@ Controller 应作为极薄的“协议适配层”，严禁涉及任何业务逻
 
 * **注释**: 所有的代码注释、文档注释必须使用 **中文**，并且注释中不能出现 'phase xxx','适合 DAY1'等ai撰写的适合会出现的注释内容
 
+### git提交格式
+（不要出现 phrase 等语句）
+fix: 修复了xxx
+feat: 新增了xxx
+doc: 更新了xxx文档
+refine: 优化了xxx
+
 ## 🛠️ Developer Workflows
 
 ### Mobile
