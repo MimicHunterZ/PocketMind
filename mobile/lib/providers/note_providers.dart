@@ -1,4 +1,5 @@
 ﻿import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:pocketmind/model/note.dart';
@@ -162,9 +163,11 @@ abstract class NoteDetailState with _$NoteDetailState {
 class NoteDetail extends _$NoteDetail {
   Timer? _debounceTimer;
   static const _tag = 'NoteDetailNotifier';
+  Note? _lastSavedNote;
 
   @override
   NoteDetailState build(Note initialNote) {
+    _lastSavedNote = initialNote;
     final tags = List<String>.from(initialNote.tags);
     return NoteDetailState(note: initialNote, tags: tags);
   }
@@ -176,14 +179,28 @@ class NoteDetail extends _$NoteDetail {
     int? categoryId,
     List<String>? tags,
   }) {
+    final nextTitle = title ?? state.note.title;
+    final nextContent = content ?? state.note.content;
+    final nextCategoryId = categoryId ?? state.note.categoryId;
+    final nextTags = tags ?? state.note.tags;
+    if (_isSameEdit(
+      state.note,
+      nextTitle,
+      nextContent,
+      nextCategoryId,
+      nextTags,
+    )) {
+      return;
+    }
+
     final updatedNote = state.note.copyWith(
-      title: title ?? state.note.title,
-      content: content ?? state.note.content,
-      categoryId: categoryId ?? state.note.categoryId,
-      tags: tags ?? state.note.tags,
+      title: nextTitle,
+      content: nextContent,
+      categoryId: nextCategoryId,
+      tags: nextTags,
     );
 
-    state = state.copyWith(note: updatedNote, tags: tags ?? state.tags);
+    state = state.copyWith(note: updatedNote, tags: nextTags);
     _debounceSave();
   }
 
@@ -208,6 +225,11 @@ class NoteDetail extends _$NoteDetail {
 
   Future<void> saveNote() async {
     if (state.isSaving || state.note.id == null) return;
+    if (_lastSavedNote != null &&
+        _isEquivalentForSave(state.note, _lastSavedNote!)) {
+      return;
+    }
+
     state = state.copyWith(isSaving: true);
     try {
       final id = await ref
@@ -223,7 +245,9 @@ class NoteDetail extends _$NoteDetail {
             previewDescription: state.note.previewDescription,
           );
       if (ref.mounted) {
-        state = state.copyWith(note: state.note.copyWith(id: id));
+        final savedNote = state.note.copyWith(id: id);
+        _lastSavedNote = savedNote;
+        state = state.copyWith(note: savedNote);
       }
     } catch (e) {
       PMlog.e(_tag, 'Save failed: $e');
@@ -265,5 +289,29 @@ class NoteDetail extends _$NoteDetail {
 
   void shareNote(dynamic context) {
     PMlog.d(_tag, 'Sharing note: ${state.note.title}');
+  }
+
+  bool _isSameEdit(
+    Note current,
+    String? title,
+    String? content,
+    int? categoryId,
+    List<String> tags,
+  ) {
+    return current.title == title &&
+        current.content == content &&
+        current.categoryId == categoryId &&
+        listEquals(current.tags, tags);
+  }
+
+  bool _isEquivalentForSave(Note a, Note b) {
+    return a.id == b.id &&
+        a.title == b.title &&
+        a.content == b.content &&
+        a.url == b.url &&
+        a.categoryId == b.categoryId &&
+        a.previewTitle == b.previewTitle &&
+        a.previewDescription == b.previewDescription &&
+        listEquals(a.tags, b.tags);
   }
 }

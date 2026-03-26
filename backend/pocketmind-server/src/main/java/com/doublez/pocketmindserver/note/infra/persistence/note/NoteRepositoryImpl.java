@@ -7,6 +7,7 @@ import com.doublez.pocketmindserver.note.domain.note.NoteEntity;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
 import com.doublez.pocketmindserver.note.domain.note.NoteTag;
 import com.doublez.pocketmindserver.note.domain.tag.TagRepository;
+import com.doublez.pocketmindserver.note.infra.persistence.tag.TagModel;
 import com.doublez.pocketmindserver.shared.domain.SyncCursorQuery;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Repository;
@@ -114,17 +115,44 @@ public class NoteRepositoryImpl implements NoteRepository {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void replaceTagNames(UUID noteUuid, long userId, List<String> tagNames) {
-        relationMapper.deleteByNoteUuid(noteUuid);
+        List<TagModel> existingTags = relationMapper.findTagsByNoteUuid(userId, noteUuid);
 
-        if (tagNames == null || tagNames.isEmpty()) {
+        Map<String, Long> existingNameToId = new HashMap<>();
+        for (TagModel existingTag : existingTags) {
+            if (existingTag.getName() == null || existingTag.getName().isBlank()) {
+                continue;
+            }
+            existingNameToId.put(existingTag.getName().strip(), existingTag.getId());
+        }
+
+        Set<String> desiredNames = new LinkedHashSet<>();
+        if (tagNames != null) {
+            for (String tagName : tagNames) {
+                if (tagName == null || tagName.isBlank()) {
+                    continue;
+                }
+                desiredNames.add(tagName.strip());
+            }
+        }
+
+        Set<String> existingNames = existingNameToId.keySet();
+        if (existingNames.equals(desiredNames)) {
             return;
         }
 
-        for (String tagName : new LinkedHashSet<>(tagNames)) {
-            if (tagName == null || tagName.isBlank()) {
-                continue;
+        Set<String> toRemove = new HashSet<>(existingNames);
+        toRemove.removeAll(desiredNames);
+        for (String tagName : toRemove) {
+            Long tagId = existingNameToId.get(tagName);
+            if (tagId != null) {
+                relationMapper.delete(noteUuid, tagId);
             }
-            var tagEntity = tagRepository.findOrCreate(userId, tagName.strip());
+        }
+
+        Set<String> toAdd = new LinkedHashSet<>(desiredNames);
+        toAdd.removeAll(existingNames);
+        for (String tagName : toAdd) {
+            var tagEntity = tagRepository.findOrCreate(userId, tagName);
             relationMapper.insert(noteUuid, tagEntity.getId());
         }
     }

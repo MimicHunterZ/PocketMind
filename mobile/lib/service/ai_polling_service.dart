@@ -1,6 +1,6 @@
 import 'package:pocketmind/api/post_detail_service.dart';
 import 'package:pocketmind/core/constants.dart';
-import 'package:pocketmind/data/repositories/isar_note_repository.dart';
+import 'package:pocketmind/service/note_service.dart';
 import 'package:pocketmind/util/logger_service.dart';
 import 'package:pocketmind/util/tag_list_utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,10 +18,10 @@ const String _tag = 'AiPollingService';
 /// - PROCESSING（超时）→ 保留队列，等待下次 resume 重试
 class AiPollingService {
   final SharedPreferences _prefs;
-  final IsarNoteRepository _noteRepository;
+  final NoteService _noteService;
   final PostDetailService _postDetailService;
 
-  AiPollingService(this._prefs, this._noteRepository, this._postDetailService);
+  AiPollingService(this._prefs, this._noteService, this._postDetailService);
 
   /// 并发轮询所有待处理 AI 分析任务。
   Future<void> pollAll() async {
@@ -46,7 +46,7 @@ class AiPollingService {
         return;
       }
 
-      final note = await _noteRepository.findByUuid(noteUuid);
+      final note = await _noteService.findNoteByUuid(noteUuid);
       if (note == null) {
         PMlog.w(_tag, '笔记不存在，移出队列: uuid=$noteUuid');
         await _removePending(noteUuid);
@@ -59,8 +59,9 @@ class AiPollingService {
         if (result.previewTitle != null && note.previewTitle == null) {
           note.previewTitle = result.previewTitle;
         }
-        if (result.previewDescription != null && note.previewContent == null) {
-          note.previewContent = result.previewDescription;
+        if (result.previewDescription != null &&
+            note.previewDescription == null) {
+          note.previewDescription = result.previewDescription;
         }
         if (result.assets.isNotEmpty) {
           // 仅设置首张预览图，不覆盖已有值
@@ -78,7 +79,7 @@ class AiPollingService {
         PMlog.w(_tag, 'AI 分析失败，保留现有数据: uuid=$noteUuid');
       }
 
-      await _noteRepository.saveSyncInternalNote(note);
+      await _noteService.persistDerivedNoteForSync(note);
       await _removePending(noteUuid);
     } catch (e) {
       // 轮询异常（如网络断开）不移出队列，下次 resume 重试

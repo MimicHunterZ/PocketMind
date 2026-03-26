@@ -274,12 +274,9 @@ Future<void> scrapeAndSave(
         final prefs = ref.read(sharedPreferencesProvider);
         await _enqueueAiAnalysis(prefs, note.uuid!);
 
-        // 元数据处理完成，标记 CRAWLED
-        await noteService.persistResourceStatus(
-          note,
-          AppConstants.resourceStatusCrawled,
-        );
-        await ref.read(noteRepositoryProvider).saveSyncInternalNote(note);
+        // 元数据处理完成，通过统一入口落库并入队同步
+        note.resourceStatus = AppConstants.resourceStatusCrawled;
+        await noteService.persistDerivedNoteForSync(note);
 
         final platform = _getPlatformName(url, metaData?.source);
         final content = note.previewTitle ?? note.previewContent;

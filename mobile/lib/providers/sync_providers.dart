@@ -75,15 +75,11 @@ SyncEngine syncEngine(Ref ref) {
 /// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器
 @Riverpod(keepAlive: true)
 ResourceFetchScheduler resourceFetchScheduler(Ref ref) {
-  final noteRepo = ref.watch(noteRepositoryProvider);
+  final noteService = ref.watch(noteServiceProvider);
   final metadataManager = ref.watch(metadataManagerProvider);
-  final writeCoordinator = ref.watch(localWriteCoordinatorProvider);
-  final engine = ref.watch(syncEngineProvider);
   final scheduler = ResourceFetchScheduler(
-    noteRepo: noteRepo,
+    noteService: noteService,
     metadataManager: metadataManager,
-    writeCoordinator: writeCoordinator,
-    syncEngine: engine,
   );
   // 应用启动时即开始监听网络事件
   scheduler.start();
@@ -114,7 +110,7 @@ void adaptiveSyncScheduler(Ref ref) {
   void startTimer() {
     timer?.cancel();
     timer = Timer.periodic(interval, (_) {
-      PMlog.d('SyncScheduler', '瀹氭椂瑙﹀彂 kick');
+      PMlog.d('SyncScheduler', '定时触发 kick');
       engine.kick();
     });
   }

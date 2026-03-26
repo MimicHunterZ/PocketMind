@@ -128,33 +128,19 @@ public class ContextCatalogRepositoryImpl implements ContextCatalogRepository {
 
     @Override
     public void upsert(ContextNode node, Long userId) {
-        ContextCatalogModel existing = mapper.selectOne(
-                new LambdaQueryWrapper<ContextCatalogModel>()
-                        .eq(ContextCatalogModel::getUri, node.uri().value()));
-
-        if (existing != null) {
-            existing.setName(node.name());
-            existing.setAbstractText(node.abstractText());
-            existing.setLayer(node.layer().name());
-            existing.setIsLeaf(node.isLeaf());
-            existing.setUpdatedAt(node.updatedAt());
-            mapper.updateById(existing);
-        } else {
-            ContextCatalogModel model = new ContextCatalogModel();
-            model.setUuid(UUID.randomUUID());
-            model.setUserId(userId);
-            model.setContextType(node.contextType().name());
-            model.setUri(node.uri().value());
-            model.setParentUri(node.parentUri() != null ? node.parentUri().value() : null);
-            model.setName(node.name());
-            model.setAbstractText(node.abstractText());
-            model.setLayer(node.layer().name());
-            model.setStatus("ACTIVE");
-            model.setIsLeaf(node.isLeaf());
-            model.setActiveCount(0L);
-            model.setUpdatedAt(node.updatedAt());
-            mapper.insert(model);
-        }
+        mapper.upsertByUri(
+                UUID.randomUUID(),
+                userId,
+                node.contextType().name(),
+                node.uri().value(),
+                node.parentUri() != null ? node.parentUri().value() : null,
+                node.name(),
+                node.abstractText(),
+                node.layer().name(),
+                node.isLeaf(),
+                0L,
+                node.updatedAt()
+        );
     }
 
     @Override

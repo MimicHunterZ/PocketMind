@@ -1,6 +1,7 @@
 package com.doublez.pocketmindserver.context.infra.persistence;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -14,6 +15,41 @@ import java.util.Map;
  */
 @Mapper
 public interface ContextCatalogMapper extends BaseMapper<ContextCatalogModel> {
+
+  /**
+   * 基于 uri 唯一键的原子 UPSERT，避免“先查后插”并发竞态。
+   */
+  @Insert("""
+      INSERT INTO context_catalog (
+        uuid, user_id, context_type, uri, parent_uri, name, abstract_text,
+        layer, status, is_leaf, active_count, updated_at, is_deleted
+      ) VALUES (
+        #{uuid}, #{userId}, #{contextType}, #{uri}, #{parentUri}, #{name}, #{abstractText},
+        #{layer}, 'ACTIVE', #{isLeaf}, #{activeCount}, #{updatedAt}, false
+      )
+      ON CONFLICT (uri) DO UPDATE SET
+        user_id = EXCLUDED.user_id,
+        context_type = EXCLUDED.context_type,
+        parent_uri = EXCLUDED.parent_uri,
+        name = EXCLUDED.name,
+        abstract_text = EXCLUDED.abstract_text,
+        layer = EXCLUDED.layer,
+        status = 'ACTIVE',
+        is_leaf = EXCLUDED.is_leaf,
+        updated_at = EXCLUDED.updated_at,
+        is_deleted = false
+      """)
+  int upsertByUri(@Param("uuid") java.util.UUID uuid,
+          @Param("userId") Long userId,
+          @Param("contextType") String contextType,
+          @Param("uri") String uri,
+          @Param("parentUri") String parentUri,
+          @Param("name") String name,
+          @Param("abstractText") String abstractText,
+          @Param("layer") String layer,
+          @Param("isLeaf") boolean isLeaf,
+          @Param("activeCount") Long activeCount,
+          @Param("updatedAt") Long updatedAt);
 
     /**
      * pgvector 余弦相似度搜索。

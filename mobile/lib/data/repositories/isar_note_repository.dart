@@ -1,5 +1,4 @@
 import 'package:isar_community/isar.dart';
-import 'package:uuid/uuid.dart';
 import '../../core/constants.dart';
 import '../../model/note.dart';
 import '../../model/category.dart';
@@ -12,70 +11,12 @@ import '../../util/image_storage_helper.dart';
 class IsarNoteRepository {
   final Isar _isar;
   static const String _tag = 'IsarNoteRepository';
-  static const _uuid = Uuid();
 
   IsarNoteRepository(this._isar);
 
   /// 按 UUID 查找笔记。
   Future<Note?> findByUuid(String uuid) async {
     return _isar.notes.getByUuid(uuid);
-  }
-
-  /// 保存同步内部衍生字段。
-  ///
-  /// 仅供抓取器、AI 轮询、同步回放等内部流程调用。
-  /// 不追加 mutation，也默认不改写 `updatedAt`，避免伪造“用户主动编辑”。
-  Future<int> saveSyncInternalNote(
-    Note note, {
-    bool preserveUpdatedAt = true,
-  }) async {
-    PMlog.d(
-      _tag,
-      'Saving internal note: title: ${note.title}, categoryId: ${note.categoryId}, preserveUpdatedAt: $preserveUpdatedAt',
-    );
-
-    try {
-      // 如果没有设置时间，使用当前时间
-      note.time ??= DateTime.now();
-
-      if (!preserveUpdatedAt) {
-        note.updatedAt = DateTime.now().millisecondsSinceEpoch;
-      }
-
-      // 如果是更新操作，保留现有的 uuid
-      // 注意：如果传入的 note 已经是从数据库取出的对象，它应该已经有 uuid 了
-      // 这里主要是为了防止新建对象时覆盖了原有的 uuid
-      if (note.id != null && note.id != Isar.autoIncrement) {
-        final existingNote = await _isar.notes.get(note.id!);
-        if (existingNote != null && existingNote.uuid != null) {
-          if (note.uuid == null || note.uuid!.isEmpty) {
-            note.uuid = existingNote.uuid;
-          }
-        }
-      }
-
-      // 如果是新记录或者没有 uuid，生成新的 UUID
-      if (note.uuid == null || note.uuid!.isEmpty) {
-        note.uuid = _uuid.v4();
-      }
-
-      int resultId = 0;
-      await _isar.writeTxn(() async {
-        // 建立笔记与分类的关联（保持 IsarLink 用于数据库关系）
-        final linkedCategory = await _isar.categorys.get(note.categoryId);
-        note.category.value = linkedCategory;
-
-        // 保存笔记
-        resultId = await _isar.notes.put(note);
-        await note.category.save();
-      });
-
-      PMlog.d(_tag, 'Internal note saved successfully with id: $resultId');
-      return resultId;
-    } catch (e, stackTrace) {
-      PMlog.e(_tag, 'Error while saving note: $e\n$stackTrace');
-      rethrow;
-    }
   }
 
   Future<void> delete(int id) async {

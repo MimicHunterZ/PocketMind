@@ -31,7 +31,7 @@ PostDetailService postDetailService(Ref ref) {
 AiPollingService aiPollingService(Ref ref) {
   return AiPollingService(
     ref.watch(sharedPreferencesProvider),
-    ref.watch(noteRepositoryProvider),
+    ref.watch(noteServiceProvider),
     ref.watch(postDetailServiceProvider),
   );
 }

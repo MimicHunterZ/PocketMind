@@ -11,6 +11,9 @@ import com.doublez.pocketmindserver.resource.domain.ResourceSourceType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
+import java.util.Optional;
+
 /**
  * 默认 Resource → ContextCatalog 同步实现。
  *
@@ -55,6 +58,7 @@ public class ResourceCatalogSyncServiceImpl implements ResourceCatalogSyncServic
         String abstractText = resource.getAbstractText() != null
                 ? resource.getAbstractText()
                 : resource.deriveDefaultAbstract();
+        Optional<ContextNode> existing = catalogRepository.findByUri(resourceUri.value());
 
         ContextNode leafNode = new ContextNode(
                 resourceUri,
@@ -72,7 +76,9 @@ public class ResourceCatalogSyncServiceImpl implements ResourceCatalogSyncServic
         log.debug("[resource-catalog-sync] 同步资源节点: uri={}", resourceUri.value());
 
         // 为叶子节点生成向量嵌入
-        embedNode(resourceUri.value(), abstractText);
+        if (shouldEmbed(existing, abstractText)) {
+            embedNode(resourceUri.value(), abstractText);
+        }
     }
 
     @Override
@@ -140,5 +146,9 @@ public class ResourceCatalogSyncServiceImpl implements ResourceCatalogSyncServic
         } catch (Exception e) {
             log.warn("[resource-catalog-sync] 向量嵌入失败, 不影响同步: uri={}, error={}", uri, e.getMessage());
         }
+    }
+
+    private boolean shouldEmbed(Optional<ContextNode> existing, String abstractText) {
+        return existing.isEmpty() || !Objects.equals(existing.get().abstractText(), abstractText);
     }
 }

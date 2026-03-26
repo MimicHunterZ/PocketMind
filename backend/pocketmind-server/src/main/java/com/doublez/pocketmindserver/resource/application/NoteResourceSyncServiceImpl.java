@@ -34,8 +34,10 @@ public class NoteResourceSyncServiceImpl implements NoteResourceSyncService {
             softDeleteByNote(note);
             return;
         }
-        syncNoteText(note);
-        syncWebClip(note);
+
+        List<ResourceRecordEntity> resources = resourceRecordRepository.findByNoteUuid(note.getUserId(), note.getUuid());
+        syncNoteText(note, findByType(resources, ResourceSourceType.NOTE_TEXT));
+        syncWebClip(note, findByType(resources, ResourceSourceType.WEB_CLIP));
     }
 
     @Override
@@ -44,47 +46,66 @@ public class NoteResourceSyncServiceImpl implements NoteResourceSyncService {
         softDeleteResources(resourceRecordRepository.findByNoteUuid(note.getUserId(), note.getUuid()));
     }
 
-    private void syncNoteText(NoteEntity note) {
-        List<ResourceRecordEntity> existing = findByType(note, ResourceSourceType.NOTE_TEXT);
+    private void syncNoteText(NoteEntity note, ResourceRecordEntity existing) {
         if (note.getContent() == null || note.getContent().isBlank()) {
-            softDeleteResources(existing);
+            if (existing != null) {
+                softDeleteResources(List.of(existing));
+            }
             return;
         }
-        if (existing.isEmpty()) {
+        if (existing == null) {
             ResourceRecordEntity resource = projectionService.projectNoteText(note);
             resourceRecordRepository.save(resource);
             catalogSyncService.syncToCatalog(resource);
             return;
         }
-        ResourceRecordEntity resource = existing.getFirst();
+
+        String nextTitle = note.getTitle();
+        String nextContent = note.getContent();
+        if (isUnchanged(existing.getTitle(), nextTitle) && isUnchanged(existing.getContent(), nextContent)) {
+            return;
+        }
+
+        ResourceRecordEntity resource = existing;
         resource.updateContent(note.getTitle(), note.getContent());
         resourceRecordRepository.update(resource);
         catalogSyncService.syncToCatalog(resource);
     }
 
-    private void syncWebClip(NoteEntity note) {
-        List<ResourceRecordEntity> existing = findByType(note, ResourceSourceType.WEB_CLIP);
+    private void syncWebClip(NoteEntity note, ResourceRecordEntity existing) {
         if (note.getPreviewContent() == null || note.getPreviewContent().isBlank()) {
-            softDeleteResources(existing);
+            if (existing != null) {
+                softDeleteResources(List.of(existing));
+            }
             return;
         }
-        if (existing.isEmpty()) {
+        if (existing == null) {
             ResourceRecordEntity resource = projectionService.projectWebClip(note);
             resourceRecordRepository.save(resource);
             catalogSyncService.syncToCatalog(resource);
             return;
         }
-        ResourceRecordEntity resource = existing.getFirst();
+
+        String nextTitle = note.getPreviewTitle();
+        String nextContent = note.getPreviewContent();
+        String nextSourceUrl = note.getSourceUrl();
+        if (isUnchanged(existing.getTitle(), nextTitle)
+                && isUnchanged(existing.getContent(), nextContent)
+                && isUnchanged(existing.getSourceUrl(), nextSourceUrl)) {
+            return;
+        }
+
+        ResourceRecordEntity resource = existing;
         resource.updateContent(note.getPreviewTitle(), note.getPreviewContent(), note.getSourceUrl());
         resourceRecordRepository.update(resource);
         catalogSyncService.syncToCatalog(resource);
     }
 
-    private List<ResourceRecordEntity> findByType(NoteEntity note, ResourceSourceType sourceType) {
-        return resourceRecordRepository.findByNoteUuid(note.getUserId(), note.getUuid())
-                .stream()
+    private ResourceRecordEntity findByType(List<ResourceRecordEntity> resources, ResourceSourceType sourceType) {
+        return resources.stream()
                 .filter(resource -> resource.getSourceType() == sourceType)
-                .toList();
+                .findFirst()
+                .orElse(null);
     }
 
     private void softDeleteResources(List<ResourceRecordEntity> resources) {
@@ -93,5 +114,9 @@ public class NoteResourceSyncServiceImpl implements NoteResourceSyncService {
             resourceRecordRepository.update(resource);
             catalogSyncService.removeFromCatalog(resource);
         }
+    }
+
+    private boolean isUnchanged(String current, String next) {
+        return java.util.Objects.equals(current, next);
     }
 }

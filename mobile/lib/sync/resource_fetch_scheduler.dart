@@ -2,10 +2,8 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:pocketmind/core/constants.dart';
-import 'package:pocketmind/data/repositories/isar_note_repository.dart';
 import 'package:pocketmind/service/metadata_manager.dart';
-import 'package:pocketmind/sync/local_write_coordinator.dart';
-import 'package:pocketmind/sync/sync_engine.dart';
+import 'package:pocketmind/service/note_service.dart';
 import 'package:pocketmind/util/logger_service.dart';
 
 /// 资源抓取调度器 —— 监听网络恢复事件，自动驱动 PENDING 笔记完成元数据抓取。
@@ -13,17 +11,15 @@ import 'package:pocketmind/util/logger_service.dart';
 /// 职责范围：
 /// - 扫描 [Note.resourceStatus] == PENDING 的笔记。
 /// - 调用 [MetadataManager] 执行端侧抓取（链接预览 / 平台专属内容）。
-/// - 抓取成功后更新 Note 字段并通知 [SyncEngine.kick]，触发推送告知后端。
+/// - 抓取成功后通过 [NoteService] 统一落库、入队并触发同步。
 /// - 抓取失败后更新 resourceStatus=FAILED，UI 降级展示裸 URL，不再无限重试。
 ///
 /// 不负责：
 /// - 后端 AI 摘要的拉取（由 Pull 增量机制自动回流）。
 /// - 大文件上传（由独立的 AssetUploadService 处理）。
 class ResourceFetchScheduler {
-  final IsarNoteRepository _noteRepo;
+  final NoteService _noteService;
   final MetadataManager _metadataManager;
-  final LocalWriteCoordinator _writeCoordinator;
-  final SyncEngine _syncEngine;
 
   static const String _tag = 'ResourceFetchScheduler';
   bool _isFetching = false;
@@ -31,14 +27,10 @@ class ResourceFetchScheduler {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
   ResourceFetchScheduler({
-    required IsarNoteRepository noteRepo,
+    required NoteService noteService,
     required MetadataManager metadataManager,
-    required LocalWriteCoordinator writeCoordinator,
-    required SyncEngine syncEngine,
-  }) : _noteRepo = noteRepo,
-       _metadataManager = metadataManager,
-       _writeCoordinator = writeCoordinator,
-       _syncEngine = syncEngine;
+  }) : _noteService = noteService,
+       _metadataManager = metadataManager;
 
   /// 初始化调度器：
   /// - 订阅网络连接恢复事件，触发扫描
@@ -78,7 +70,7 @@ class ResourceFetchScheduler {
     _isFetching = true;
     try {
       // 查询所有 resourceStatus=PENDING 的笔记（有 url 且未抓取）
-      final pendingNotes = await _noteRepo.findByResourceStatus(
+      final pendingNotes = await _noteService.findNotesByResourceStatus(
         AppConstants.resourceStatusPending,
       );
 
@@ -95,7 +87,7 @@ class ResourceFetchScheduler {
 
         try {
           // 标记为抓取中
-          await _noteRepo.updateResourceStatus(
+          await _noteService.persistResourceStatus(
             note,
             AppConstants.resourceStatusScraping,
           );
@@ -113,14 +105,11 @@ class ResourceFetchScheduler {
               ..previewContent = metadata.previewContent ?? note.previewContent
               ..resourceStatus = AppConstants.resourceStatusCrawled;
 
-            // 抓取成功后通过写入协调器落库并入队 mutation，避免下一轮 Pull 反向覆盖本地预览字段。
-            await _writeCoordinator.writeNote(note);
+            // 通过统一入口落库并入队 mutation，内部自动触发同步。
+            await _noteService.persistDerivedNoteForSync(note);
             PMlog.d(_tag, '笔记 ${note.uuid} 抓取成功，状态: CRAWLED');
-
-            // 通知 SyncEngine Push（后端收到 CRAWLED 后触发 AI 管线）
-            _syncEngine.kick();
           } else {
-            await _noteRepo.updateResourceStatus(
+            await _noteService.persistResourceStatus(
               note,
               AppConstants.resourceStatusFailed,
             );
@@ -128,7 +117,7 @@ class ResourceFetchScheduler {
           }
         } catch (e) {
           PMlog.e(_tag, '笔记 ${note.uuid} 抓取出错: $e');
-          await _noteRepo.updateResourceStatus(
+          await _noteService.persistResourceStatus(
             note,
             AppConstants.resourceStatusFailed,
           );

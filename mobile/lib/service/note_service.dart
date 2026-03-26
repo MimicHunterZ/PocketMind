@@ -186,8 +186,38 @@ class NoteService {
   Stream<List<Note>> findNotesWithQuery(String query) =>
       _noteRepository.findByQuery(query);
 
+  /// 按 UUID 查找笔记。
+  Future<Note?> findNoteByUuid(String uuid) async =>
+      _noteRepository.findByUuid(uuid);
+
   Future<List<Note>> findNotesWithUrls(List<String> urls) async =>
       _noteRepository.findByUrls(urls);
+
+  /// 查询指定资源状态的笔记（供后台抓取调度使用）。
+  Future<List<Note>> findNotesByResourceStatus(String status) async =>
+      _noteRepository.findByResourceStatus(status);
+
+  /// 后台衍生字段写入统一入口：
+  /// - 持久化 Note
+  /// - 追加 mutation 进入同步队列
+  /// - 可选触发同步
+  ///
+  /// 供抓取、轮询、后台任务等非 UI 入口使用，避免旁路写导致跨端不一致。
+  Future<int> persistDerivedNoteForSync(
+    Note note, {
+    bool triggerSync = true,
+  }) async {
+    final savedId = await _writeCoordinator.writeNote(note);
+    if (triggerSync) {
+      _syncEngine?.kick();
+    }
+    return savedId;
+  }
+
+  /// 手动触发一次同步（供 UI 操作入口调用）。
+  void triggerSyncNow() {
+    _syncEngine?.kick();
+  }
 
   /// 持久化 resourceStatus 字段（不更新 updatedAt，由 [ResourceFetchScheduler] 调用）。
   Future<void> persistResourceStatus(Note note, String status) async {

@@ -2,7 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-import '../../providers/sync_providers.dart';
+import '../../providers/note_providers.dart';
 import '../../sync/sync_state_provider.dart';
 import '../../util/theme_data.dart';
 import '../widget/pm_app_bar.dart';
@@ -89,7 +89,7 @@ class _SyncActionCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isSyncing = ref.watch(syncIsSyncingProvider);
-    final syncEngine = ref.read(syncEngineProvider);
+    final noteService = ref.read(noteServiceProvider);
 
     return Card(
       child: Padding(
@@ -102,7 +102,7 @@ class _SyncActionCard extends ConsumerWidget {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: isSyncing ? null : syncEngine.kick,
+                onPressed: isSyncing ? null : noteService.triggerSyncNow,
                 icon: const Icon(Icons.sync),
                 label: Text(isSyncing ? '同步中...' : '立即同步'),
               ),

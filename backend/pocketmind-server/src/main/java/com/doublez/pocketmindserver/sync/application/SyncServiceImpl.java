@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -102,11 +103,36 @@ public class SyncServiceImpl implements SyncService {
                 };
                 results.add(result);
             } catch (Exception e) {
-                log.error("[Sync] 处理 mutation 出现异常, mutationId={}", mutation.mutationId(), e);
+                SyncPushResult recovered = tryRecoverDuplicateKeyAsIdempotent(mutation, e);
+                if (recovered != null) {
+                    results.add(recovered);
+                    continue;
+                }
+
+                if (e instanceof DuplicateKeyException) {
+                    log.warn("[Sync] mutation 写入发生唯一键冲突, mutationId={}, error={}", mutation.mutationId(), e.getMessage());
+                } else {
+                    log.error("[Sync] 处理 mutation 出现异常, mutationId={}", mutation.mutationId(), e);
+                }
                 results.add(SyncPushResult.retryableRejected(mutation.mutationId(), "SERVER_ERROR"));
             }
         }
         return results;
+    }
+
+    /**
+     * 并发重试场景下，若唯一键冲突对应的 mutation 已成功落库，则按幂等接受返回。
+     */
+    private SyncPushResult tryRecoverDuplicateKeyAsIdempotent(SyncMutationDto mutation, Exception e) {
+        if (!(e instanceof DuplicateKeyException)) {
+            return null;
+        }
+        Optional<Long> cached = changeLogRepository.findVersionByMutationId(mutation.mutationId());
+        if (cached.isEmpty()) {
+            return null;
+        }
+        log.info("[Sync] 唯一键冲突按幂等恢复, mutationId={}, sv={}", mutation.mutationId(), cached.get());
+        return SyncPushResult.accepted(mutation.mutationId(), cached.get());
     }
 
     // ─── 笔记 Mutation 处理 ───────────────────────────────────────────────────
