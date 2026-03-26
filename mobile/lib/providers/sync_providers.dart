@@ -19,7 +19,7 @@ import 'package:pocketmind/util/logger_service.dart';
 
 part 'sync_providers.g.dart';
 
-// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 鍩虹璁炬柦 Provider 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ======================== 基础设施 Provider ========================
 
 /// IsarCategoryRepository Provider
 @Riverpod(keepAlive: true)
@@ -58,7 +58,7 @@ PushCoordinator pushCoordinator(Ref ref) {
   return PushCoordinator(isar: isar, syncApi: syncApi);
 }
 
-/// SyncEngine Provider 鈥斺€?鍚屾寮曟搸鍞竴瀹炰緥
+/// SyncEngine Provider —— 同步引擎唯一实例
 @Riverpod(keepAlive: true)
 SyncEngine syncEngine(Ref ref) {
   final pull = ref.watch(pullCoordinatorProvider);
@@ -72,40 +72,42 @@ SyncEngine syncEngine(Ref ref) {
   );
 }
 
-/// ResourceFetchScheduler Provider 鈥斺€?绔晶鍏冩暟鎹姄鍙栬皟搴﹀櫒
+/// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器
 @Riverpod(keepAlive: true)
 ResourceFetchScheduler resourceFetchScheduler(Ref ref) {
   final noteRepo = ref.watch(noteRepositoryProvider);
   final metadataManager = ref.watch(metadataManagerProvider);
+  final writeCoordinator = ref.watch(localWriteCoordinatorProvider);
   final engine = ref.watch(syncEngineProvider);
   final scheduler = ResourceFetchScheduler(
     noteRepo: noteRepo,
     metadataManager: metadataManager,
+    writeCoordinator: writeCoordinator,
     syncEngine: engine,
   );
-  // 搴旂敤鍚姩鏃朵究寮€濮嬬洃鍚綉缁滀簨浠?
+  // 应用启动时即开始监听网络事件
   scheduler.start();
   ref.onDispose(scheduler.dispose);
   return scheduler;
 }
 
-// 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 鑷€傚簲杞璋冨害鍣?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ======================== 自适应轮询调度器 ========================
 
-/// 鑷€傚簲杞 Provider 鈥斺€?鏍规嵁搴旂敤鐘舵€佽嚜鍔ㄨ皟鏁?Pull 闂撮殧銆?
+/// 自适应轮询 Provider —— 根据应用状态自动调整 Pull 间隔。
 ///
-/// 绛栫暐锛?
-/// - 鐧诲綍鐘舵€佷笅姣?30 绉掕Е鍙戜竴娆?SyncEngine.kick()
-/// - 缃戠粶鐘舵€佸彉鍖栨椂绔嬪嵆瑙﹀彂涓€娆?
-/// - 姝?Provider keepAlive锛孉pp 鐢熷懡鍛ㄦ湡鍐呮寔缁繍琛?
+/// 策略：
+/// - 登录状态下每 30 秒触发一次 SyncEngine.kick()
+/// - 网络状态变化时立即触发一次
+/// - 该 Provider 为 keepAlive，App 生命周期内持续运行
 @Riverpod(keepAlive: true)
 void adaptiveSyncScheduler(Ref ref) {
   final engine = ref.watch(syncEngineProvider);
   final authState = ref.watch(authControllerProvider);
 
-  // 鏈櫥褰曟椂涓嶅惎鍔ㄨ皟搴?
+  // 未登录时不启动调度
   if (authState.userId == null) return;
 
-  // 鑷€傚簲瀹氭椂鍣細鍓嶅彴娲昏穬 30 绉掗棿闅?
+  // 自适应定时器：前台活跃 30 秒间隔
   const interval = Duration(seconds: 30);
   Timer? timer;
 
@@ -117,19 +119,19 @@ void adaptiveSyncScheduler(Ref ref) {
     });
   }
 
-  // 缃戠粶鎭㈠绔嬪嵆瑙﹀彂
+  // 网络恢复立即触发
   final connectivitySub = Connectivity().onConnectivityChanged.listen((
     results,
   ) {
     final hasNetwork = results.any((r) => r != ConnectivityResult.none);
     if (hasNetwork) {
-      PMlog.d('SyncScheduler', '缃戠粶鎭㈠锛岀珛鍗?kick');
+      PMlog.d('SyncScheduler', '网络恢复，立即 kick');
       engine.kick();
     }
   });
 
   startTimer();
-  // 鍚姩鏃剁珛鍗冲悓姝ヤ竴娆?
+  // 启动时立即同步一次
   engine.kick();
 
   ref.onDispose(() {

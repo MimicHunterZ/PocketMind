@@ -19,6 +19,9 @@ abstract final class NoteSyncPayloadMapper {
   }) {
     final existingPreviewImageUrl =
         fallbackPreviewImageUrl ?? target.previewImageUrl;
+    final existingPreviewTitle = target.previewTitle;
+    final existingPreviewDescription = target.previewDescription;
+    final existingPreviewContent = target.previewContent;
 
     target
       ..uuid = payload['uuid'] as String?
@@ -30,12 +33,28 @@ abstract final class NoteSyncPayloadMapper {
       ..categoryId =
           payload['categoryId'] as int? ?? AppConstants.homeCategoryId
       ..tags = TagListUtils.normalize(payload['tags'] as List<dynamic>?)
-      ..previewTitle = payload['previewTitle'] as String?
-      ..previewDescription = payload['previewDescription'] as String?
-      ..previewContent = payload['previewContent'] as String?
+      ..previewTitle = existingPreviewTitle
+      ..previewDescription = existingPreviewDescription
+      ..previewContent = existingPreviewContent
       ..resourceStatus = payload['resourceStatus'] as String?
       ..aiSummary = payload['aiSummary'] as String?
       ..serverVersion = serverVersion;
+
+    target.previewTitle = _resolvePreviewField(
+      payload: payload,
+      key: 'previewTitle',
+      fallback: existingPreviewTitle,
+    );
+    target.previewDescription = _resolvePreviewField(
+      payload: payload,
+      key: 'previewDescription',
+      fallback: existingPreviewDescription,
+    );
+    target.previewContent = _resolvePreviewField(
+      payload: payload,
+      key: 'previewContent',
+      fallback: existingPreviewContent,
+    );
 
     if (payload.containsKey('previewImageUrl')) {
       target.previewImageUrl = payload['previewImageUrl'] as String?;
@@ -64,5 +83,19 @@ abstract final class NoteSyncPayloadMapper {
       fallbackPreviewImageUrl: fallbackPreviewImageUrl,
     );
     return note;
+  }
+
+  /// 预览字段采用“非空覆盖”策略，避免服务端空值抹除端侧抓取结果。
+  static String? _resolvePreviewField({
+    required Map<String, dynamic> payload,
+    required String key,
+    required String? fallback,
+  }) {
+    if (!payload.containsKey(key)) return fallback;
+    final value = payload[key] as String?;
+    if (value == null || value.trim().isEmpty) {
+      return fallback;
+    }
+    return value;
   }
 }

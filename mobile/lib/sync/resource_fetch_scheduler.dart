@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/data/repositories/isar_note_repository.dart';
 import 'package:pocketmind/service/metadata_manager.dart';
+import 'package:pocketmind/sync/local_write_coordinator.dart';
 import 'package:pocketmind/sync/sync_engine.dart';
 import 'package:pocketmind/util/logger_service.dart';
 
@@ -21,6 +22,7 @@ import 'package:pocketmind/util/logger_service.dart';
 class ResourceFetchScheduler {
   final IsarNoteRepository _noteRepo;
   final MetadataManager _metadataManager;
+  final LocalWriteCoordinator _writeCoordinator;
   final SyncEngine _syncEngine;
 
   static const String _tag = 'ResourceFetchScheduler';
@@ -31,9 +33,11 @@ class ResourceFetchScheduler {
   ResourceFetchScheduler({
     required IsarNoteRepository noteRepo,
     required MetadataManager metadataManager,
+    required LocalWriteCoordinator writeCoordinator,
     required SyncEngine syncEngine,
   }) : _noteRepo = noteRepo,
        _metadataManager = metadataManager,
+       _writeCoordinator = writeCoordinator,
        _syncEngine = syncEngine;
 
   /// 初始化调度器：
@@ -109,7 +113,8 @@ class ResourceFetchScheduler {
               ..previewContent = metadata.previewContent ?? note.previewContent
               ..resourceStatus = AppConstants.resourceStatusCrawled;
 
-            await _noteRepo.saveSyncInternalNote(note);
+            // 抓取成功后通过写入协调器落库并入队 mutation，避免下一轮 Pull 反向覆盖本地预览字段。
+            await _writeCoordinator.writeNote(note);
             PMlog.d(_tag, '笔记 ${note.uuid} 抓取成功，状态: CRAWLED');
 
             // 通知 SyncEngine Push（后端收到 CRAWLED 后触发 AI 管线）

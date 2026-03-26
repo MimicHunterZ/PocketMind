@@ -186,14 +186,19 @@ class PullCoordinator {
     if (p['resourceStatus'] != null) {
       local.resourceStatus = p['resourceStatus'] as String?;
     }
-    if (p['previewTitle'] != null) {
-      local.previewTitle = p['previewTitle'] as String?;
+    final serverPreviewTitle = p['previewTitle'] as String?;
+    if (serverPreviewTitle != null && serverPreviewTitle.trim().isNotEmpty) {
+      local.previewTitle = serverPreviewTitle;
     }
-    if (p['previewDescription'] != null) {
-      local.previewDescription = p['previewDescription'] as String?;
+    final serverPreviewDescription = p['previewDescription'] as String?;
+    if (serverPreviewDescription != null &&
+        serverPreviewDescription.trim().isNotEmpty) {
+      local.previewDescription = serverPreviewDescription;
     }
-    if (p['previewContent'] != null) {
-      local.previewContent = p['previewContent'] as String?;
+    final serverPreviewContent = p['previewContent'] as String?;
+    if (serverPreviewContent != null &&
+        serverPreviewContent.trim().isNotEmpty) {
+      local.previewContent = serverPreviewContent;
     }
     if (p['previewImageUrl'] != null) {
       local.previewImageUrl = p['previewImageUrl'] as String?;

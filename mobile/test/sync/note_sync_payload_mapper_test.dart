@@ -51,5 +51,59 @@ void main() {
 
       expect(note.previewImageUrl, 'https://server/image.jpg');
     });
+
+    test('当服务端预览字段为 null 时保留本地值', () {
+      final note = Note()
+        ..previewTitle = 'local-title'
+        ..previewDescription = 'local-desc'
+        ..previewContent = 'local-content';
+
+      NoteSyncPayloadMapper.applyServerSnapshot(
+        target: note,
+        payload: {
+          'uuid': 'u3',
+          'updatedAt': 10,
+          'isDeleted': false,
+          'categoryId': 1,
+          'tags': const <String>[],
+          'previewTitle': null,
+          'previewDescription': null,
+          'previewContent': null,
+          'serverVersion': 9,
+        },
+        serverVersion: 9,
+      );
+
+      expect(note.previewTitle, 'local-title');
+      expect(note.previewDescription, 'local-desc');
+      expect(note.previewContent, 'local-content');
+    });
+
+    test('当服务端预览字段为空字符串时保留本地值', () {
+      final note = Note()
+        ..previewTitle = 'local-title'
+        ..previewDescription = 'local-desc'
+        ..previewContent = 'local-content';
+
+      NoteSyncPayloadMapper.applyServerSnapshot(
+        target: note,
+        payload: {
+          'uuid': 'u4',
+          'updatedAt': 10,
+          'isDeleted': false,
+          'categoryId': 1,
+          'tags': const <String>[],
+          'previewTitle': '   ',
+          'previewDescription': '',
+          'previewContent': ' \n\t ',
+          'serverVersion': 10,
+        },
+        serverVersion: 10,
+      );
+
+      expect(note.previewTitle, 'local-title');
+      expect(note.previewDescription, 'local-desc');
+      expect(note.previewContent, 'local-content');
+    });
   });
 }
