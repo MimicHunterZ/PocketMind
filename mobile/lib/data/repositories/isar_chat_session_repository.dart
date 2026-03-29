@@ -51,6 +51,17 @@ class IsarChatSessionRepository {
         .findAll();
   }
 
+  /// 查询全局会话（scopeNoteUuid == null），按 updatedAt 倒序。
+  Future<List<ChatSession>> findGlobalSessions() {
+    return _isar.chatSessions
+        .filter()
+        .scopeNoteUuidIsNull()
+        .and()
+        .isDeletedEqualTo(false)
+        .sortByUpdatedAtDesc()
+        .findAll();
+  }
+
   // 写入
 
   /// 将服务端返回的会话列表全量 upsert（有则更新，无则插入）。

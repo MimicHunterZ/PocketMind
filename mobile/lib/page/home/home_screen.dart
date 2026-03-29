@@ -1,269 +1,198 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:go_router/go_router.dart';
+import 'package:pocketmind/core/constants.dart';
+import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/model/note.dart';
-import 'package:pocketmind/page/widget/glass_nav_bar.dart';
-import 'package:pocketmind/page/widget/note_item.dart';
-import 'package:pocketmind/page/home/note_add_sheet.dart';
+import 'package:pocketmind/page/chat/chat_page.dart';
+import 'package:pocketmind/page/home/category_posts_screen.dart';
 import 'package:pocketmind/page/home/mixin/search_logic_mixin.dart';
+import 'package:pocketmind/page/home/note_add_sheet.dart';
+import 'package:pocketmind/page/home/widgets/note_feed_paged_view.dart';
+import 'package:pocketmind/page/home/widgets/themed_category_grid.dart';
+import 'package:pocketmind/page/home/widgets/themed_home_tab_bar.dart';
+import 'package:pocketmind/page/home/widgets/themed_home_top_bar.dart';
+import 'package:pocketmind/page/home/widgets/unified_home_background.dart';
+import 'package:pocketmind/page/widget/add_category_dialog.dart';
+import 'package:pocketmind/providers/app_config_provider.dart';
+import 'package:pocketmind/providers/category_providers.dart';
+import 'package:pocketmind/providers/chat_providers.dart';
 import 'package:pocketmind/providers/nav_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
-import 'package:pocketmind/providers/app_config_provider.dart';
+import 'package:pocketmind/router/route_paths.dart';
 import 'package:pocketmind/service/note_service.dart';
 import 'package:pocketmind/sync/sync_state_provider.dart';
-import 'package:pocketmind/util/theme_data.dart';
 import 'package:pocketmind/util/logger_service.dart';
-import 'package:pocketmind/providers/sync_providers.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 final String tag = 'HomeScreen';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({
+    super.key,
+    this.openChatSession,
+    this.resolveGlobalSessionUuid,
+  });
+
+  final Future<void> Function(BuildContext context, String sessionUuid)?
+      openChatSession;
+  final Future<String> Function()? resolveGlobalSessionUuid;
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen>
-    with SingleTickerProviderStateMixin, SearchLogicMixin {
-  // 滚动控制器，用于保持滚动位置
+class _HomeScreenState extends ConsumerState<HomeScreen> with SearchLogicMixin {
+  ThemedHomeTab _tab = ThemedHomeTab.everything;
   final ScrollController _scrollController = ScrollController();
-
   bool _isSearchMode = false;
-  late AnimationController _searchAnimationController;
-  late Animation<Offset> _navBarSlideAnimation;
-  late Animation<Offset> _searchBarSlideAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-
-    // 初始化动画控制器
-    _searchAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-
-    // NavBar 向左滑出的动画
-    _navBarSlideAnimation =
-        Tween<Offset>(begin: Offset.zero, end: const Offset(-1.0, 0.0)).animate(
-          CurvedAnimation(
-            parent: _searchAnimationController,
-            curve: Curves.easeInOut,
-          ),
-        );
-
-    // 搜索框从右滑入的动画
-    _searchBarSlideAnimation =
-        Tween<Offset>(begin: const Offset(1.0, 0.0), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: _searchAnimationController,
-            curve: Curves.easeInOut,
-          ),
-        );
-  }
 
   @override
   void dispose() {
     _scrollController.dispose();
-    _searchAnimationController.dispose();
     super.dispose();
-  }
-
-  // 切换搜索模式
-  void _toggleSearchMode() {
-    setState(() {
-      _isSearchMode = !_isSearchMode;
-      if (_isSearchMode) {
-        _searchAnimationController.forward();
-        // 延迟一点让动画先执行，然后再聚焦
-        Future.delayed(const Duration(milliseconds: 100), () {
-          searchFocusNode.requestFocus();
-        });
-      } else {
-        _searchAnimationController.reverse();
-        clearSearch();
-        searchFocusNode.unfocus();
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    // 确保自适应同步调度器处于激活状态（30s 定时器 + 网络恢复触发）
-    ref.watch(adaptiveSyncSchedulerProvider);
+    final ext = CategoryHomeColors.of(context);
 
     return Scaffold(
-      // 使用主题背景色
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-
-      body: SafeArea(
-        bottom: false,
+      backgroundColor: ext.unifiedHomeBackground,
+      body: UnifiedHomeBackground(
         child: Column(
           children: [
-            // 顶部导航栏 / 搜索栏 切换区域
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 4.w),
-              child: SizedBox(
-                height: 56.h, // 固定高度，防止切换时跳动
-                child: Stack(
-                  children: [
-                    // GlassNavBar - 向左滑出
-                    SlideTransition(
-                      position: _navBarSlideAnimation,
-                      child: Padding(
-                        padding: EdgeInsets.only(right: 8.w), // 添加右侧间距
-                        child: GlassNavBar(onSearchPressed: _toggleSearchMode),
-                      ),
-                    ),
-                    // 搜索栏 - 从右滑入
-                    SlideTransition(
-                      position: _searchBarSlideAnimation,
-                      child: Padding(
-                        padding: EdgeInsets.only(left: 8.w), // 添加左侧间距
-                        child: _buildSearchBar(),
-                      ),
-                    ),
-                  ],
-                ),
+            if (_tab != ThemedHomeTab.everything)
+              const SafeArea(top: true, bottom: false, child: SizedBox.shrink()),
+            if (_tab == ThemedHomeTab.everything)
+              ThemedHomeTopBar(
+                showSearchInput: _isSearchMode,
+                searchController: searchController,
+                searchFocusNode: searchFocusNode,
+                onSearchBackTap: _exitSearchMode,
+                onAvatarTap: () => context.push(RoutePaths.settings),
+                onSearchTap: _enterSearchMode,
+                onAddTap: () => Navigator.of(context).push(NoteEditorRoute()),
               ),
-            ),
-
-            SizedBox(height: 12.h),
-
-            // 笔记列表（根据布局模式切换 或 搜索结果）
-            Expanded(
-              child: _HomeNotesPane(scrollController: _scrollController),
-            ),
+            Expanded(child: _buildBody()),
           ],
         ),
       ),
-
-      // FAB - 使用主题样式（药丸形状）
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showAddNotePage(context);
-        },
-        elevation: 12,
-        child: Container(
-          width: 56.w,
-          height: 56.w,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Theme.of(context).colorScheme.tertiary,
-                Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.85),
-              ],
-            ),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Theme.of(
-                  context,
-                ).colorScheme.tertiary.withValues(alpha: 0.4),
-                blurRadius: 16.r,
-                offset: Offset(0, 6.h),
-              ),
-            ],
-          ),
-          child: Icon(Icons.add, size: 28.sp),
-        ),
+      floatingActionButton: _tab == ThemedHomeTab.category
+          ? FloatingActionButton(
+              onPressed: _showAddCategory,
+              child: const Icon(Icons.add),
+            )
+          : null,
+      bottomNavigationBar: ThemedHomeTabBar(
+        currentTab: _tab,
+        onChanged: _handleTabChange,
       ),
     );
   }
 
-  // 显示添加笔记页面（全屏）
-  void _showAddNotePage(BuildContext context) {
-    Navigator.of(context).push(NoteEditorRoute());
+  Widget _buildBody() {
+    return switch (_tab) {
+      ThemedHomeTab.everything => _EverythingPane(scrollController: _scrollController),
+      ThemedHomeTab.ai => const SizedBox.shrink(),
+      ThemedHomeTab.category => const _CategoryTab(),
+    };
   }
 
-  // 构建搜索栏
-  Widget _buildSearchBar() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colorScheme = Theme.of(context).colorScheme;
+  Future<void> _handleTabChange(ThemedHomeTab tab) async {
+    if (tab == ThemedHomeTab.ai) {
+      final previousTab = _tab;
+      if (_isSearchMode) {
+        setState(() {
+          _isSearchMode = false;
+        });
+        clearSearch();
+      }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.1)
-            : Colors.black.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(28.r),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.2)
-              : Colors.black.withValues(alpha: 0.08),
-          width: 1.0.w,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
-            blurRadius: 8.r,
-            offset: Offset(0, 2.h),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // 返回按钮
-          IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: _toggleSearchMode,
-            color: colorScheme.primary,
-          ),
+      setState(() {
+        _tab = ThemedHomeTab.ai;
+      });
+      await _openGlobalAiSession();
+      if (!mounted) return;
+      setState(() {
+        _tab = previousTab == ThemedHomeTab.ai
+            ? ThemedHomeTab.everything
+            : previousTab;
+      });
+      return;
+    }
 
-          // 搜索输入框
-          Expanded(
-            child: TextField(
-              controller: searchController,
-              focusNode: searchFocusNode,
-              decoration: InputDecoration(
-                hintText: '搜索笔记...',
-                border: InputBorder.none,
-                hintStyle: TextStyle(
-                  color: colorScheme.onSurface.withValues(alpha: 0.5),
-                ),
-              ),
-              style: TextStyle(color: colorScheme.onSurface),
-              // 实时搜索，不需要提交动作
-            ),
-          ),
+    setState(() {
+      _tab = tab;
+      if (tab != ThemedHomeTab.everything && _isSearchMode) {
+        _isSearchMode = false;
+        clearSearch();
+      }
+    });
+  }
 
-          // 清空按钮（当有输入时显示）
-          ValueListenableBuilder<TextEditingValue>(
-            valueListenable: searchController,
-            builder: (context, value, child) {
-              if (value.text.isEmpty) {
-                return SizedBox(width: 48.w); // 占位，保持布局稳定
-              }
-              return IconButton(
-                icon: const Icon(Icons.clear),
-                onPressed: () {
-                  clearSearch();
-                  searchFocusNode.requestFocus();
-                },
-                color: colorScheme.onSurface.withValues(alpha: 0.6),
-                iconSize: 20.sp,
-              );
-            },
-          ),
-        ],
+  void _enterSearchMode() {
+    setState(() => _isSearchMode = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      searchFocusNode.requestFocus();
+    });
+  }
+
+  void _exitSearchMode() {
+    setState(() => _isSearchMode = false);
+    clearSearch();
+    searchFocusNode.unfocus();
+  }
+
+  Future<void> _showAddCategory() async {
+    final result = await showAddCategoryDialog(context);
+    if (result == null) return;
+    await ref.read(categoryActionsProvider.notifier).addCategory(
+          name: result.name,
+          description: result.description,
+          iconPath: result.iconPath,
+        );
+  }
+
+  Future<void> _openGlobalAiSession() async {
+    final customResolver = widget.resolveGlobalSessionUuid;
+    final sessionUuid = customResolver != null
+        ? await customResolver()
+        : await _resolveGlobalSessionUuid();
+
+    if (!mounted) return;
+    final customOpenChat = widget.openChatSession;
+    if (customOpenChat != null) {
+      await customOpenChat(context, sessionUuid);
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatPage(sessionUuid: sessionUuid),
       ),
     );
+  }
+
+  Future<String> _resolveGlobalSessionUuid() async {
+    final repo = ref.read(chatSessionRepositoryProvider);
+    final service = ref.read(chatServiceProvider);
+    final globalSessions = await repo.findGlobalSessions();
+    if (globalSessions.isNotEmpty) {
+      return globalSessions.first.uuid;
+    }
+    final created = await service.createSession(noteUuid: null);
+    return created.uuid;
   }
 }
 
-class _HomeNotesPane extends ConsumerWidget {
-  const _HomeNotesPane({required this.scrollController});
+class _EverythingPane extends ConsumerWidget {
+  const _EverythingPane({required this.scrollController});
 
   final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final noteService = ref.read(noteServiceProvider);
     final currentLayout = ref.watch(
       appConfigProvider.select(
         (config) =>
@@ -274,59 +203,56 @@ class _HomeNotesPane extends ConsumerWidget {
 
     if (searchQuery != null) {
       final searchResults = ref.watch(searchResultsProvider);
-      return _HomeSearchResults(
-        searchResults: searchResults,
-        currentLayout: currentLayout,
-        noteService: noteService,
-        scrollController: scrollController,
+      return searchResults.when(
+        data: (notes) {
+          if (notes.isEmpty) {
+            return const Center(child: Text('未找到相关笔记'));
+          }
+          final noteService = ref.read(noteServiceProvider);
+          return NoteFeedPagedView(
+            notes: notes,
+            currentLayout: currentLayout,
+            noteService: noteService,
+            scrollController: scrollController,
+            itemKeyPrefix: 'search_note',
+          );
+        },
+        error: (error, stack) {
+          PMlog.e(tag, '搜索错误: $error, stack:$stack');
+          return const Center(child: Text('搜索失败'));
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
       );
     }
 
     final isInitialPull = ref.watch(syncIsInitialPullProvider);
     if (isInitialPull) {
-      return const _InitialPullSkeleton();
+      return const Center(child: CircularProgressIndicator());
     }
 
-    final noteByCategory = ref.watch(noteByCategoryProvider);
-    return noteByCategory.when(
-      skipLoadingOnRefresh: true,
+    final allNotesAsync = ref.watch(allNotesProvider);
+    return allNotesAsync.when(
       data: (notes) {
         if (notes.isEmpty) {
           return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.note_add_outlined,
-                  size: 80.sp,
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-                SizedBox(height: 16.h),
-                Text(
-                  '你的思绪将汇聚于此',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.secondary,
-                  ),
-                ),
-                SizedBox(height: 8.h),
-                Text(
-                  '点击右下角，捕捉第一个灵感',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
+            child: Text(
+              '你的思绪将汇聚于此',
+              style: Theme.of(context).textTheme.titleMedium,
             ),
           );
         }
+        final noteService = ref.read(noteServiceProvider);
 
-        return _NotesListView(
+        return NoteFeedPagedView(
           notes: notes,
           currentLayout: currentLayout,
           noteService: noteService,
           scrollController: scrollController,
+          itemKeyPrefix: 'note',
         );
       },
       error: (error, stack) {
-        PMlog.e(tag, 'stack: $error,stack:$stack');
+        PMlog.e(tag, '加载失败: $error, stack:$stack');
         return const Center(child: Text('加载笔记失败'));
       },
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -334,187 +260,82 @@ class _HomeNotesPane extends ConsumerWidget {
   }
 }
 
-class _HomeSearchResults extends StatelessWidget {
-  const _HomeSearchResults({
-    required this.searchResults,
-    required this.currentLayout,
-    required this.noteService,
-    required this.scrollController,
-  });
-
-  final AsyncValue<List<Note>> searchResults;
-  final NoteLayout currentLayout;
-  final NoteService noteService;
-  final ScrollController scrollController;
+class _CategoryTab extends ConsumerWidget {
+  const _CategoryTab();
 
   @override
-  Widget build(BuildContext context) {
-    return searchResults.when(
-      data: (notes) {
-        if (notes.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.search_off,
-                  size: 80.sp,
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-                SizedBox(height: 16.h),
-                Text(
-                  '未找到相关笔记',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.secondary,
-                  ),
-                ),
-                SizedBox(height: 8.h),
-                Text('尝试使用其他关键词', style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
-          );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final categoryAsync = ref.watch(allCategoriesProvider);
+    return categoryAsync.when(
+      data: (categories) {
+        if (categories.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        final visibleCategories = categories
+            .where((item) => item.id != AppConstants.homeCategoryId)
+            .toList();
+        if (visibleCategories.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return ThemedCategoryGrid(categories: visibleCategories);
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, _) => const Center(child: Text('分类加载失败')),
+    );
+  }
+}
+
+class CategoryPostsBody extends ConsumerWidget {
+  const CategoryPostsBody({
+    super.key,
+    required this.categoryId,
+    required this.scrollController,
+    this.emptyText = '暂无帖子',
+  });
+
+  final int categoryId;
+  final ScrollController scrollController;
+  final String emptyText;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentLayout = ref.watch(
+      appConfigProvider.select(
+        (config) =>
+            config.waterfallLayoutEnabled ? NoteLayout.grid : NoteLayout.list,
+      ),
+    );
+    final noteService = ref.read(noteServiceProvider);
+
+    return StreamBuilder<List<Note>>(
+      stream: noteService.watchCategoryNotes(categoryId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
         }
 
-        return _NotesListView(
+        final notes = snapshot.data!;
+        if (notes.isEmpty) {
+          return Center(child: Text(emptyText));
+        }
+
+        return NoteFeedPagedView(
           notes: notes,
           currentLayout: currentLayout,
           noteService: noteService,
           scrollController: scrollController,
-        );
-      },
-      error: (error, stack) {
-        PMlog.e(tag, '搜索错误: $error, stack:$stack');
-        return const Center(child: Text('搜索失败'));
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-    );
-  }
-}
-
-class _NotesListView extends StatelessWidget {
-  const _NotesListView({
-    required this.notes,
-    required this.currentLayout,
-    required this.noteService,
-    required this.scrollController,
-  });
-
-  final List<Note> notes;
-  final NoteLayout currentLayout;
-  final NoteService noteService;
-  final ScrollController scrollController;
-
-  @override
-  Widget build(BuildContext context) {
-    if (currentLayout == NoteLayout.grid) {
-      return MasonryGridView.count(
-        controller: scrollController,
-        key: const PageStorageKey('masonry_grid_view'),
-        crossAxisCount: 2,
-        cacheExtent: 500.h,
-        padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 8.h),
-        itemCount: notes.length,
-        itemBuilder: (context, index) {
-          final note = notes[index];
-          return RepaintBoundary(
-            child: NoteItem(
-              note: note,
-              noteService: noteService,
-              isWaterfall: true,
-              key: ValueKey('note_${note.id}'),
-            ),
-          );
-        },
-      );
-    }
-
-    return ListView.builder(
-      controller: scrollController,
-      key: const PageStorageKey('list_view'),
-      cacheExtent: 500.h,
-      padding: EdgeInsets.symmetric(horizontal: 4.w),
-      itemCount: notes.length,
-      itemBuilder: (context, index) {
-        final note = notes[index];
-        return RepaintBoundary(
-          child: NoteItem(
-            note: note,
-            noteService: noteService,
-            isWaterfall: false,
-            key: ValueKey('note_${note.id}'),
-          ),
+          itemKeyPrefix: 'category_note',
         );
       },
     );
   }
 }
 
-class _InitialPullSkeleton extends StatelessWidget {
-  const _InitialPullSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    final appColors = AppColors.of(context);
-
-    return ListView.separated(
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-      itemCount: 6,
-      separatorBuilder: (_, _) => SizedBox(height: 12.h),
-      itemBuilder: (context, index) {
-        return Container(
-          height: 112.h,
-          decoration: BoxDecoration(
-            color: appColors.skeletonBase,
-            borderRadius: BorderRadius.circular(20.r),
-            border: Border.all(color: appColors.cardBorder),
-          ),
-          padding: EdgeInsets.all(16.r),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: (0.55 + (index % 3) * 0.12).sw,
-                height: 16.h,
-                decoration: BoxDecoration(
-                  color: appColors.skeletonHighlight,
-                  borderRadius: BorderRadius.circular(999.r),
-                ),
-              ),
-              SizedBox(height: 14.h),
-              Container(
-                width: double.infinity,
-                height: 12.h,
-                decoration: BoxDecoration(
-                  color: appColors.skeletonHighlight,
-                  borderRadius: BorderRadius.circular(999.r),
-                ),
-              ),
-              SizedBox(height: 8.h),
-              Container(
-                width: 0.72.sw,
-                height: 12.h,
-                decoration: BoxDecoration(
-                  color: appColors.skeletonHighlight,
-                  borderRadius: BorderRadius.circular(999.r),
-                ),
-              ),
-              const Spacer(),
-              Align(
-                alignment: Alignment.bottomRight,
-                child: Container(
-                  width: 64.w,
-                  height: 22.h,
-                  decoration: BoxDecoration(
-                    color: appColors.skeletonHighlight,
-                    borderRadius: BorderRadius.circular(999.r),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+Category resolveCategoryById(List<Category> categories, int categoryId) {
+  return categories.firstWhere(
+    (item) => item.id == categoryId,
+    orElse: () => Category()
+      ..id = categoryId
+      ..name = '分类',
+  );
 }

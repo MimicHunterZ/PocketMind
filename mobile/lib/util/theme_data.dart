@@ -141,6 +141,129 @@ class SharePageThemeColors extends ThemeExtension<SharePageThemeColors> {
   }
 }
 
+/// 主题分类首页扩展配色
+class CategoryHomeColors extends ThemeExtension<CategoryHomeColors> {
+  const CategoryHomeColors({
+    required this.unifiedHomeBackground,
+    required this.unifiedHomeGradient,
+    required this.pageBackground,
+    required this.pageRadialA,
+    required this.pageRadialB,
+    required this.cardBackground,
+    required this.cardBorder,
+    required this.cardShadow,
+    required this.layerBackground,
+    required this.titleText,
+    required this.bodyText,
+    required this.metaText,
+    required this.tabActiveBg,
+    required this.tabActiveText,
+    required this.tabInactiveText,
+    required this.topGlowGradient,
+  });
+
+  final Color unifiedHomeBackground;
+  final List<Color> unifiedHomeGradient;
+  final Color pageBackground;
+  final Color pageRadialA;
+  final Color pageRadialB;
+  final Color cardBackground;
+  final Color cardBorder;
+  final Color cardShadow;
+  final Color layerBackground;
+  final Color titleText;
+  final Color bodyText;
+  final Color metaText;
+  final Color tabActiveBg;
+  final Color tabActiveText;
+  final Color tabInactiveText;
+  final List<Color> topGlowGradient;
+
+  @override
+  CategoryHomeColors copyWith({
+    Color? unifiedHomeBackground,
+    List<Color>? unifiedHomeGradient,
+    Color? pageBackground,
+    Color? pageRadialA,
+    Color? pageRadialB,
+    Color? cardBackground,
+    Color? cardBorder,
+    Color? cardShadow,
+    Color? layerBackground,
+    Color? titleText,
+    Color? bodyText,
+    Color? metaText,
+    Color? tabActiveBg,
+    Color? tabActiveText,
+    Color? tabInactiveText,
+    List<Color>? topGlowGradient,
+  }) {
+    return CategoryHomeColors(
+      unifiedHomeBackground: unifiedHomeBackground ?? this.unifiedHomeBackground,
+      unifiedHomeGradient: unifiedHomeGradient ?? this.unifiedHomeGradient,
+      pageBackground: pageBackground ?? this.pageBackground,
+      pageRadialA: pageRadialA ?? this.pageRadialA,
+      pageRadialB: pageRadialB ?? this.pageRadialB,
+      cardBackground: cardBackground ?? this.cardBackground,
+      cardBorder: cardBorder ?? this.cardBorder,
+      cardShadow: cardShadow ?? this.cardShadow,
+      layerBackground: layerBackground ?? this.layerBackground,
+      titleText: titleText ?? this.titleText,
+      bodyText: bodyText ?? this.bodyText,
+      metaText: metaText ?? this.metaText,
+      tabActiveBg: tabActiveBg ?? this.tabActiveBg,
+      tabActiveText: tabActiveText ?? this.tabActiveText,
+      tabInactiveText: tabInactiveText ?? this.tabInactiveText,
+      topGlowGradient: topGlowGradient ?? this.topGlowGradient,
+    );
+  }
+
+  @override
+  CategoryHomeColors lerp(ThemeExtension<CategoryHomeColors>? other, double t) {
+    if (other is! CategoryHomeColors) return this;
+    return CategoryHomeColors(
+      unifiedHomeBackground: Color.lerp(
+        unifiedHomeBackground,
+        other.unifiedHomeBackground,
+        t,
+      )!,
+      unifiedHomeGradient: List<Color>.generate(
+        unifiedHomeGradient.length,
+        (index) => Color.lerp(
+          unifiedHomeGradient[index],
+          other.unifiedHomeGradient[index],
+          t,
+        )!,
+      ),
+      pageBackground: Color.lerp(pageBackground, other.pageBackground, t)!,
+      pageRadialA: Color.lerp(pageRadialA, other.pageRadialA, t)!,
+      pageRadialB: Color.lerp(pageRadialB, other.pageRadialB, t)!,
+      cardBackground: Color.lerp(cardBackground, other.cardBackground, t)!,
+      cardBorder: Color.lerp(cardBorder, other.cardBorder, t)!,
+      cardShadow: Color.lerp(cardShadow, other.cardShadow, t)!,
+      layerBackground: Color.lerp(layerBackground, other.layerBackground, t)!,
+      titleText: Color.lerp(titleText, other.titleText, t)!,
+      bodyText: Color.lerp(bodyText, other.bodyText, t)!,
+      metaText: Color.lerp(metaText, other.metaText, t)!,
+      tabActiveBg: Color.lerp(tabActiveBg, other.tabActiveBg, t)!,
+      tabActiveText: Color.lerp(tabActiveText, other.tabActiveText, t)!,
+      tabInactiveText: Color.lerp(tabInactiveText, other.tabInactiveText, t)!,
+      topGlowGradient: List<Color>.generate(
+        topGlowGradient.length,
+        (index) => Color.lerp(
+          topGlowGradient[index],
+          other.topGlowGradient[index],
+          t,
+        )!,
+      ),
+    );
+  }
+
+  static CategoryHomeColors of(BuildContext context) {
+    return Theme.of(context).extension<CategoryHomeColors>()!;
+  }
+}
+
 const lightShareColors = SharePageThemeColors(
   primary: Color(0xFFFFFFFF),
   secondary: Color(0xFFEAE5E0),
@@ -149,6 +272,52 @@ const lightShareColors = SharePageThemeColors(
 const darkShareColors = SharePageThemeColors(
   primary: Color(0xFFFFFFFF),
   secondary: Color(0xFFEAE5E0),
+);
+
+const lightCategoryHomeColors = CategoryHomeColors(
+  unifiedHomeBackground: Color(0xFFF5F2EE),
+  unifiedHomeGradient: [
+    Color(0xFFFFE9D6),
+    Color(0xFFE3ECFA),
+    Color(0xFFF5F2EE),
+  ],
+  pageBackground: Color(0xFFF5F2EE),
+  pageRadialA: Color(0xFFFFE9D6),
+  pageRadialB: Color(0xFFE3ECFA),
+  cardBackground: Color(0xFFFFFFFF),
+  cardBorder: Color(0x1F332B22),
+  cardShadow: Color(0x1A3D3429),
+  layerBackground: Color(0xFFF2EEE8),
+  titleText: Color(0xFF2E2722),
+  bodyText: Color(0xFF6E645C),
+  metaText: Color(0xFF9A9088),
+  tabActiveBg: Color(0xFFE8DED3),
+  tabActiveText: Color(0xFF3A3029),
+  tabInactiveText: Color(0xFF8B8178),
+  topGlowGradient: [Color(0xFF5EA8FF), Color(0xFF8BE7FF)],
+);
+
+const darkCategoryHomeColors = CategoryHomeColors(
+  unifiedHomeBackground: Color(0xFF0B0F1A),
+  unifiedHomeGradient: [
+    Color(0x66211D58),
+    Color(0x66203C5A),
+    Color(0xFF0B0F1A),
+  ],
+  pageBackground: Color(0xFF0B0F1A),
+  pageRadialA: Color(0x66211D58),
+  pageRadialB: Color(0x66203C5A),
+  cardBackground: Color(0xFF171D2A),
+  cardBorder: Color(0x1AFFFFFF),
+  cardShadow: Color(0x6B000000),
+  layerBackground: Color(0xFF1D2431),
+  titleText: Color(0xFFE9EDF8),
+  bodyText: Color(0xFFA8B1C7),
+  metaText: Color(0xFF727D95),
+  tabActiveBg: Color(0xFF20283A),
+  tabActiveText: Color(0xFFF2F6FF),
+  tabInactiveText: Color(0xFF8C96AC),
+  topGlowGradient: [Color(0xFF3AB8FF), Color(0xFF2EEBD4)],
 );
 
 // 亮色模式
@@ -277,6 +446,7 @@ final ThemeData calmBeigeTheme = ThemeData(
     lightShareColors,
     lightAppColors,
     lightChatBubbleColors,
+    lightCategoryHomeColors,
   ],
 );
 
@@ -406,6 +576,7 @@ final ThemeData quietNightTheme = ThemeData(
     darkShareColors,
     darkAppColors,
     darkChatBubbleColors,
+    darkCategoryHomeColors,
   ],
 );
 // 聊天气泡颜色 - 供 ChatPage 使用
