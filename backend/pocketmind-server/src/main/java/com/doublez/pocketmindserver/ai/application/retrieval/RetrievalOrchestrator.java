@@ -100,14 +100,14 @@ public class RetrievalOrchestrator {
         }
 
         return result.matches().stream()
-                .map(scored -> new ContextSnippet(
-                        scored.node().uri().value(),
-                        scored.node().name(),
-                        scored.node().abstractText(),
-                        null,  // L2 content 按需加载
-                        scored.score(),
-                        SnippetSource.RESOURCE
-                ))
+            .map(scored -> new ContextSnippet(
+                scored.node().uri().value(),
+                scored.node().name(),
+                scored.node().abstractText(),
+                null,
+                scored.score(),
+                SnippetSource.RESOURCE
+            ))
                 .toList();
     }
 

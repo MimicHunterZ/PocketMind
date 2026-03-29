@@ -38,6 +38,9 @@ public class ContextAssembler {
     @Value("classpath:prompts/chat/note_system.md")
     private Resource noteSystemTemplate;
 
+    @Value("classpath:prompts/chat/context_item.md")
+    private Resource contextItemTemplate;
+
     public ContextAssembler(
             ContextDataRetriever contextDataRetriever,
             UserSettingService userSettingService) {
@@ -144,7 +147,7 @@ public class ContextAssembler {
                 if (!hasText(uri) || !seen.add(uri)) {
                     continue;
                 }
-                String line = firstNonBlank(snippet.abstractText(), snippet.content(), snippet.title());
+                String line = formatContextSnippet(snippet);
                 if (hasText(line)) {
                     items.add(line.trim());
                 }
@@ -157,7 +160,7 @@ public class ContextAssembler {
                 if (!seen.add(key)) {
                     continue;
                 }
-                String line = firstNonBlank(memory.getAbstractText(), memory.getContent(), memory.getTitle());
+                String line = formatMemoryRecord(memory);
                 if (hasText(line)) {
                     items.add(line.trim());
                 }
@@ -173,12 +176,46 @@ public class ContextAssembler {
         }
         List<String> items = new ArrayList<>();
         for (ContextSnippet snippet : snippets) {
-            String line = firstNonBlank(snippet.abstractText(), snippet.content(), snippet.title(), snippet.uri());
+            String line = formatContextSnippet(snippet);
             if (hasText(line)) {
                 items.add(line.trim());
             }
         }
         return items;
+    }
+
+    private String formatContextSnippet(ContextSnippet snippet) {
+        String content = hasText(snippet.content()) ? snippet.content() : snippet.abstractText();
+        return formatItem(snippet.title(), snippet.uri(), content);
+    }
+
+    private String formatMemoryRecord(MemoryRecordEntity memory) {
+        String content = hasText(memory.getContent()) ? memory.getContent() : memory.getAbstractText();
+        return formatItem(memory.getTitle(), null, content);
+    }
+
+    private String formatItem(String title, String uri, String content) {
+        Map<String, Object> vars = new HashMap<>();
+        vars.put("title", "无标题");
+        vars.put("uri", "无来源");
+        vars.put("content", "无内容");
+
+        if (hasText(title)) {
+            vars.put("title", title.trim());
+        }
+        if (hasText(uri)) {
+            vars.put("uri", uri.trim());
+        }
+        if (hasText(content)) {
+            vars.put("content", content.trim());
+        }
+
+        try {
+            return PromptBuilder.render(contextItemTemplate, vars);
+        } catch (IOException e) {
+            log.warn("渲染 context_item 模板失败", e);
+            return "";
+        }
     }
 
     private List<String> defaultList(List<String> values) {

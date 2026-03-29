@@ -206,7 +206,7 @@ class RetrievalOrchestratorTest {
         @Override
         public List<ContextSnippet> retrieve(String queryText, long userId, int limit) {
             if (exception != null) throw exception;
-            return results.stream().limit(limit).toList();
+            return results;
         }
     }
 
