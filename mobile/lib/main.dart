@@ -13,6 +13,7 @@ import 'package:pocketmind/providers/shared_preferences_provider.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/util/proxy_config.dart';
 import 'package:pocketmind/util/theme_data.dart';
+import 'package:pocketmind/util/workmanager_platform_guard.dart';
 import 'package:pocketmind/router/app_router.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:path_provider/path_provider.dart';
@@ -86,8 +87,10 @@ Future<void> main() async {
     }
   };
 
-  //开启后台进程
-  await Workmanager().initialize(callbackDispatcher);
+  // 仅移动端初始化 Workmanager，桌面端跳过避免缺少平台实现
+  if (shouldInitializeWorkmanager(Platform.operatingSystem)) {
+    await Workmanager().initialize(callbackDispatcher);
+  }
 
   runApp(
     // 使用 ProviderScope 包裹应用，并 override isarProvider
