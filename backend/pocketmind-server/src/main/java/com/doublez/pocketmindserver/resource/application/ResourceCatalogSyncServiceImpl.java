@@ -2,29 +2,20 @@ package com.doublez.pocketmindserver.resource.application;
 
 import com.doublez.pocketmindserver.ai.application.embedding.EmbeddingService;
 import com.doublez.pocketmindserver.context.domain.ContextCatalogRepository;
-import com.doublez.pocketmindserver.context.domain.ContextLayer;
 import com.doublez.pocketmindserver.context.domain.ContextNode;
 import com.doublez.pocketmindserver.context.domain.ContextType;
-import com.doublez.pocketmindserver.context.domain.ContextUri;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordEntity;
-import com.doublez.pocketmindserver.resource.domain.ResourceSourceType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
 import java.util.Objects;
 import java.util.Optional;
 
 /**
  * 默认 Resource → ContextCatalog 同步实现。
  *
- * <p>同步策略：
- * <ul>
- *   <li>Resource 自身 → L2_DETAIL 叶子节点</li>
- *   <li>来源分组目录（如 notes/、chats/） → L0_ABSTRACT 目录节点</li>
- *   <li>用户资源根目录 → L0_ABSTRACT 目录节点</li>
- * </ul>
- *
- * <p>目录节点采用 upsert 语义，已存在则跳过不覆盖描述。
+ * <p>同步策略：仅同步 Resource 对应的薄索引节点，不再创建目录树节点。
  */
 @Slf4j
 @Service
@@ -42,96 +33,42 @@ public class ResourceCatalogSyncServiceImpl implements ResourceCatalogSyncServic
     @Override
     public void syncToCatalog(ResourceRecordEntity resource) {
         long userId = resource.getUserId();
-        ContextUri resourceUri = resource.getRootUri();
+        String resourceUri = resource.getRootUri().value();
 
-        // 1. 确保用户资源根目录节点存在
-        ContextUri rootUri = ContextUri.userResourcesRoot(userId);
-        ensureDirectoryNode(rootUri, null, "resources", "用户资源根目录", userId);
-
-        // 2. 确保来源分组目录节点存在（notes/ chats/ assets/）
-        String groupSegment = resolveGroupSegment(resource.getSourceType());
-        ContextUri groupUri = rootUri.child(groupSegment);
-        String groupDescription = resolveGroupDescription(resource.getSourceType());
-        ensureDirectoryNode(groupUri, rootUri, groupSegment, groupDescription, userId);
-
-        // 3. upsert Resource 自身为叶子节点
+        // upsert Resource 自身为薄索引节点
         String abstractText = resource.getAbstractText() != null
                 ? resource.getAbstractText()
                 : resource.deriveDefaultAbstract();
-        Optional<ContextNode> existing = catalogRepository.findByUri(resourceUri.value());
+        Optional<ContextNode> existing = catalogRepository.findByUri(resourceUri);
 
         ContextNode leafNode = new ContextNode(
-                resourceUri,
-                groupUri,
+                resource.getRootUri(),
+                resource.getUuid(),
                 ContextType.RESOURCE,
-                ContextLayer.L2_DETAIL,
                 resource.getTitle() != null ? resource.getTitle() : "未命名资源",
                 abstractText,
-                0L,
-                resource.getUpdatedAt(),
-                true
+                existing.map(ContextNode::activeCount).orElse(0L),
+                resource.getUpdatedAt()
         );
 
         catalogRepository.upsert(leafNode, userId);
-        log.debug("[resource-catalog-sync] 同步资源节点: uri={}", resourceUri.value());
+        log.debug("[resource-catalog-sync] 同步资源索引节点: uri={}", resourceUri);
 
-        // 为叶子节点生成向量嵌入
+        // 为索引节点生成向量嵌入
         if (shouldEmbed(existing, abstractText)) {
-            embedNode(resourceUri.value(), abstractText);
+            embedNode(resourceUri, abstractText);
         }
     }
 
     @Override
     public void removeFromCatalog(ResourceRecordEntity resource) {
         log.debug("[resource-catalog-sync] 资源已删除, 同步级联逻辑删除 context_catalog 条目: uri={}", resource.getRootUri().value());
-        catalogRepository.deleteByUri(resource.getRootUri().value());
+        catalogRepository.deleteByResourceUuid(resource.getUuid());
     }
 
-    /**
-     * 确保目录节点存在（upsert 语义，已存在则不覆盖）。
-     */
-    private void ensureDirectoryNode(ContextUri uri, ContextUri parentUri,
-                                     String name, String description, long userId) {
-        if (catalogRepository.findByUri(uri.value()).isPresent()) {
-            return;
-        }
-
-        ContextNode dirNode = new ContextNode(
-                uri,
-                parentUri,
-                ContextType.RESOURCE,
-                ContextLayer.L0_ABSTRACT,
-                name,
-                description,
-                0L,
-                System.currentTimeMillis(),
-                false
-        );
-
-        catalogRepository.upsert(dirNode, userId);
-        log.debug("[resource-catalog-sync] 创建目录节点: uri={}", uri.value());
-    }
-
-    /**
-     * 根据来源类型推导分组目录段。
-     */
-    private String resolveGroupSegment(ResourceSourceType sourceType) {
-        return switch (sourceType) {
-            case NOTE_TEXT, WEB_CLIP, MARKDOWN_TEXT -> "notes";
-            case CHAT_TRANSCRIPT, CHAT_STAGE_SUMMARY -> "chats";
-            case OCR_TEXT, PDF_TEXT -> "assets";
-        };
-    }
-
-    /**
-     * 根据来源类型推导分组目录描述。
-     */
-    private String resolveGroupDescription(ResourceSourceType sourceType) {
-        return switch (sourceType) {
-            case NOTE_TEXT, WEB_CLIP, MARKDOWN_TEXT -> "笔记类资源";
-            case CHAT_TRANSCRIPT, CHAT_STAGE_SUMMARY -> "对话记录类资源";
-            case OCR_TEXT, PDF_TEXT -> "附件类资源";
-        };
+    @Override
+    public void removeFromCatalogByResourceUuid(UUID resourceUuid) {
+        catalogRepository.deleteByResourceUuid(resourceUuid);
     }
 
     /**

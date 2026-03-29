@@ -1,10 +1,12 @@
 package com.doublez.pocketmindserver.resource.application;
 
 import com.doublez.pocketmindserver.note.domain.note.NoteEntity;
+import com.doublez.pocketmindserver.resource.domain.ResourceIndexOutboxConstants;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordEntity;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordRepository;
+import com.doublez.pocketmindserver.resource.domain.ResourceIndexOutboxEntity;
+import com.doublez.pocketmindserver.resource.domain.ResourceIndexOutboxRepository;
 import com.doublez.pocketmindserver.resource.domain.ResourceSourceType;
-import com.doublez.pocketmindserver.resource.application.NoOpResourceCatalogSyncService;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -24,14 +26,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class NoteResourceSyncServiceTest {
 
     private final InMemoryResourceRecordRepository repository = new InMemoryResourceRecordRepository();
+    private final InMemoryResourceIndexOutboxRepository outboxRepository = new InMemoryResourceIndexOutboxRepository();
     private final NoteResourceSyncService service = new NoteResourceSyncServiceImpl(
             new NoteResourceProjectionServiceImpl(new ResourceContextServiceImpl()),
             repository,
-            new NoOpResourceCatalogSyncService()
+            outboxRepository,
+            event -> {
+            }
     );
 
     @Test
-    void shouldCreateNoteTextAndWebClipResources() {
+    void shouldCreateSingleWebClipResourceWhenSourceUrlPresent() {
         NoteEntity note = new NoteEntity(
                 UUID.randomUUID(),
                 7L,
@@ -55,9 +60,10 @@ class NoteResourceSyncServiceTest {
         service.syncProjectedResources(note);
 
         List<ResourceRecordEntity> resources = repository.findByNoteUuid(note.getUserId(), note.getUuid());
-        assertEquals(2, resources.size());
-        assertTrue(resources.stream().anyMatch(resource -> resource.getSourceType() == ResourceSourceType.NOTE_TEXT));
-        assertTrue(resources.stream().anyMatch(resource -> resource.getSourceType() == ResourceSourceType.WEB_CLIP));
+        assertEquals(1, resources.size());
+        assertEquals(ResourceSourceType.WEB_CLIP, resources.getFirst().getSourceType());
+        assertEquals(1, outboxRepository.events.size());
+        assertTrue(outboxRepository.events.stream().allMatch(e -> ResourceIndexOutboxConstants.OPERATION_UPSERT.equals(e.getOperation())));
     }
 
     @Test
@@ -89,6 +95,8 @@ class NoteResourceSyncServiceTest {
         assertEquals(0, repository.findByNoteUuid(note.getUserId(), note.getUuid()).size());
         assertEquals(1, repository.storage.size());
         assertTrue(repository.storage.getFirst().isDeleted());
+        assertEquals(2, outboxRepository.events.size());
+        assertEquals(ResourceIndexOutboxConstants.OPERATION_DELETE, outboxRepository.events.getLast().getOperation());
     }
 
     @Test
@@ -122,6 +130,8 @@ class NoteResourceSyncServiceTest {
         assertEquals(ResourceSourceType.WEB_CLIP, resource.getSourceType());
         assertEquals("https://example.com/new", resource.getSourceUrl());
         assertEquals("新正文", resource.getContent());
+        assertEquals(2, outboxRepository.events.size());
+        assertTrue(outboxRepository.events.stream().allMatch(e -> ResourceIndexOutboxConstants.OPERATION_UPSERT.equals(e.getOperation())));
     }
 
     @Test
@@ -152,6 +162,43 @@ class NoteResourceSyncServiceTest {
 
         assertEquals(0, repository.findByNoteUuid(note.getUserId(), note.getUuid()).size());
         assertTrue(repository.storage.stream().allMatch(ResourceRecordEntity::isDeleted));
+        assertEquals(2, outboxRepository.events.size());
+        assertEquals(ResourceIndexOutboxConstants.OPERATION_DELETE, outboxRepository.events.get(1).getOperation());
+    }
+
+    @Test
+    void shouldKeepSingleWebClipResourceWhenClientFetchUpdatesNoteWithUrl() {
+        NoteEntity note = new NoteEntity(
+                UUID.randomUUID(),
+                12L,
+                "初始标题",
+                "初始正文",
+                "https://example.com/client-fetch",
+                1L,
+                Collections.emptyList(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                System.currentTimeMillis(),
+                false,
+                null
+        );
+
+        service.syncProjectedResources(note);
+
+        note.completeFetch("抓取后标题", "抓取后描述", "抓取后正文");
+        service.syncProjectedResources(note);
+
+        List<ResourceRecordEntity> resources = repository.findByNoteUuid(note.getUserId(), note.getUuid());
+        assertEquals(1, resources.size());
+        assertEquals(ResourceSourceType.WEB_CLIP, resources.getFirst().getSourceType());
+        assertEquals("抓取后标题", resources.getFirst().getTitle());
+        assertEquals("抓取后正文", resources.getFirst().getContent());
+        assertEquals("https://example.com/client-fetch", resources.getFirst().getSourceUrl());
     }
 
     private static final class InMemoryResourceRecordRepository implements ResourceRecordRepository {
@@ -206,6 +253,36 @@ class NoteResourceSyncServiceTest {
         @Override
         public List<ResourceRecordEntity> findByAssetUuid(long userId, UUID assetUuid) {
             return List.of();
+        }
+    }
+
+    private static final class InMemoryResourceIndexOutboxRepository implements ResourceIndexOutboxRepository {
+
+        private final List<ResourceIndexOutboxEntity> events = new ArrayList<>();
+
+        @Override
+        public void appendPending(UUID eventUuid, long userId, UUID resourceUuid, String operation) {
+            events.add(ResourceIndexOutboxEntity.pending(eventUuid, userId, resourceUuid, operation));
+        }
+
+        @Override
+        public List<ResourceIndexOutboxEntity> pollRunnable(long nowEpochMillis, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public List<ResourceIndexOutboxEntity> claimRunnable(long nowEpochMillis, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public void markCompleted(UUID eventUuid) {
+            // noop
+        }
+
+        @Override
+        public void markFailed(UUID eventUuid, long nextRetryAfterEpochMillis, String errorMessage) {
+            // noop
         }
     }
 }

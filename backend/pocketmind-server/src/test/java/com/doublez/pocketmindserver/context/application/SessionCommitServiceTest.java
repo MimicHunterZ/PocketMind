@@ -6,18 +6,18 @@ import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
 import com.doublez.pocketmindserver.context.domain.ContextCatalogRepository;
-import com.doublez.pocketmindserver.context.domain.ContextLayer;
 import com.doublez.pocketmindserver.context.domain.ContextNode;
 import com.doublez.pocketmindserver.context.domain.ContextType;
 import com.doublez.pocketmindserver.context.domain.ContextUri;
 import com.doublez.pocketmindserver.resource.application.ChatTranscriptResourceSyncService;
-import com.doublez.pocketmindserver.resource.application.ResourceCatalogSyncService;
 import com.doublez.pocketmindserver.resource.application.ResourceContextService;
 import com.doublez.pocketmindserver.resource.application.ResourceContextServiceImpl;
+import com.doublez.pocketmindserver.resource.domain.ResourceIndexOutboxConstants;
+import com.doublez.pocketmindserver.resource.domain.ResourceIndexOutboxEntity;
+import com.doublez.pocketmindserver.resource.domain.ResourceIndexOutboxRepository;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordEntity;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordRepository;
 import com.doublez.pocketmindserver.resource.domain.ResourceSourceType;
-import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
 import com.doublez.pocketmindserver.shared.domain.PageQuery;
 import com.doublez.pocketmindserver.shared.domain.SyncCursorQuery;
 import com.doublez.pocketmind.common.web.BusinessException;
@@ -26,21 +26,22 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionOperations;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -58,11 +59,13 @@ class SessionCommitServiceTest {
     private final InMemoryResourceRecordRepository resourceRepo = new InMemoryResourceRecordRepository();
     private final InMemoryContextCatalogRepository catalogRepo = new InMemoryContextCatalogRepository();
     private final ResourceContextService contextService = new ResourceContextServiceImpl();
-    private final NoOpCatalogSyncService catalogSyncService = new NoOpCatalogSyncService();
+    private final InMemoryResourceIndexOutboxRepository outboxRepository = new InMemoryResourceIndexOutboxRepository();
     private final RecordingTranscriptSyncService transcriptSyncService = new RecordingTranscriptSyncService();
 
     @Mock
-    private AiFailoverRouter aiFailoverRouter;
+    private SessionSummaryGenerator sessionSummaryGenerator;
+    @Mock
+    private TransactionOperations transactionOperations;
 
     private SessionCommitServiceImpl service;
 
@@ -74,16 +77,16 @@ class SessionCommitServiceTest {
                 transcriptSyncService,
                 resourceRepo,
                 contextService,
-                catalogSyncService,
+                outboxRepository,
                 catalogRepo,
-                aiFailoverRouter,
-                (userId, sessionUuid, commitResult) -> 0  // no-op memory extractor for unit test
+                sessionSummaryGenerator,
+                (userId, sessionUuid, commitResult) -> 0,
+                transactionOperations
         );
-        // 注入 @Value 模板资源（单元测试无 Spring 上下文）
-        ReflectionTestUtils.setField(service, "summarySystemTemplate",
-                new ClassPathResource("prompts/compression/structured_summary_system.md"));
-        ReflectionTestUtils.setField(service, "summaryUserTemplate",
-                new ClassPathResource("prompts/compression/structured_summary_user.md"));
+        lenient().when(transactionOperations.execute(any())).thenAnswer(invocation -> {
+            org.springframework.transaction.support.TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(new org.springframework.transaction.support.SimpleTransactionStatus());
+        });
         ReflectionTestUtils.setField(service, "transcriptMessageTemplate",
                 new ClassPathResource("prompts/chat/transcript_message.md"));
     }
@@ -109,14 +112,11 @@ class SessionCommitServiceTest {
         };
 
         // Mock LLM 返回
-        when(aiFailoverRouter.executeChat(eq("sessionCommitSummary"), any()))
-                .thenAnswer(invocation -> {
-                    // 直接返回模拟的 StructuredSummaryResult
-                    return new SessionCommitServiceImpl.StructuredSummaryResult(
-                            "讨论 Spring AI 框架的基本用法",
-                            "## 讨论主题\nSpring AI 框架入门\n## 关键结论\n- 提供统一 LLM 抽象层"
-                    );
-                });
+        when(sessionSummaryGenerator.generate(anyString(), anyString()))
+                .thenReturn(new SessionSummaryGenerator.SummaryResult(
+                        "讨论 Spring AI 框架的基本用法",
+                        "## 讨论主题\nSpring AI 框架入门\n## 关键结论\n- 提供统一 LLM 抽象层"
+                ));
 
         SessionCommitResult result = service.commit(USER_ID, sessionUuid);
 
@@ -136,6 +136,9 @@ class SessionCommitServiceTest {
 
         // 验证 transcript sync 被调用
         assertThat(transcriptSyncService.syncCalled).isTrue();
+        assertThat(outboxRepository.events)
+                .extracting(ResourceIndexOutboxEntity::getOperation)
+                .contains(ResourceIndexOutboxConstants.OPERATION_UPSERT);
     }
 
     @Test
@@ -181,10 +184,10 @@ class SessionCommitServiceTest {
             }
         };
 
-        when(aiFailoverRouter.executeChat(eq("sessionCommitSummary"), any()))
-                .thenReturn(new SessionCommitServiceImpl.StructuredSummaryResult(
+        when(sessionSummaryGenerator.generate(anyString(), anyString()))
+                .thenReturn(new SessionSummaryGenerator.SummaryResult(
                         "第一次摘要", "## 讨论主题\n首次讨论"))
-                .thenReturn(new SessionCommitServiceImpl.StructuredSummaryResult(
+                .thenReturn(new SessionSummaryGenerator.SummaryResult(
                         "更新后的摘要", "## 讨论主题\n更新后讨论"));
 
         // 第一次提交
@@ -280,23 +283,41 @@ class SessionCommitServiceTest {
     private static final class InMemoryContextCatalogRepository implements ContextCatalogRepository {
         final List<String> incrementedUris = new ArrayList<>();
 
-        @Override public List<ContextNode> findChildrenByParentUri(String parentUri, long userId) { return List.of(); }
-        @Override public List<ContextNode> findDescendantsByUriPrefix(String uriPrefix, long userId) { return List.of(); }
         @Override public List<ContextNode> searchByKeyword(String keyword, Long userId, ContextType contextType, int limit) { return List.of(); }
         @Override public Optional<ContextNode> findByUri(String uri) { return Optional.empty(); }
-        @Override public List<ContextNode> findByUris(List<String> uris) { return List.of(); }
+        @Override public List<ContextNode> findByUris(List<String> uris, Long userId) { return List.of(); }
         @Override public void upsert(ContextNode node, Long userId) {}
         @Override public void incrementActiveCount(String uri) { incrementedUris.add(uri); }
         @Override public void incrementActiveCountBatch(List<String> uris) { incrementedUris.addAll(uris); }
         @Override public void deleteByUri(String uri) {}
+        @Override public void deleteByResourceUuid(UUID resourceUuid) {}
         @Override public List<ScoredCatalogEntry> searchByVector(float[] queryVector, long userId, ContextType contextType, int limit) { return List.of(); }
-        @Override public List<ScoredCatalogEntry> searchChildrenByVector(float[] queryVector, String parentUri, long userId, int limit) { return List.of(); }
         @Override public void updateEmbedding(String uri, float[] embedding) {}
     }
 
-    private static final class NoOpCatalogSyncService implements ResourceCatalogSyncService {
-        @Override public void syncToCatalog(ResourceRecordEntity resource) {}
-        @Override public void removeFromCatalog(ResourceRecordEntity resource) {}
+    private static final class InMemoryResourceIndexOutboxRepository implements ResourceIndexOutboxRepository {
+        final List<ResourceIndexOutboxEntity> events = new ArrayList<>();
+
+        @Override
+        public void appendPending(UUID eventUuid, long userId, UUID resourceUuid, String operation) {
+            events.add(ResourceIndexOutboxEntity.pending(eventUuid, userId, resourceUuid, operation));
+        }
+
+        @Override
+        public List<ResourceIndexOutboxEntity> pollRunnable(long nowEpochMillis, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public List<ResourceIndexOutboxEntity> claimRunnable(long nowEpochMillis, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public void markCompleted(UUID eventUuid) {}
+
+        @Override
+        public void markFailed(UUID eventUuid, long nextRetryAfterEpochMillis, String errorMessage) {}
     }
 
     /**

@@ -2,6 +2,8 @@ package com.doublez.pocketmindserver.resource.application;
 
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordEntity;
 
+import java.util.UUID;
+
 /**
  * Resource → ContextCatalog 同步服务。
  *
@@ -32,4 +34,10 @@ public interface ResourceCatalogSyncService {
      * @param resource 已删除的 Resource 实体
      */
     void removeFromCatalog(ResourceRecordEntity resource);
+
+    /**
+     * 按 resource_uuid 移除索引节点。
+     */
+    default void removeFromCatalogByResourceUuid(UUID resourceUuid) {
+    }
 }

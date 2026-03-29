@@ -227,25 +227,24 @@ CREATE INDEX IF NOT EXISTS idx_sessions_scope_note    ON chat_sessions(user_id, 
 CREATE TABLE IF NOT EXISTS context_catalog (
     id               BIGSERIAL    PRIMARY KEY,
     uuid             UUID         NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    user_id          BIGINT,
+    user_id          BIGINT       NOT NULL,
+    resource_uuid    UUID         NOT NULL,
     context_type     VARCHAR(20)  NOT NULL,
-    sub_type         VARCHAR(50),
     uri              TEXT         NOT NULL UNIQUE,
-    parent_uri       TEXT,
     name             TEXT,
-    abstract_text    TEXT,           -- L0 摘要 (~100 token)
-    layer            VARCHAR(20)  NOT NULL DEFAULT 'L2_DETAIL',
-    status           VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
-    is_leaf          BOOLEAN      NOT NULL DEFAULT TRUE,
+    abstract_text    TEXT,
     active_count     BIGINT       NOT NULL DEFAULT 0,
-    embedding        vector(1024),            -- pgvector 语义向量
+    embedding        vector(1024),
     created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at       BIGINT       NOT NULL DEFAULT 0,
     is_deleted       BOOLEAN      NOT NULL DEFAULT FALSE
 );
 
+-- 兼容已存在旧表结构：确保薄索引新增列在增量启动时可用
+ALTER TABLE context_catalog ADD COLUMN IF NOT EXISTS resource_uuid UUID;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_context_catalog_resource_uuid ON context_catalog(resource_uuid);
 CREATE INDEX IF NOT EXISTS idx_context_catalog_user_type ON context_catalog(user_id, context_type, updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_context_catalog_parent    ON context_catalog(parent_uri);
 CREATE INDEX IF NOT EXISTS idx_context_catalog_embedding ON context_catalog
     USING hnsw (embedding vector_cosine_ops) WHERE embedding IS NOT NULL;
 
@@ -311,6 +310,26 @@ CREATE INDEX IF NOT EXISTS idx_memory_records_merge_key  ON memory_records(user_
 CREATE INDEX IF NOT EXISTS idx_memory_records_space      ON memory_records(space_type, tenant_id);
 CREATE INDEX IF NOT EXISTS idx_memory_records_embedding  ON memory_records
     USING hnsw (embedding vector_cosine_ops) WHERE embedding IS NOT NULL;
+
+-- ============================================================
+-- 11.1 resource_index_outbox（catalog 异步索引事件）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS resource_index_outbox (
+    id                 BIGSERIAL    PRIMARY KEY,
+    uuid               UUID         NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    user_id            BIGINT       NOT NULL,
+    resource_uuid      UUID         NOT NULL,
+    operation          VARCHAR(20)  NOT NULL,     -- UPSERT | DELETE
+    status             VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
+    retry_count        INTEGER      NOT NULL DEFAULT 0,
+    retry_after        BIGINT       NOT NULL DEFAULT 0,
+    last_error         TEXT,
+    created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at         BIGINT       NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_resource_outbox_status_retry ON resource_index_outbox(status, retry_after, id);
+CREATE INDEX IF NOT EXISTS idx_resource_outbox_resource_uuid ON resource_index_outbox(resource_uuid, id DESC);
 
 -- ============================================================
 -- 12. chat_messages

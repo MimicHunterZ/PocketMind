@@ -4,12 +4,16 @@ import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
+import com.doublez.pocketmindserver.resource.domain.ResourceIndexOutboxConstants;
+import com.doublez.pocketmindserver.resource.domain.ResourceIndexOutboxRepository;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordEntity;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordRepository;
 import com.doublez.pocketmindserver.resource.domain.ResourceSourceType;
+import com.doublez.pocketmindserver.resource.application.mq.ResourceOutboxHintEvent;
 import com.doublez.pocketmindserver.shared.domain.PageQuery;
 import com.doublez.pocketmindserver.shared.util.PromptBuilder;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,7 +35,8 @@ public class ChatTranscriptResourceSyncServiceImpl implements ChatTranscriptReso
     private final ChatSessionRepository chatSessionRepository;
     private final ResourceRecordRepository resourceRecordRepository;
     private final ResourceContextService resourceContextService;
-    private final ResourceCatalogSyncService catalogSyncService;
+    private final ResourceIndexOutboxRepository outboxRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     /** 对话转录消息条目模板 */
     @Value("classpath:prompts/chat/transcript_message.md")
@@ -41,12 +46,14 @@ public class ChatTranscriptResourceSyncServiceImpl implements ChatTranscriptReso
                                                  ChatSessionRepository chatSessionRepository,
                                                  ResourceRecordRepository resourceRecordRepository,
                                                  ResourceContextService resourceContextService,
-                                                 ResourceCatalogSyncService catalogSyncService) {
+                                                 ResourceIndexOutboxRepository outboxRepository,
+                                                 ApplicationEventPublisher applicationEventPublisher) {
         this.chatMessageRepository = chatMessageRepository;
         this.chatSessionRepository = chatSessionRepository;
         this.resourceRecordRepository = resourceRecordRepository;
         this.resourceContextService = resourceContextService;
-        this.catalogSyncService = catalogSyncService;
+        this.outboxRepository = outboxRepository;
+        this.applicationEventPublisher = applicationEventPublisher;
     }
 
     @Override
@@ -84,14 +91,14 @@ public class ChatTranscriptResourceSyncServiceImpl implements ChatTranscriptReso
                     transcript
             );
             resourceRecordRepository.save(resource);
-            catalogSyncService.syncToCatalog(resource);
+            appendOutbox(resource, ResourceIndexOutboxConstants.OPERATION_UPSERT);
             return;
         }
 
         ResourceRecordEntity resource = existing.getFirst();
         resource.updateContent(title, transcript);
         resourceRecordRepository.update(resource);
-        catalogSyncService.syncToCatalog(resource);
+        appendOutbox(resource, ResourceIndexOutboxConstants.OPERATION_UPSERT);
     }
 
     @Override
@@ -110,8 +117,20 @@ public class ChatTranscriptResourceSyncServiceImpl implements ChatTranscriptReso
         for (ResourceRecordEntity resource : resources) {
             resource.softDelete();
             resourceRecordRepository.update(resource);
-            catalogSyncService.removeFromCatalog(resource);
+            appendOutbox(resource, ResourceIndexOutboxConstants.OPERATION_DELETE);
         }
+    }
+
+    private void appendOutbox(ResourceRecordEntity resource, String operation) {
+        UUID eventUuid = UUID.randomUUID();
+        outboxRepository.appendPending(eventUuid, resource.getUserId(), resource.getUuid(), operation);
+        applicationEventPublisher.publishEvent(new ResourceOutboxHintEvent(
+                eventUuid,
+                resource.getUserId(),
+                resource.getUuid(),
+                operation,
+                System.currentTimeMillis()
+        ));
     }
 
     private String renderTranscript(List<ChatMessageEntity> messages) {

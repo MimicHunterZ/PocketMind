@@ -32,14 +32,24 @@ public class NoteResourceProjectionServiceImpl implements NoteResourceProjection
 
     @Override
     public ResourceRecordEntity projectWebClip(NoteEntity note) {
+        String title = note.getPreviewTitle();
+        if (title == null || title.isBlank()) {
+            title = note.getTitle();
+        }
+        String content = note.getPreviewContent();
+        if ((content == null || content.isBlank())
+                && note.getSourceUrl() != null
+                && !note.getSourceUrl().isBlank()) {
+            content = note.getContent();
+        }
         return ResourceRecordEntity.createWebClip(
                 UUID.randomUUID(),
                 note.getUserId(),
                 note.getUuid(),
                 resourceContextService.webClipResource(note.getUserId(), note.getUuid()),
                 note.getSourceUrl(),
-                note.getPreviewTitle(),
-                note.getPreviewContent()
+                title,
+                content
         );
     }
 }

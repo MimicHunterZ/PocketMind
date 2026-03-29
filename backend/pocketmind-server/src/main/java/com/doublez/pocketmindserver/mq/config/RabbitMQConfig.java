@@ -1,6 +1,7 @@
 package com.doublez.pocketmindserver.mq.config;
 
 import com.doublez.pocketmindserver.mq.CrawlerMqConstants;
+import com.doublez.pocketmindserver.mq.ResourceOutboxMqConstants;
 import com.doublez.pocketmindserver.mq.VisionMqConstants;
 
 import org.springframework.amqp.core.*;
@@ -16,6 +17,7 @@ import org.springframework.amqp.rabbit.retry.RepublishMessageRecoverer;
 import org.springframework.amqp.rabbit.config.RetryInterceptorBuilder;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.beans.factory.annotation.Value;
 
 @Configuration
 public class RabbitMQConfig {
@@ -80,6 +82,42 @@ public class RabbitMQConfig {
     @Bean
     public Binding visionDlqBinding(Queue visionDlqQueue, DirectExchange visionDlqExchange) {
         return BindingBuilder.bind(visionDlqQueue).to(visionDlqExchange).with(VisionMqConstants.VISION_DLQ_ROUTING_KEY);
+    }
+
+    // Resource Outbox Hint 队列
+    @Bean
+    public Queue resourceOutboxHintQueue() {
+        return QueueBuilder.durable(ResourceOutboxMqConstants.OUTBOX_HINT_QUEUE).build();
+    }
+
+    @Bean
+    public DirectExchange resourceOutboxHintExchange() {
+        return new DirectExchange(ResourceOutboxMqConstants.OUTBOX_HINT_EXCHANGE);
+    }
+
+    @Bean
+    public Binding resourceOutboxHintBinding(Queue resourceOutboxHintQueue, DirectExchange resourceOutboxHintExchange) {
+        return BindingBuilder.bind(resourceOutboxHintQueue)
+                .to(resourceOutboxHintExchange)
+                .with(ResourceOutboxMqConstants.OUTBOX_HINT_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue resourceOutboxHintDlqQueue() {
+        return QueueBuilder.durable(ResourceOutboxMqConstants.OUTBOX_HINT_DLQ_QUEUE).build();
+    }
+
+    @Bean
+    public DirectExchange resourceOutboxHintDlqExchange() {
+        return new DirectExchange(ResourceOutboxMqConstants.OUTBOX_HINT_DLQ_EXCHANGE);
+    }
+
+    @Bean
+    public Binding resourceOutboxHintDlqBinding(Queue resourceOutboxHintDlqQueue,
+                                                DirectExchange resourceOutboxHintDlqExchange) {
+        return BindingBuilder.bind(resourceOutboxHintDlqQueue)
+                .to(resourceOutboxHintDlqExchange)
+                .with(ResourceOutboxMqConstants.OUTBOX_HINT_DLQ_ROUTING_KEY);
     }
 
 
@@ -164,6 +202,53 @@ public class RabbitMQConfig {
                         .recoverer(visionRepublishRecoverer)
                         .build()
         );
+        return factory;
+    }
+
+    @Bean
+    public RepublishMessageRecoverer resourceOutboxHintRecoverer(
+            @Qualifier("pocketmindRabbitTemplate") RabbitTemplate rabbitTemplate
+    ) {
+        return new RepublishMessageRecoverer(
+                rabbitTemplate,
+                ResourceOutboxMqConstants.OUTBOX_HINT_DLQ_EXCHANGE,
+                ResourceOutboxMqConstants.OUTBOX_HINT_DLQ_ROUTING_KEY
+        );
+    }
+
+    @Bean(ResourceOutboxMqConstants.OUTBOX_HINT_CONTAINER_FACTORY)
+    public SimpleRabbitListenerContainerFactory resourceOutboxHintContainerFactory(
+            ConnectionFactory connectionFactory,
+            @Qualifier("pocketmindRabbitMessageConverter") MessageConverter messageConverter,
+            @Qualifier("resourceOutboxHintRecoverer") RepublishMessageRecoverer recoverer,
+            @Value("${pocketmind.resource.catalog.hint-max-retry:3}") int hintMaxRetry,
+            @Value("${pocketmind.resource.catalog.hint-listener-concurrency:2}") int concurrency
+    ) {
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        factory.setConnectionFactory(connectionFactory);
+        factory.setMessageConverter(messageConverter);
+        factory.setDefaultRequeueRejected(false);
+        factory.setConcurrentConsumers(Math.max(1, concurrency));
+        factory.setAdviceChain(
+                RetryInterceptorBuilder.stateless()
+                        .maxRetries(Math.max(1, hintMaxRetry))
+                        .recoverer(recoverer)
+                        .build()
+        );
+        return factory;
+    }
+
+    @Bean(ResourceOutboxMqConstants.OUTBOX_HINT_DLQ_CONTAINER_FACTORY)
+    public SimpleRabbitListenerContainerFactory resourceOutboxHintDlqContainerFactory(
+            ConnectionFactory connectionFactory,
+            @Qualifier("pocketmindRabbitMessageConverter") MessageConverter messageConverter,
+            @Value("${pocketmind.resource.catalog.hint-listener-concurrency:2}") int concurrency
+    ) {
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        factory.setConnectionFactory(connectionFactory);
+        factory.setMessageConverter(messageConverter);
+        factory.setDefaultRequeueRejected(false);
+        factory.setConcurrentConsumers(Math.max(1, concurrency));
         return factory;
     }
 }

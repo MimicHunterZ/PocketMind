@@ -5,10 +5,12 @@ import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
+import com.doublez.pocketmindserver.resource.domain.ResourceIndexOutboxConstants;
+import com.doublez.pocketmindserver.resource.domain.ResourceIndexOutboxEntity;
+import com.doublez.pocketmindserver.resource.domain.ResourceIndexOutboxRepository;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordEntity;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordRepository;
 import com.doublez.pocketmindserver.resource.domain.ResourceSourceType;
-import com.doublez.pocketmindserver.resource.application.NoOpResourceCatalogSyncService;
 import com.doublez.pocketmindserver.shared.domain.PageQuery;
 import com.doublez.pocketmindserver.shared.domain.SyncCursorQuery;
 import org.junit.jupiter.api.Test;
@@ -32,6 +34,7 @@ class ChatTranscriptResourceSyncServiceTest {
     private final InMemoryChatMessageRepository chatMessageRepository = new InMemoryChatMessageRepository();
     private final InMemoryChatSessionRepository chatSessionRepository = new InMemoryChatSessionRepository();
     private final InMemoryResourceRecordRepository resourceRecordRepository = new InMemoryResourceRecordRepository();
+    private final InMemoryResourceIndexOutboxRepository outboxRepository = new InMemoryResourceIndexOutboxRepository();
     private final ChatTranscriptResourceSyncServiceImpl service;
 
     ChatTranscriptResourceSyncServiceTest() {
@@ -40,7 +43,9 @@ class ChatTranscriptResourceSyncServiceTest {
                 chatSessionRepository,
                 resourceRecordRepository,
                 new ResourceContextServiceImpl(),
-                new NoOpResourceCatalogSyncService()
+                outboxRepository,
+                event -> {
+                }
         );
         ReflectionTestUtils.setField(service, "transcriptMessageTemplate",
                 new ByteArrayResource("<role>：<content>\n".getBytes()));
@@ -60,6 +65,8 @@ class ChatTranscriptResourceSyncServiceTest {
         assertEquals(ResourceSourceType.CHAT_TRANSCRIPT, resources.getFirst().getSourceType());
         assertTrue(resources.getFirst().getContent().contains("用户：你好"));
         assertTrue(resources.getFirst().getContent().contains("助手：你好，我在"));
+        assertEquals(1, outboxRepository.events.size());
+        assertEquals(ResourceIndexOutboxConstants.OPERATION_UPSERT, outboxRepository.events.getFirst().getOperation());
     }
 
     @Test
@@ -74,6 +81,8 @@ class ChatTranscriptResourceSyncServiceTest {
         service.syncSessionTranscript(8L, sessionUuid);
 
         assertTrue(resourceRecordRepository.storage.stream().allMatch(ResourceRecordEntity::isDeleted));
+        assertEquals(2, outboxRepository.events.size());
+        assertEquals(ResourceIndexOutboxConstants.OPERATION_DELETE, outboxRepository.events.getLast().getOperation());
     }
 
     private static final class InMemoryChatMessageRepository implements ChatMessageRepository {
@@ -231,6 +240,35 @@ class ChatTranscriptResourceSyncServiceTest {
         @Override
         public List<ResourceRecordEntity> findByAssetUuid(long userId, UUID assetUuid) {
             return List.of();
+        }
+    }
+
+    private static final class InMemoryResourceIndexOutboxRepository implements ResourceIndexOutboxRepository {
+        private final List<ResourceIndexOutboxEntity> events = new ArrayList<>();
+
+        @Override
+        public void appendPending(UUID eventUuid, long userId, UUID resourceUuid, String operation) {
+            events.add(ResourceIndexOutboxEntity.pending(eventUuid, userId, resourceUuid, operation));
+        }
+
+        @Override
+        public List<ResourceIndexOutboxEntity> pollRunnable(long nowEpochMillis, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public List<ResourceIndexOutboxEntity> claimRunnable(long nowEpochMillis, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public void markCompleted(UUID eventUuid) {
+            // noop
+        }
+
+        @Override
+        public void markFailed(UUID eventUuid, long nextRetryAfterEpochMillis, String errorMessage) {
+            // noop
         }
     }
 }

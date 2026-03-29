@@ -243,7 +243,6 @@ public class SseReplyService {
                 content,
                 List.of());
         chatMessageRepository.save(assistantMsg);
-            chatTranscriptResourceSyncService.syncSessionTranscript(userId, sessionUuid);
         return assistantMsgUuid;
     }
 

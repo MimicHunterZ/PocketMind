@@ -24,15 +24,11 @@ public class ContextCatalogModel {
 
     private UUID uuid;
     private Long userId;
+    private UUID resourceUuid;
     private String contextType;
-    private String subType;
     private String uri;
-    private String parentUri;
     private String name;
     private String abstractText;
-    private String layer;
-    private String status;
-    private Boolean isLeaf;
     private Long activeCount;
 
     @TableField(typeHandler = VectorTypeHandler.class)

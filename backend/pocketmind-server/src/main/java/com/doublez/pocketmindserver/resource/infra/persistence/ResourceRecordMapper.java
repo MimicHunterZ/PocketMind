@@ -15,6 +15,17 @@ public interface ResourceRecordMapper extends BaseMapper<ResourceRecordModel> {
             SELECT id, uuid, user_id, source_type, root_uri, title, abstract_text, summary_text, content, source_url,
                    note_uuid, session_uuid, asset_uuid, status, created_at, updated_at, is_deleted
               FROM resource_records
+             WHERE uuid = #{uuid}
+               AND user_id = #{userId}
+             LIMIT 1
+            """)
+    ResourceRecordModel findByUuidAndUserIdIncludingDeleted(@Param("uuid") UUID uuid,
+                                                            @Param("userId") long userId);
+
+    @Select("""
+            SELECT id, uuid, user_id, source_type, root_uri, title, abstract_text, summary_text, content, source_url,
+                   note_uuid, session_uuid, asset_uuid, status, created_at, updated_at, is_deleted
+              FROM resource_records
              WHERE user_id = #{userId}
                AND note_uuid = #{noteUuid}
                AND is_deleted = FALSE
@@ -45,5 +56,24 @@ public interface ResourceRecordMapper extends BaseMapper<ResourceRecordModel> {
              ORDER BY updated_at DESC
             """)
     List<ResourceRecordModel> findByAssetUuid(@Param("userId") long userId,
-                                              @Param("assetUuid") UUID assetUuid);
+                                               @Param("assetUuid") UUID assetUuid);
+
+    @Select("""
+            SELECT id, uuid, user_id, source_type, root_uri, title, abstract_text, summary_text, content, source_url,
+                   note_uuid, session_uuid, asset_uuid, status, created_at, updated_at, is_deleted
+              FROM resource_records
+             WHERE user_id = #{userId}
+               AND is_deleted = FALSE
+               AND (
+                    title ILIKE CONCAT('%', #{keyword}, '%')
+                 OR abstract_text ILIKE CONCAT('%', #{keyword}, '%')
+                 OR summary_text ILIKE CONCAT('%', #{keyword}, '%')
+                 OR content ILIKE CONCAT('%', #{keyword}, '%')
+               )
+             ORDER BY updated_at DESC
+             LIMIT #{limit}
+            """)
+    List<ResourceRecordModel> searchByKeyword(@Param("userId") long userId,
+                                              @Param("keyword") String keyword,
+                                              @Param("limit") int limit);
 }
