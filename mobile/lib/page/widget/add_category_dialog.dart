@@ -6,9 +6,10 @@ import 'package:pocketmind/page/widget/category_icon_picker.dart';
 /// 添加分类的结果数据
 class AddCategoryResult {
   final String name;
+  final String? description;
   final String? iconPath;
 
-  const AddCategoryResult({required this.name, this.iconPath});
+  const AddCategoryResult({required this.name, this.description, this.iconPath});
 }
 
 /// 统一的添加分类对话框 - 精美设计，适配桌面端
@@ -21,6 +22,7 @@ class AddCategoryDialog extends StatefulWidget {
 
 class _AddCategoryDialogState extends State<AddCategoryDialog> {
   final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
   final _focusNode = FocusNode();
   String? _selectedIconPath;
 
@@ -35,6 +37,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
   @override
   void dispose() {
     _nameController.dispose();
+    _descriptionController.dispose();
     _focusNode.dispose();
     super.dispose();
   }
@@ -42,10 +45,15 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
   void _submit() {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
+    final description = _descriptionController.text.trim();
 
-    Navigator.of(
-      context,
-    ).pop(AddCategoryResult(name: name, iconPath: _selectedIconPath));
+    Navigator.of(context).pop(
+      AddCategoryResult(
+        name: name,
+        description: description.isEmpty ? null : description,
+        iconPath: _selectedIconPath,
+      ),
+    );
   }
 
   @override
@@ -160,6 +168,42 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
             ),
             const SizedBox(height: 6),
 
+            Padding(
+              padding: EdgeInsets.only(left: iconButtonSize + 12),
+              child: TextField(
+                controller: _descriptionController,
+                decoration: InputDecoration(
+                  hintText: '分类描述（可选）',
+                  hintStyle: TextStyle(
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                    fontSize: 13,
+                  ),
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.35,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(
+                      color: colorScheme.primary.withValues(alpha: 0.5),
+                      width: 1.5,
+                    ),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                ),
+                maxLines: 2,
+                style: TextStyle(fontSize: 13, color: colorScheme.onSurface),
+              ),
+            ),
+            const SizedBox(height: 8),
+
             // 提示文字
             Padding(
               padding: EdgeInsets.only(left: iconButtonSize + 12),
@@ -251,10 +295,6 @@ class _IconButton extends StatelessWidget {
                   iconPath!,
                   width: iconSize,
                   height: iconSize,
-                  colorFilter: ColorFilter.mode(
-                    colorScheme.primary,
-                    BlendMode.srcIn,
-                  ),
                 )
               : Icon(
                   Icons.add_photo_alternate_outlined,

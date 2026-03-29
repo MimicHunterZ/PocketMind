@@ -51,17 +51,42 @@ class CategoryActions extends _$CategoryActions {
   /// 添加新分类
   ///
   /// [name] 分类名称（必填）
+  /// [description] 分类描述（可选）
   /// [iconPath] 分类图标路径（可选）
   /// 返回新创建分类的 ID
-  Future<int> addCategory({required String name, String? iconPath}) async {
+  Future<int> addCategory({
+    required String name,
+    String? description,
+    String? iconPath,
+  }) async {
     final service = ref.read(categoryServiceProvider);
-    return await service.addCategory(name: name, iconPath: iconPath);
+    return await service.addCategory(
+      name: name,
+      description: description,
+      iconPath: iconPath,
+    );
   }
 
   /// 删除分类（软删除，触发同步）
   Future<void> deleteCategory(int categoryId) async {
     final service = ref.read(categoryServiceProvider);
     await service.deleteCategory(categoryId);
+  }
+
+  /// 更新分类（名称/描述/图标）。
+  Future<int> updateCategory({
+    required int categoryId,
+    String? name,
+    String? description,
+    String? iconPath,
+  }) async {
+    final service = ref.read(categoryServiceProvider);
+    return await service.updateCategory(
+      categoryId: categoryId,
+      name: name,
+      description: description,
+      iconPath: iconPath,
+    );
   }
 
   /// 获取分类详情

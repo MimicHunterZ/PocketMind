@@ -295,7 +295,11 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
     if (result != null) {
       await ref
           .read(categoryActionsProvider.notifier)
-          .addCategory(name: result.name, iconPath: result.iconPath);
+          .addCategory(
+            name: result.name,
+            description: result.description,
+            iconPath: result.iconPath,
+          );
     }
   }
 

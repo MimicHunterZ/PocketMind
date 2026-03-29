@@ -81,6 +81,29 @@ class CategoryService {
     PMlog.d(categoryServiceTag, '分类软删除成功（已追加同步 mutation）: id=$categoryId');
   }
 
+  /// 更新分类字段（名称/描述/图标）。
+  Future<int> updateCategory({
+    required int categoryId,
+    String? name,
+    String? description,
+    String? iconPath,
+  }) async {
+    final category = await _categoryRepository.getById(categoryId);
+    if (category == null) {
+      throw Exception('分类不存在: id=$categoryId');
+    }
+
+    category
+      ..name = name ?? category.name
+      ..description = description ?? category.description
+      ..iconPath = iconPath ?? category.iconPath;
+
+    final resultId = await _writeCoordinator.writeCategory(category);
+    _syncEngine?.kick();
+    PMlog.d(categoryServiceTag, '分类更新成功: id=$categoryId');
+    return resultId;
+  }
+
   /// 监听所有分类变化
   Stream<List<Category>> watchAllCategories() {
     return _categoryRepository.watchAll();

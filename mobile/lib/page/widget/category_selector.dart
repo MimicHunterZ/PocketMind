@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:pocketmind/model/category.dart';
+import 'package:pocketmind/page/home/model/category_theme_icon_registry.dart';
 import 'package:pocketmind/page/widget/add_category_dialog.dart';
 import 'package:pocketmind/providers/category_providers.dart';
 
@@ -108,27 +109,29 @@ class CategorySelector extends ConsumerWidget {
   }
 }
 
-/// 根据分类名称获取默认图标路径（当 Category.iconPath 为空时使用）
-String getDefaultIconForCategory(String name) {
-  // 预设的图标映射，用于已知平台
-  const iconMap = {
-    'b站': 'assets/icons/bilibili.svg',
-    'B站': 'assets/icons/bilibili.svg',
-    'bilibili': 'assets/icons/bilibili.svg',
-    'Bilibili': 'assets/icons/bilibili.svg',
-    '小红书': 'assets/icons/redBook.svg',
-    'RedBook': 'assets/icons/redBook.svg',
-    'X': 'assets/icons/x.svg',
-    'x': 'assets/icons/x.svg',
-    'Twitter': 'assets/icons/x.svg',
-    'twitter': 'assets/icons/x.svg',
-  };
-  return iconMap[name] ?? 'assets/icons/home.svg';
-}
-
-/// 获取分类图标路径，优先使用数据库存储的 iconPath，否则使用默认映射
+/// 获取分类图标路径，统一使用 jelly 图标集合
 String getCategoryIcon(Category category) {
-  return category.iconPath ?? getDefaultIconForCategory(category.name);
+  final options = themeCategoryIconOptions;
+  if (options.isEmpty) {
+    return 'assets/icons/jelly/notes.svg';
+  }
+
+  final savedPath = category.iconPath;
+  if (savedPath != null && savedPath.startsWith('assets/icons/jelly/')) {
+    return savedPath;
+  }
+
+  final source = category.name.trim().toLowerCase();
+  for (final option in options) {
+    final label = option.label.trim().toLowerCase();
+    if (label.isNotEmpty && source.contains(label)) {
+      return option.assetPath;
+    }
+  }
+
+  final id = category.id ?? 0;
+  final index = id.abs() % options.length;
+  return options[index].assetPath;
 }
 
 class _CategoryDialog extends ConsumerWidget {
@@ -147,7 +150,11 @@ class _CategoryDialog extends ConsumerWidget {
     if (result != null) {
       await ref
           .read(categoryActionsProvider.notifier)
-          .addCategory(name: result.name, iconPath: result.iconPath);
+          .addCategory(
+            name: result.name,
+            description: result.description,
+            iconPath: result.iconPath,
+          );
     }
   }
 
