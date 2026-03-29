@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:pocketmind/page/home/model/category_theme_icon_registry.dart';
 
-/// 可选的分类图标列表
-const List<CategoryIconOption> availableCategoryIcons = [
-  CategoryIconOption(path: 'assets/icons/home.svg', label: '默认'),
-  CategoryIconOption(path: 'assets/icons/bilibili.svg', label: 'B站'),
-  CategoryIconOption(path: 'assets/icons/redBook.svg', label: '小红书'),
-  CategoryIconOption(path: 'assets/icons/x.svg', label: 'X'),
+final List<CategoryIconOption> availableCategoryIcons = [
+  ...themeCategoryIconOptions.map(
+    (icon) => CategoryIconOption(path: icon.assetPath, label: icon.label),
+  ),
 ];
 
 class CategoryIconOption {
@@ -17,7 +16,6 @@ class CategoryIconOption {
   const CategoryIconOption({required this.path, required this.label});
 }
 
-/// 图标选择弹窗 - 精美设计，适配桌面端
 class CategoryIconPickerDialog extends StatefulWidget {
   final String? initialIconPath;
 
@@ -29,12 +27,18 @@ class CategoryIconPickerDialog extends StatefulWidget {
 }
 
 class _CategoryIconPickerDialogState extends State<CategoryIconPickerDialog> {
-  late String? _selectedPath;
+  late int _currentIndex;
 
   @override
   void initState() {
     super.initState();
-    _selectedPath = widget.initialIconPath;
+    final initialPath = widget.initialIconPath;
+    if (initialPath == null) {
+      _currentIndex = 0;
+      return;
+    }
+    final index = availableCategoryIcons.indexWhere((it) => it.path == initialPath);
+    _currentIndex = index < 0 ? 0 : index;
   }
 
   @override
@@ -42,14 +46,12 @@ class _CategoryIconPickerDialogState extends State<CategoryIconPickerDialog> {
     final colorScheme = Theme.of(context).colorScheme;
     final isDesktop = MediaQuery.of(context).size.width > 600;
 
-    // 桌面端使用固定尺寸，移动端使用响应式
-    final dialogWidth = isDesktop ? 320.0 : 280.w;
-    final iconSize = isDesktop ? 52.0 : 56.w;
-    final iconInnerSize = isDesktop ? 24.0 : 26.w;
-    final spacing = isDesktop ? 16.0 : 14.w;
+    final dialogWidth = isDesktop ? 320.0 : 300.w;
     final padding = isDesktop ? 24.0 : 20.r;
-    final fontSize = isDesktop ? 14.0 : 15.sp;
-    final labelSize = isDesktop ? 11.0 : 10.sp;
+    final previewSize = isDesktop ? 110.0 : 110.w;
+    final titleSize = isDesktop ? 15.0 : 16.sp;
+
+    final current = availableCategoryIcons[_currentIndex];
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -76,78 +78,70 @@ class _CategoryIconPickerDialogState extends State<CategoryIconPickerDialog> {
             Text(
               '选择图标',
               style: TextStyle(
-                fontSize: fontSize,
+                fontSize: titleSize,
                 fontWeight: FontWeight.w600,
                 color: colorScheme.onSurface,
               ),
             ),
-            SizedBox(height: padding),
-            // 图标网格
-            Wrap(
-              spacing: spacing,
-              runSpacing: spacing,
-              alignment: WrapAlignment.center,
-              children: availableCategoryIcons.map((icon) {
-                final isSelected =
-                    _selectedPath == icon.path ||
-                    (_selectedPath == null &&
-                        icon == availableCategoryIcons.first);
-
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedPath = icon.path),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    width: iconSize,
-                    height: iconSize,
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? colorScheme.primary.withValues(alpha: 0.12)
-                          : colorScheme.surfaceContainerHighest.withValues(
-                              alpha: 0.5,
+            SizedBox(height: 20.h),
+            Row(
+              children: [
+                IconButton(
+                  onPressed: _goPrev,
+                  icon: const Icon(Icons.chevron_left_rounded),
+                ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        transitionBuilder: (child, animation) {
+                          return FadeTransition(opacity: animation, child: child);
+                        },
+                        child: Container(
+                          key: ValueKey(current.path),
+                          width: previewSize,
+                          height: previewSize,
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest.withValues(
+                              alpha: 0.45,
                             ),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isSelected
-                            ? colorScheme.primary.withValues(alpha: 0.5)
-                            : Colors.transparent,
-                        width: 1.5,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                            ),
+                          ),
+                          padding: const EdgeInsets.all(14),
+                          child: SvgPicture.asset(current.path),
+                        ),
                       ),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SvgPicture.asset(
-                          icon.path,
-                          width: iconInnerSize,
-                          height: iconInnerSize,
-                          colorFilter: ColorFilter.mode(
-                            isSelected
-                                ? colorScheme.primary
-                                : colorScheme.onSurfaceVariant,
-                            BlendMode.srcIn,
-                          ),
+                      SizedBox(height: 10.h),
+                      Text(
+                        current.label,
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                          fontSize: isDesktop ? 13 : 13.sp,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          icon.label,
-                          style: TextStyle(
-                            fontSize: labelSize,
-                            color: isSelected
-                                ? colorScheme.primary
-                                : colorScheme.onSurfaceVariant,
-                            fontWeight: isSelected
-                                ? FontWeight.w500
-                                : FontWeight.normal,
-                          ),
+                      ),
+                      SizedBox(height: 2.h),
+                      Text(
+                        '${_currentIndex + 1}/${availableCategoryIcons.length}',
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: isDesktop ? 11 : 11.sp,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                );
-              }).toList(),
+                ),
+                IconButton(
+                  onPressed: _goNext,
+                  icon: const Icon(Icons.chevron_right_rounded),
+                ),
+              ],
             ),
-            SizedBox(height: padding),
-            // 按钮行
+            SizedBox(height: 22.h),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -164,7 +158,7 @@ class _CategoryIconPickerDialogState extends State<CategoryIconPickerDialog> {
                 ),
                 const SizedBox(width: 8),
                 FilledButton(
-                  onPressed: () => Navigator.pop(context, _selectedPath),
+                  onPressed: () => Navigator.pop(context, current.path),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
@@ -180,9 +174,22 @@ class _CategoryIconPickerDialogState extends State<CategoryIconPickerDialog> {
       ),
     );
   }
+
+  void _goPrev() {
+    setState(() {
+      _currentIndex =
+          (_currentIndex - 1 + availableCategoryIcons.length) %
+          availableCategoryIcons.length;
+    });
+  }
+
+  void _goNext() {
+    setState(() {
+      _currentIndex = (_currentIndex + 1) % availableCategoryIcons.length;
+    });
+  }
 }
 
-/// 显示图标选择对话框
 Future<String?> showCategoryIconPicker(
   BuildContext context, {
   String? initialIconPath,
