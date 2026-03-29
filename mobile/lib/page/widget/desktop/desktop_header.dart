@@ -171,6 +171,7 @@ class DesktopHeader extends ConsumerWidget {
   final FocusNode searchFocusNode;
   final VoidCallback? onSearchSubmit;
   final VoidCallback? onClear;
+  final VoidCallback? onAddTap;
 
   const DesktopHeader({
     super.key,
@@ -178,6 +179,7 @@ class DesktopHeader extends ConsumerWidget {
     required this.searchFocusNode,
     this.onSearchSubmit,
     this.onClear,
+    this.onAddTap,
   });
 
   @override
@@ -217,6 +219,16 @@ class DesktopHeader extends ConsumerWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (onAddTap != null)
+                Padding(
+                  padding: EdgeInsets.only(right: 8.w),
+                  child: FilledButton.icon(
+                    key: const ValueKey('desktop_add_note_button'),
+                    onPressed: onAddTap,
+                    icon: const Icon(Icons.add),
+                    label: const Text('新增'),
+                  ),
+                ),
               const ThemeToggleButton(),
               const SizedBox(width: 8),
               Container(

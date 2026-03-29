@@ -1,17 +1,26 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:pocketmind/core/constants.dart';
+import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/model/note.dart';
+import 'package:pocketmind/page/chat/chat_page.dart';
+import 'package:pocketmind/page/home/widgets/themed_category_grid.dart';
 import 'package:pocketmind/page/widget/note_item.dart';
 import 'package:pocketmind/page/widget/desktop/desktop_header.dart';
 import 'package:pocketmind/page/home/note_add_sheet.dart';
 import 'package:pocketmind/page/home/mixin/search_logic_mixin.dart';
+import 'package:pocketmind/page/widget/add_category_dialog.dart';
+import 'package:pocketmind/providers/category_providers.dart';
+import 'package:pocketmind/providers/chat_providers.dart';
 import 'package:pocketmind/providers/nav_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/providers/ui_providers.dart';
 import 'package:pocketmind/providers/app_config_provider.dart';
+import 'package:pocketmind/router/route_paths.dart';
 import 'package:pocketmind/util/logger_service.dart';
 
 final String tag = 'DesktopHomeScreen';
@@ -28,6 +37,7 @@ class DesktopHomeScreen extends ConsumerStatefulWidget {
 class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
     with SearchLogicMixin {
   final ScrollController _scrollController = ScrollController();
+  bool _openingAiSession = false;
 
   @override
   void dispose() {
@@ -49,7 +59,6 @@ class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final noteByCategory = ref.watch(noteByCategoryProvider);
     final noteService = ref.watch(noteServiceProvider);
     final currentLayout = ref.watch(appConfigProvider).waterfallLayoutEnabled
         ? NoteLayout.grid
@@ -57,6 +66,18 @@ class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
     final searchQuery = ref.watch(searchQueryProvider);
     final searchResults = ref.watch(searchResultsProvider);
     final isAddingNote = ref.watch(isAddingNoteProvider);
+    final activeIndex = ref.watch(activeNavIndexProvider);
+
+    if (activeIndex == 1 && !_openingAiSession) {
+      _openingAiSession = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await _openGlobalAiSession();
+        if (!mounted) return;
+        ref.read(activeNavIndexProvider.notifier).set(0);
+        _openingAiSession = false;
+      });
+    }
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -72,42 +93,47 @@ class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
                 if (Platform.isMacOS) SizedBox(height: 28.h),
 
                 // 顶部导航栏
-                DesktopHeader(
-                  searchController: searchController,
-                  searchFocusNode: searchFocusNode,
-                  onSearchSubmit: submitSearch,
-                  onClear: clearSearch,
-                ),
+                if (activeIndex == 0)
+                  DesktopHeader(
+                    searchController: searchController,
+                    searchFocusNode: searchFocusNode,
+                    onSearchSubmit: submitSearch,
+                    onClear: clearSearch,
+                    onAddTap: () => _showAddNotePage(context),
+                  ),
 
                 // 内容区域
                 Expanded(
-                  child: (searchQuery != null && searchQuery.isNotEmpty)
-                      ? _buildSearchResults(
-                          searchResults,
-                          currentLayout,
-                          noteService,
-                        )
-                      : noteByCategory.when(
-                          skipLoadingOnRefresh: true,
-                          data: (notes) => _buildNotesContent(
-                            notes,
-                            currentLayout,
-                            noteService,
-                          ),
-                          error: (error, stack) {
-                            PMlog.e(tag, 'stack: $error,stack:$stack');
-                            return const Center(child: Text('加载笔记失败'));
-                          },
-                          loading: () =>
-                              const Center(child: CircularProgressIndicator()),
-                        ),
+                  child: activeIndex == 0
+                      ? (searchQuery != null && searchQuery.isNotEmpty)
+                            ? _buildSearchResults(
+                                searchResults,
+                                currentLayout,
+                                noteService,
+                              )
+                            : ref
+                                  .watch(allNotesProvider)
+                                  .when(
+                                    skipLoadingOnRefresh: true,
+                                    data: (notes) => _buildNotesContent(
+                                      notes,
+                                      currentLayout,
+                                      noteService,
+                                    ),
+                                    error: (error, stack) {
+                                      PMlog.e(tag, 'stack: $error,stack:$stack');
+                                      return const Center(child: Text('加载笔记失败'));
+                                    },
+                                    loading: () =>
+                                        const Center(child: CircularProgressIndicator()),
+                                  )
+                      : _buildCategoryBody(),
                 ),
               ],
             ),
-      // FAB - 桌面端放在右下角
-      floatingActionButton: !isAddingNote
+      floatingActionButton: activeIndex == 2 && !isAddingNote
           ? FloatingActionButton(
-              onPressed: () => _showAddNotePage(context),
+              onPressed: _showAddCategory,
               elevation: 8,
               child: Container(
                 width: 56.w,
@@ -140,6 +166,51 @@ class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
   /// 显示添加笔记页面（嵌入式）
   void _showAddNotePage(BuildContext context) {
     ref.read(isAddingNoteProvider.notifier).set(true);
+  }
+
+  Future<void> _showAddCategory() async {
+    final result = await showAddCategoryDialog(context);
+    if (result == null) {
+      return;
+    }
+    await ref.read(categoryActionsProvider.notifier).addCategory(
+      name: result.name,
+      description: result.description,
+      iconPath: result.iconPath,
+    );
+  }
+
+  Future<void> _openGlobalAiSession() async {
+    final repo = ref.read(chatSessionRepositoryProvider);
+    final service = ref.read(chatServiceProvider);
+    final globalSessions = await repo.findGlobalSessions();
+    final sessionUuid = globalSessions.isNotEmpty
+        ? globalSessions.first.uuid
+        : (await service.createSession(noteUuid: null)).uuid;
+
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatPage(sessionUuid: sessionUuid),
+      ),
+    );
+  }
+
+  Widget _buildCategoryBody() {
+    final categoryAsync = ref.watch(allCategoriesProvider);
+    return categoryAsync.when(
+      data: (categories) {
+        final visibleCategories = categories
+            .where((item) => item.id != AppConstants.homeCategoryId)
+            .toList();
+        if (visibleCategories.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return ThemedCategoryGrid(categories: visibleCategories);
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, _) => const Center(child: Text('分类加载失败')),
+    );
   }
 
   /// 构建笔记内容区域

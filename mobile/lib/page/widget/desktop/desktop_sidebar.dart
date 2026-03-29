@@ -14,7 +14,7 @@ import 'sidebar_item.dart';
 /// 包含 App 名称、分类列表和设置入口
 class DesktopSidebar extends ConsumerWidget {
   /// 侧边栏宽度
-  static final double width = 260.w;
+  static const double width = 260;
 
   const DesktopSidebar({super.key});
 
@@ -22,8 +22,6 @@ class DesktopSidebar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    // 从 provider 获取导航项数据
-    final navItemsAsync = ref.watch(navItemsProvider);
     // 从 provider 获取当前激活的索引
     final activeIndex = ref.watch(activeNavIndexProvider);
 
@@ -80,11 +78,11 @@ class DesktopSidebar extends ConsumerWidget {
             ),
           ),
 
-          // 分类标题
+          // 主导航标题
           Padding(
             padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
             child: Text(
-              '分类',
+              '主导航',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -94,52 +92,36 @@ class DesktopSidebar extends ConsumerWidget {
             ),
           ),
 
-          // 分类列表
+          // 三个主Tab入口
           Expanded(
-            child: navItemsAsync.when(
-              data: (navItems) {
-                if (navItems.isEmpty) {
-                  return const SizedBox.shrink();
-                }
-                return ListView.builder(
-                  padding: EdgeInsets.zero,
-                  itemCount: navItems.length,
-                  itemBuilder: (context, index) {
-                    final item = navItems[index];
-                    // 默认分类（如"全部"）通常ID较小或固定，这里假设 categoryId > 1 才能删除
-                    // 或者根据业务逻辑判断是否可删除
-                    final canDelete = item.categoryId > 1;
-
-                    return SidebarItem(
-                      text: item.text,
-                      isActive: activeIndex == index,
-                      onTap: () {
-                        ref.read(activeNavIndexProvider.notifier).set(index);
-                        // 切换分类时回到首页列表
-                        context.go(RoutePaths.home);
-                      },
-                      onDelete: canDelete
-                          ? () => _onDeletePressed(
-                              context,
-                              ref,
-                              item.categoryId,
-                              item.text,
-                            )
-                          : null,
-                    );
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                SidebarItem(
+                  text: 'Everything',
+                  isActive: activeIndex == 0,
+                  onTap: () {
+                    ref.read(activeNavIndexProvider.notifier).set(0);
+                    context.go(RoutePaths.home);
                   },
-                );
-              },
-              loading: () => Center(
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-              ),
-              error: (error, stack) {
-                debugPrint('Error loading nav items: $error');
-                return const SizedBox.shrink();
-              },
+                SidebarItem(
+                  text: 'AI',
+                  isActive: activeIndex == 1,
+                  onTap: () {
+                    ref.read(activeNavIndexProvider.notifier).set(1);
+                    context.go(RoutePaths.home);
+                  },
+                ),
+                SidebarItem(
+                  text: '分类',
+                  isActive: activeIndex == 2,
+                  onTap: () {
+                    ref.read(activeNavIndexProvider.notifier).set(2);
+                    context.go(RoutePaths.home);
+                  },
+                ),
+              ],
             ),
           ),
 

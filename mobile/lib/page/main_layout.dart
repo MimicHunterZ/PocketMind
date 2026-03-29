@@ -1,6 +1,6 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:pocketmind/page/widget/desktop/desktop_sidebar.dart';
+import 'package:pocketmind/util/responsive_breakpoints.dart';
 
 /// 全局主布局组件
 /// 负责根据平台实现响应式布局：
@@ -13,11 +13,12 @@ class MainLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 根据平台判断是否显示持久化侧边栏
-    final bool isDesktopPlatform =
-        Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+    // 根据可用宽度判断是否显示侧边栏，避免测试与小窗下强制桌面布局
+    final width = MediaQuery.of(context).size.width;
+    final bool isDesktopLayout =
+        ResponsiveBreakpoints.shouldShowHomeSidebar(width);
 
-    if (isDesktopPlatform) {
+    if (isDesktopLayout) {
       return Scaffold(
         body: Row(
           children: [

@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocketmind/model/note.dart';
@@ -34,7 +35,7 @@ final appRouter = GoRouter(
           path: RoutePaths.home,
           builder: (context, state) {
             final isDesktop =
-                Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+                Platform.isWindows || Platform.isLinux || Platform.isMacOS;
             return isDesktop ? const DesktopHomeScreen() : const HomeScreen();
           },
           routes: [
