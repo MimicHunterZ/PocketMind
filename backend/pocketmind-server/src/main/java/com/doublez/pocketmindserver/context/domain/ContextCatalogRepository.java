@@ -4,24 +4,11 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * 上下文目录仓库接口 — 对应 context_catalog 表。
+ * 上下文索引仓库接口 — 对应 context_catalog 表。
  *
- * <p>context_catalog 是层级检索树的元数据索引表，
- * 每行代表 URI 树中的一个节点（目录或叶子）。
+ * <p>context_catalog 是资源检索薄索引表，每行映射一个 resource 索引节点。
  */
 public interface ContextCatalogRepository {
-
-    /**
-     * 按 parent_uri 查找子节点（一级直接子节点）。
-     */
-    List<ContextNode> findChildrenByParentUri(String parentUri, long userId);
-
-    /**
-     * 按 parent_uri 前缀匹配查找所有后代节点。
-     *
-     * <p>用于全文搜索场景下快速获取某棵子树的所有节点。
-     */
-    List<ContextNode> findDescendantsByUriPrefix(String uriPrefix, long userId);
 
     /**
      * 全局关键词搜索 — 在 name 和 description 字段上进行模糊匹配。
@@ -42,7 +29,9 @@ public interface ContextCatalogRepository {
     /**
      * 批量按 URI 查找节点。
      */
-    List<ContextNode> findByUris(List<String> uris);
+    default List<ContextNode> findByUris(List<String> uris, Long userId) {
+        return List.of();
+    }
 
     /**
      * 保存或更新节点。
@@ -65,6 +54,12 @@ public interface ContextCatalogRepository {
      */
     void deleteByUri(String uri);
 
+    /**
+     * 按 resource_uuid 删除索引节点。
+     */
+    default void deleteByResourceUuid(java.util.UUID resourceUuid) {
+    }
+
     /**     * 向量相似度搜索 — 返回最相关的节点及其余弦相似度。
      *
      * @param queryVector 查询向量
@@ -74,11 +69,6 @@ public interface ContextCatalogRepository {
      * @return (node, similarity) 对列表，按相似度降序
      */
     List<ScoredCatalogEntry> searchByVector(float[] queryVector, long userId, ContextType contextType, int limit);
-
-    /**
-     * 向量相似度子节点搜索 — 限定 parentUri 下的子节点。
-     */
-    List<ScoredCatalogEntry> searchChildrenByVector(float[] queryVector, String parentUri, long userId, int limit);
 
     /**
      * 更新指定 URI 节点的向量嵌入。

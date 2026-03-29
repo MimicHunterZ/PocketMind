@@ -75,6 +75,26 @@ pocketmind:
       log-full-payload: false
       max-payload-length: 1200
       log-tool-context: true
+  resource:
+    catalog:
+      # catalog 未命中时，是否回读 resource_records 做降级召回
+      retrieval-fallback-enabled: true
+      # projector 每轮最大消费 outbox 事件数
+      projector-batch-size: 100
+      # projector 失败事件重试间隔（毫秒）
+      projector-retry-interval-millis: 5000
+      # hint 监听并发数
+      hint-listener-concurrency: 2
+      # hint 去抖窗口（毫秒）
+      hint-debounce-millis: 300
+      # hint 主队列重试次数
+      hint-max-retry: 3
+      # hint 死信最大重放次数
+      hint-dlq-max-replay: 3
+      # PROCESSING 状态租约超时回收窗口（毫秒）
+      outbox-processing-lease-millis: 60000
+      # 是否开启 outbox/projector 指标采集
+      metrics-enabled: true
 app:
   base-url: http://localhost:8080  # 替换为生产环境实际地址，供拼接图片访问 URL
   storage:

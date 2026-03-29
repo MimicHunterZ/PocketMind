@@ -1,11 +1,16 @@
 package com.doublez.pocketmindserver.ai.application.retrieval;
 
 import com.doublez.pocketmindserver.context.domain.ContextType;
+import com.doublez.pocketmindserver.resource.application.ResourceCatalogRuntimeProperties;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 检索编排器 — 并行调度 Resource + Memory 双通道检索，汇总为 {@link OrchestratedContext}。
@@ -21,11 +26,29 @@ public class RetrievalOrchestrator {
 
     private final HierarchicalRetriever hierarchicalRetriever;
     private final MemoryRetriever memoryRetriever;
+    private final ResourceRetrievalFallbackService resourceRetrievalFallbackService;
+    private final ResourceCatalogRuntimeProperties runtimeProperties;
+    private final Executor retrievalExecutor;
 
     public RetrievalOrchestrator(HierarchicalRetriever hierarchicalRetriever,
-                                 MemoryRetriever memoryRetriever) {
+                                 MemoryRetriever memoryRetriever,
+                                 ResourceRetrievalFallbackService resourceRetrievalFallbackService,
+                                 ResourceCatalogRuntimeProperties runtimeProperties) {
+        this(hierarchicalRetriever, memoryRetriever, resourceRetrievalFallbackService, runtimeProperties, Runnable::run);
+    }
+
+    @Autowired
+    public RetrievalOrchestrator(HierarchicalRetriever hierarchicalRetriever,
+                                 MemoryRetriever memoryRetriever,
+                                 ResourceRetrievalFallbackService resourceRetrievalFallbackService,
+                                 ResourceCatalogRuntimeProperties runtimeProperties,
+                                 @Qualifier("applicationTaskExecutor")
+                                 Executor retrievalExecutor) {
         this.hierarchicalRetriever = hierarchicalRetriever;
         this.memoryRetriever = memoryRetriever;
+        this.resourceRetrievalFallbackService = resourceRetrievalFallbackService;
+        this.runtimeProperties = runtimeProperties;
+        this.retrievalExecutor = retrievalExecutor == null ? Runnable::run : retrievalExecutor;
     }
 
     /**
@@ -38,14 +61,16 @@ public class RetrievalOrchestrator {
     public OrchestratedContext retrieve(long userId, String queryText) {
         // 双通道并行检索：任一通道异常不影响另一通道
         CompletableFuture<List<ContextSnippet>> resourceFuture =
-                CompletableFuture.supplyAsync(() -> retrieveResources(userId, queryText))
+                CompletableFuture.supplyAsync(() -> retrieveResources(userId, queryText), retrievalExecutor)
+                        .completeOnTimeout(List.of(), 2, TimeUnit.SECONDS)
                         .exceptionally(ex -> {
                             log.warn("[retrieval-orchestrator] resource 通道检索异常: {}", ex.getMessage());
                             return List.of();
                         });
 
         CompletableFuture<List<ContextSnippet>> memoryFuture =
-                CompletableFuture.supplyAsync(() -> retrieveMemories(userId, queryText))
+                CompletableFuture.supplyAsync(() -> retrieveMemories(userId, queryText), retrievalExecutor)
+                        .completeOnTimeout(List.of(), 2, TimeUnit.SECONDS)
                         .exceptionally(ex -> {
                             log.warn("[retrieval-orchestrator] memory 通道检索异常: {}", ex.getMessage());
                             return List.of();
@@ -66,6 +91,14 @@ public class RetrievalOrchestrator {
         RetrievalQuery query = new RetrievalQuery(queryText, ContextType.RESOURCE, List.of(), RESOURCE_LIMIT);
         RetrievalResult result = hierarchicalRetriever.retrieve(query, userId);
 
+        if (result.matches().isEmpty() && shouldUseFallback()) {
+            List<ContextSnippet> fallback = resourceRetrievalFallbackService.search(userId, queryText, RESOURCE_LIMIT);
+            if (!fallback.isEmpty()) {
+                log.debug("[retrieval-orchestrator] catalog 未命中，触发 resource_records 降级命中: count={}", fallback.size());
+            }
+            return fallback;
+        }
+
         return result.matches().stream()
                 .map(scored -> new ContextSnippet(
                         scored.node().uri().value(),
@@ -80,5 +113,12 @@ public class RetrievalOrchestrator {
 
     private List<ContextSnippet> retrieveMemories(long userId, String queryText) {
         return memoryRetriever.retrieve(queryText, userId, MEMORY_LIMIT);
+    }
+
+    private boolean shouldUseFallback() {
+        if (resourceRetrievalFallbackService == null) {
+            return false;
+        }
+        return runtimeProperties == null || runtimeProperties.isRetrievalFallbackEnabled();
     }
 }

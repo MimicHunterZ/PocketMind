@@ -1,6 +1,5 @@
 package com.doublez.pocketmindserver.context.application;
 
-import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
@@ -10,8 +9,9 @@ import com.doublez.pocketmindserver.context.domain.ContextCatalogRepository;
 import com.doublez.pocketmindserver.context.domain.ContextUri;
 import com.doublez.pocketmindserver.memory.application.MemoryExtractorService;
 import com.doublez.pocketmindserver.resource.application.ChatTranscriptResourceSyncService;
-import com.doublez.pocketmindserver.resource.application.ResourceCatalogSyncService;
 import com.doublez.pocketmindserver.resource.application.ResourceContextService;
+import com.doublez.pocketmindserver.resource.domain.ResourceIndexOutboxConstants;
+import com.doublez.pocketmindserver.resource.domain.ResourceIndexOutboxRepository;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordEntity;
 import com.doublez.pocketmindserver.resource.domain.ResourceRecordRepository;
 import com.doublez.pocketmindserver.resource.domain.ResourceSourceType;
@@ -20,15 +20,11 @@ import com.doublez.pocketmindserver.shared.util.PromptBuilder;
 import com.doublez.pocketmind.common.web.ApiCode;
 import com.doublez.pocketmind.common.web.BusinessException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.converter.BeanOutputConverter;
-import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 
 import java.util.List;
 import java.util.Map;
@@ -60,16 +56,11 @@ public class SessionCommitServiceImpl implements SessionCommitService {
     private final ChatTranscriptResourceSyncService transcriptSyncService;
     private final ResourceRecordRepository resourceRecordRepository;
     private final ResourceContextService resourceContextService;
-    private final ResourceCatalogSyncService catalogSyncService;
+    private final ResourceIndexOutboxRepository outboxRepository;
     private final ContextCatalogRepository contextCatalogRepository;
-    private final AiFailoverRouter aiFailoverRouter;
+    private final SessionSummaryGenerator sessionSummaryGenerator;
     private final MemoryExtractorService memoryExtractorService;
-
-    @Value("classpath:prompts/compression/structured_summary_system.md")
-    private Resource summarySystemTemplate;
-
-    @Value("classpath:prompts/compression/structured_summary_user.md")
-    private Resource summaryUserTemplate;
+    private final TransactionOperations transactionOperations;
 
     /** 对话转录消息条目模板 */
     @Value("classpath:prompts/chat/transcript_message.md")
@@ -80,23 +71,24 @@ public class SessionCommitServiceImpl implements SessionCommitService {
                                     ChatTranscriptResourceSyncService transcriptSyncService,
                                     ResourceRecordRepository resourceRecordRepository,
                                     ResourceContextService resourceContextService,
-                                    ResourceCatalogSyncService catalogSyncService,
+                                    ResourceIndexOutboxRepository outboxRepository,
                                     ContextCatalogRepository contextCatalogRepository,
-                                    AiFailoverRouter aiFailoverRouter,
-                                    MemoryExtractorService memoryExtractorService) {
+                                    SessionSummaryGenerator sessionSummaryGenerator,
+                                    MemoryExtractorService memoryExtractorService,
+                                    TransactionOperations transactionOperations) {
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.transcriptSyncService = transcriptSyncService;
         this.resourceRecordRepository = resourceRecordRepository;
         this.resourceContextService = resourceContextService;
-        this.catalogSyncService = catalogSyncService;
+        this.outboxRepository = outboxRepository;
         this.contextCatalogRepository = contextCatalogRepository;
-        this.aiFailoverRouter = aiFailoverRouter;
+        this.sessionSummaryGenerator = sessionSummaryGenerator;
         this.memoryExtractorService = memoryExtractorService;
+        this.transactionOperations = transactionOperations;
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public SessionCommitResult commit(long userId, UUID sessionUuid) {
         // 1. 加载会话
         ChatSessionEntity session = chatSessionRepository.findByUuidAndUserId(sessionUuid, userId)
@@ -129,18 +121,19 @@ public class SessionCommitServiceImpl implements SessionCommitService {
         String sessionTitle = session.getTitle() != null && !session.getTitle().isBlank()
                 ? session.getTitle() : "未命名对话";
 
-        // 5. 调用 LLM 生成结构化摘要
-        StructuredSummaryResult summaryResult = generateStructuredSummary(sessionTitle, truncatedTranscript);
+        // 5. 调用 LLM 生成结构化摘要（事务外执行）
+        SessionSummaryGenerator.SummaryResult summaryResult =
+                sessionSummaryGenerator.generate(sessionTitle, truncatedTranscript);
 
-        // 6. 创建 CHAT_STAGE_SUMMARY Resource
-        ContextUri summaryUri = resourceContextService.chatStageSummaryResource(userId, sessionUuid);
-        ResourceRecordEntity summaryResource = createOrUpdateSummaryResource(
-                userId, sessionUuid, summaryUri, sessionTitle,
-                summaryResult.abstractText(), summaryResult.summaryText(), transcript
+        // 6. 落库阶段（事务内）
+        ResourceRecordEntity summaryResource = persistSummaryResourceTx(
+                userId,
+                sessionUuid,
+                sessionTitle,
+                summaryResult.abstractText(),
+                summaryResult.summaryText(),
+                transcript
         );
-
-        // 8. 递增 catalog 热度
-        contextCatalogRepository.incrementActiveCount(summaryUri.value());
 
         log.info("会话提交完成: userId={}, sessionUuid={}, messageCount={}, abstract={}",
                 userId, sessionUuid, messages.size(),
@@ -197,48 +190,26 @@ public class SessionCommitServiceImpl implements SessionCommitService {
                 .orElse(null);
     }
 
-    /**
-     * 调用 LLM 生成结构化摘要。
-     */
-    private StructuredSummaryResult generateStructuredSummary(String sessionTitle, String transcript) {
-        BeanOutputConverter<StructuredSummaryResult> outputConverter =
-                new BeanOutputConverter<>(StructuredSummaryResult.class);
-
-        OpenAiChatOptions options = OpenAiChatOptions.builder()
-                .responseFormat(new ResponseFormat(
-                        ResponseFormat.Type.JSON_OBJECT,
-                        outputConverter.getJsonSchema()))
-                .build();
-
-        try {
-            Prompt prompt = PromptBuilder.build(
-                    summarySystemTemplate,
-                    summaryUserTemplate,
-                    Map.of(
-                            "sessionTitle", sessionTitle,
-                            "transcript", transcript,
-                            "format", outputConverter.getFormat()
-                    ),
-                    options
+    private ResourceRecordEntity persistSummaryResourceTx(long userId,
+                                                          UUID sessionUuid,
+                                                          String title,
+                                                          String abstractText,
+                                                          String summaryText,
+                                                          String fullTranscript) {
+        return transactionOperations.execute(status -> {
+            ContextUri summaryUri = resourceContextService.chatStageSummaryResource(userId, sessionUuid);
+            ResourceRecordEntity resource = createOrUpdateSummaryResource(
+                    userId,
+                    sessionUuid,
+                    summaryUri,
+                    title,
+                    abstractText,
+                    summaryText,
+                    fullTranscript
             );
-
-            StructuredSummaryResult result = aiFailoverRouter.executeChat(
-                    "sessionCommitSummary",
-                    client -> client.prompt(prompt).call().entity(StructuredSummaryResult.class)
-            );
-            if (result == null || result.abstractText() == null || result.abstractText().isBlank()) {
-                log.warn("LLM 返回空摘要，使用默认值");
-                return new StructuredSummaryResult("对话摘要生成失败", "无法生成结构化概览。");
-            }
-            return result;
-        } catch (Exception e) {
-            log.error("LLM 结构化摘要生成失败: {}", e.getMessage(), e);
-            throw new BusinessException(
-                    ApiCode.INTERNAL_ERROR,
-                    HttpStatus.INTERNAL_SERVER_ERROR,
-                    "AI 摘要生成失败"
-            );
-        }
+            contextCatalogRepository.incrementActiveCount(summaryUri.value());
+            return resource;
+        });
     }
 
     /**
@@ -263,7 +234,12 @@ public class SessionCommitServiceImpl implements SessionCommitService {
             existing.updateAbstractText(abstractText);
             existing.updateSummaryText(summaryText);
             resourceRecordRepository.update(existing);
-            catalogSyncService.syncToCatalog(existing);
+            outboxRepository.appendPending(
+                    UUID.randomUUID(),
+                    userId,
+                    existing.getUuid(),
+                    ResourceIndexOutboxConstants.OPERATION_UPSERT
+            );
             return existing;
         }
 
@@ -278,7 +254,12 @@ public class SessionCommitServiceImpl implements SessionCommitService {
                 fullTranscript
         );
         resourceRecordRepository.save(resource);
-        catalogSyncService.syncToCatalog(resource);
+        outboxRepository.appendPending(
+                UUID.randomUUID(),
+                userId,
+                resource.getUuid(),
+                ResourceIndexOutboxConstants.OPERATION_UPSERT
+        );
         return resource;
     }
 
@@ -302,9 +283,4 @@ public class SessionCommitServiceImpl implements SessionCommitService {
         return value.length() > maxChars ? value.substring(0, maxChars) + "…" : value;
     }
 
-    /**
-     * LLM 输出的结构化摘要结果。
-     */
-    record StructuredSummaryResult(String abstractText, String summaryText) {
-    }
 }

@@ -3,7 +3,6 @@ package com.doublez.pocketmindserver.ai.application.retrieval;
 import com.doublez.pocketmindserver.ai.application.embedding.EmbeddingService;
 import com.doublez.pocketmindserver.context.domain.ContextCatalogRepository;
 import com.doublez.pocketmindserver.context.domain.ContextCatalogRepository.ScoredCatalogEntry;
-import com.doublez.pocketmindserver.context.domain.ContextLayer;
 import com.doublez.pocketmindserver.context.domain.ContextNode;
 import com.doublez.pocketmindserver.context.domain.ContextType;
 import com.doublez.pocketmindserver.context.domain.ContextUri;
@@ -15,8 +14,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * VectorChildSearchStrategy 单测 — 使用 Stub 验证向量搜索路由逻辑。
@@ -35,16 +36,15 @@ class VectorChildSearchStrategyTest {
     }
 
     @Test
-    void 向量搜索子节点按相似度返回() {
+    void 平铺向量搜索按相似度返回() {
         long userId = 1L;
-        ContextUri root = ContextUri.userResourcesRoot(userId);
-        ContextNode high = node(root.child("note-1"), root, "Spring Boot 架构设计", true);
-        ContextNode low = node(root.child("note-2"), root, "Rust 入门教程", true);
+        ContextNode high = node(ContextUri.of("pm://users/1/resources/note-1"), "Spring Boot 架构设计");
+        ContextNode low = node(ContextUri.of("pm://users/1/resources/note-2"), "Rust 入门教程");
 
-        repository.addChildVectorResult(root.value(), new ScoredCatalogEntry(high, 0.92));
-        repository.addChildVectorResult(root.value(), new ScoredCatalogEntry(low, 0.35));
+        repository.addGlobalVectorResult(new ScoredCatalogEntry(high, 0.92));
+        repository.addGlobalVectorResult(new ScoredCatalogEntry(low, 0.35));
 
-        List<ScoredNode> results = strategy.searchChildren(root, "Spring 架构", userId, 10);
+        List<ScoredNode> results = strategy.search("Spring 架构", userId, ContextType.RESOURCE, 10);
 
         assertThat(results).hasSize(2);
         assertThat(results.get(0).node().name()).isEqualTo("Spring Boot 架构设计");
@@ -56,8 +56,7 @@ class VectorChildSearchStrategyTest {
         long userId = 1L;
         ContextNode hit = node(
                 ContextUri.of("pm://users/1/resources/notes/spring"),
-                ContextUri.userResourcesRoot(userId),
-                "Spring AI 指南", true);
+                "Spring AI 指南");
 
         repository.addGlobalVectorResult(new ScoredCatalogEntry(hit, 0.88));
 
@@ -72,8 +71,7 @@ class VectorChildSearchStrategyTest {
     void 空白查询返回空列表() {
         embeddingService.setReturnNull(true);
 
-        List<ScoredNode> results = strategy.searchChildren(
-                ContextUri.userResourcesRoot(1L), "", 1L, 10);
+        List<ScoredNode> results = strategy.search("", 1L, ContextType.RESOURCE, 10);
 
         assertThat(results).isEmpty();
     }
@@ -82,20 +80,27 @@ class VectorChildSearchStrategyTest {
     void loadByUris委托到普通查找() {
         long userId = 1L;
         ContextUri uri = ContextUri.of("pm://users/1/resources/notes/test");
-        ContextNode n = node(uri, null, "测试笔记", true);
+        ContextNode n = node(uri, "测试笔记");
         repository.addFindByUriResult(uri.value(), n);
 
         List<ScoredNode> results = strategy.loadByUris(List.of(uri), userId);
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).score()).isEqualTo(0.0);
+        assertEquals(1L, repository.lastFindByUrisUserId);
     }
 
     // ─── 辅助方法 ──────────────────────────────────────────────
 
-    private ContextNode node(ContextUri uri, ContextUri parent, String name, boolean isLeaf) {
-        return new ContextNode(uri, parent, ContextType.RESOURCE, ContextLayer.L2_DETAIL,
-                name, name + " 的摘要", 0L, System.currentTimeMillis(), isLeaf);
+    private ContextNode node(ContextUri uri, String name) {
+        return new ContextNode(
+                uri,
+                UUID.nameUUIDFromBytes(uri.value().getBytes()),
+                ContextType.RESOURCE,
+                name,
+                name + " 的摘要",
+                0L,
+                System.currentTimeMillis());
     }
 
     // ─── Stub EmbeddingService ──────────────────────────────────
@@ -124,13 +129,9 @@ class VectorChildSearchStrategyTest {
 
     static class InMemoryCatalogRepository implements ContextCatalogRepository {
 
-        private final Map<String, List<ScoredCatalogEntry>> childVectorResults = new ConcurrentHashMap<>();
         private final List<ScoredCatalogEntry> globalVectorResults = new ArrayList<>();
         private final Map<String, ContextNode> uriNodes = new ConcurrentHashMap<>();
-
-        void addChildVectorResult(String parentUri, ScoredCatalogEntry entry) {
-            childVectorResults.computeIfAbsent(parentUri, k -> new ArrayList<>()).add(entry);
-        }
+        private Long lastFindByUrisUserId;
 
         void addGlobalVectorResult(ScoredCatalogEntry entry) {
             globalVectorResults.add(entry);
@@ -146,15 +147,11 @@ class VectorChildSearchStrategyTest {
         }
 
         @Override
-        public List<ScoredCatalogEntry> searchChildrenByVector(float[] queryVector, String parentUri, long userId, int limit) {
-            return childVectorResults.getOrDefault(parentUri, List.of()).stream().limit(limit).toList();
-        }
-
-        @Override
         public void updateEmbedding(String uri, float[] embedding) {}
 
         @Override
-        public List<ContextNode> findByUris(List<String> uris) {
+        public List<ContextNode> findByUris(List<String> uris, Long userId) {
+            lastFindByUrisUserId = userId;
             return uris.stream()
                     .map(uriNodes::get)
                     .filter(n -> n != null)
@@ -163,8 +160,6 @@ class VectorChildSearchStrategyTest {
 
         // ─── 未使用的接口方法 ──────────────────────────────────
 
-        @Override public List<ContextNode> findChildrenByParentUri(String parentUri, long userId) { return List.of(); }
-        @Override public List<ContextNode> findDescendantsByUriPrefix(String uriPrefix, long userId) { return List.of(); }
         @Override public List<ContextNode> searchByKeyword(String keyword, Long userId, ContextType contextType, int limit) { return List.of(); }
         @Override public Optional<ContextNode> findByUri(String uri) { return Optional.ofNullable(uriNodes.get(uri)); }
         @Override public void upsert(ContextNode node, Long userId) {}

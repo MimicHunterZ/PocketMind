@@ -2,7 +2,6 @@ package com.doublez.pocketmindserver.resource.application;
 
 import com.doublez.pocketmindserver.ai.application.embedding.EmbeddingService;
 import com.doublez.pocketmindserver.context.domain.ContextCatalogRepository;
-import com.doublez.pocketmindserver.context.domain.ContextLayer;
 import com.doublez.pocketmindserver.context.domain.ContextNode;
 import com.doublez.pocketmindserver.context.domain.ContextType;
 import com.doublez.pocketmindserver.context.domain.ContextUri;
@@ -19,7 +18,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * ResourceCatalogSyncService 单元测试 — 验证 Resource → ContextCatalog 目录同步。
+ * ResourceCatalogSyncService 单元测试 — 验证 Resource → ContextCatalog 薄索引同步。
  */
 class ResourceCatalogSyncServiceTest {
 
@@ -33,7 +32,7 @@ class ResourceCatalogSyncServiceTest {
     }
 
     @Test
-    void 同步笔记资源应创建完整目录结构() {
+    void 同步笔记资源应只创建单个索引节点() {
         ResourceRecordEntity resource = ResourceRecordEntity.createNoteText(
                 UUID.randomUUID(), 1L, UUID.randomUUID(),
                 ContextUri.userResourcesRoot(1L).child("notes").child("test-note"),
@@ -41,31 +40,15 @@ class ResourceCatalogSyncServiceTest {
 
         syncService.syncToCatalog(resource);
 
-        // 应创建 3 个节点：根目录、notes 分组目录、资源叶子
-        assertEquals(3, catalogRepository.storage.size());
-
-        // 验证根目录
-        Optional<ContextNode> root = catalogRepository.findByUri("pm://users/1/resources");
-        assertTrue(root.isPresent());
-        assertFalse(root.get().isLeaf());
-        assertEquals(ContextLayer.L0_ABSTRACT, root.get().layer());
-
-        // 验证 notes 分组目录
-        Optional<ContextNode> notesDir = catalogRepository.findByUri("pm://users/1/resources/notes");
-        assertTrue(notesDir.isPresent());
-        assertFalse(notesDir.get().isLeaf());
-        assertEquals("notes", notesDir.get().name());
-
-        // 验证叶子节点
+        assertEquals(1, catalogRepository.storage.size());
         Optional<ContextNode> leaf = catalogRepository.findByUri(resource.getRootUri().value());
         assertTrue(leaf.isPresent());
-        assertTrue(leaf.get().isLeaf());
-        assertEquals(ContextLayer.L2_DETAIL, leaf.get().layer());
+        assertEquals(resource.getUuid(), leaf.get().resourceUuid());
         assertEquals("架构笔记", leaf.get().name());
     }
 
     @Test
-    void 同步聊天记录应放入chats分组() {
+    void 同步聊天记录不会创建chats目录节点() {
         UUID sessionUuid = UUID.randomUUID();
         ResourceRecordEntity resource = ResourceRecordEntity.createChatTranscript(
                 UUID.randomUUID(), 2L, sessionUuid,
@@ -74,14 +57,12 @@ class ResourceCatalogSyncServiceTest {
 
         syncService.syncToCatalog(resource);
 
-        Optional<ContextNode> chatsDir = catalogRepository.findByUri("pm://users/2/resources/chats");
-        assertTrue(chatsDir.isPresent());
-        assertEquals("chats", chatsDir.get().name());
-        assertTrue(chatsDir.get().abstractText().contains("对话"));
+        assertEquals(1, catalogRepository.storage.size());
+        assertTrue(catalogRepository.findByUri("pm://users/2/resources/chats").isEmpty());
     }
 
     @Test
-    void 同步OCR资源应放入assets分组() {
+    void 同步OCR资源不会创建assets目录节点() {
         UUID assetUuid = UUID.randomUUID();
         ResourceRecordEntity resource = ResourceRecordEntity.createAssetText(
                 UUID.randomUUID(), 3L, assetUuid,
@@ -90,9 +71,8 @@ class ResourceCatalogSyncServiceTest {
 
         syncService.syncToCatalog(resource);
 
-        Optional<ContextNode> assetsDir = catalogRepository.findByUri("pm://users/3/resources/assets");
-        assertTrue(assetsDir.isPresent());
-        assertEquals("assets", assetsDir.get().name());
+        assertEquals(1, catalogRepository.storage.size());
+        assertTrue(catalogRepository.findByUri("pm://users/3/resources/assets").isEmpty());
     }
 
     @Test
@@ -105,7 +85,7 @@ class ResourceCatalogSyncServiceTest {
         syncService.syncToCatalog(resource);
         int sizeAfterFirst = catalogRepository.storage.size();
 
-        // 第二次同步不应增加新节点（目录 upsert + 叶子 upsert）
+        // 第二次同步不应增加新节点
         syncService.syncToCatalog(resource);
         assertEquals(sizeAfterFirst, catalogRepository.storage.size());
     }
@@ -142,6 +122,24 @@ class ResourceCatalogSyncServiceTest {
         assertEquals("未命名资源", leaf.name());
     }
 
+    @Test
+    void 重复同步不应重置activeCount() {
+        ResourceRecordEntity resource = ResourceRecordEntity.createNoteText(
+                UUID.randomUUID(), 1L, UUID.randomUUID(),
+                ContextUri.userResourcesRoot(1L).child("notes").child("hot-note"),
+                "笔记", "内容"
+        );
+
+        syncService.syncToCatalog(resource);
+        catalogRepository.incrementActiveCount(resource.getRootUri().value());
+        catalogRepository.incrementActiveCount(resource.getRootUri().value());
+
+        syncService.syncToCatalog(resource);
+
+        ContextNode leaf = catalogRepository.findByUri(resource.getRootUri().value()).orElseThrow();
+        assertEquals(2L, leaf.activeCount());
+    }
+
     // ─── 内存仓库 ─────────────────────────────────────────────────
 
     /**
@@ -150,20 +148,6 @@ class ResourceCatalogSyncServiceTest {
     private static class InMemoryCatalogRepository implements ContextCatalogRepository {
 
         final List<ContextNode> storage = new ArrayList<>();
-
-        @Override
-        public List<ContextNode> findChildrenByParentUri(String parentUri, long userId) {
-            return storage.stream()
-                    .filter(n -> n.parentUri() != null && n.parentUri().value().equals(parentUri))
-                    .toList();
-        }
-
-        @Override
-        public List<ContextNode> findDescendantsByUriPrefix(String uriPrefix, long userId) {
-            return storage.stream()
-                    .filter(n -> n.uri().value().startsWith(uriPrefix))
-                    .toList();
-        }
 
         @Override
         public List<ContextNode> searchByKeyword(String keyword, Long userId, ContextType contextType, int limit) {
@@ -182,7 +166,7 @@ class ResourceCatalogSyncServiceTest {
         }
 
         @Override
-        public List<ContextNode> findByUris(List<String> uris) {
+        public List<ContextNode> findByUris(List<String> uris, Long userId) {
             return storage.stream()
                     .filter(n -> uris.contains(n.uri().value()))
                     .toList();
@@ -190,25 +174,38 @@ class ResourceCatalogSyncServiceTest {
 
         @Override
         public void upsert(ContextNode node, Long userId) {
-            storage.removeIf(n -> n.uri().value().equals(node.uri().value()));
+            storage.removeIf(n -> n.resourceUuid().equals(node.resourceUuid()));
             storage.add(node);
         }
 
         @Override
         public void incrementActiveCount(String uri) {
+            for (int i = 0; i < storage.size(); i++) {
+                ContextNode node = storage.get(i);
+                if (node.uri().value().equals(uri)) {
+                    storage.set(i, new ContextNode(
+                            node.uri(),
+                            node.resourceUuid(),
+                            node.contextType(),
+                            node.name(),
+                            node.abstractText(),
+                            node.activeCount() + 1,
+                            node.updatedAt()
+                    ));
+                }
+            }
         }
 
         @Override
         public void incrementActiveCountBatch(List<String> uris) {
+            if (uris == null || uris.isEmpty()) {
+                return;
+            }
+            uris.forEach(this::incrementActiveCount);
         }
 
         @Override
         public List<ScoredCatalogEntry> searchByVector(float[] queryVector, long userId, ContextType contextType, int limit) {
-            return List.of();
-        }
-
-        @Override
-        public List<ScoredCatalogEntry> searchChildrenByVector(float[] queryVector, String parentUri, long userId, int limit) {
             return List.of();
         }
 
@@ -219,6 +216,11 @@ class ResourceCatalogSyncServiceTest {
         @Override
         public void deleteByUri(String uri) {
             storage.removeIf(n -> n.uri().value().equals(uri));
+        }
+
+        @Override
+        public void deleteByResourceUuid(UUID resourceUuid) {
+            storage.removeIf(n -> n.resourceUuid().equals(resourceUuid));
         }
     }
 

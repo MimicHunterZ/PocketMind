@@ -7,6 +7,13 @@ import com.doublez.pocketmindserver.note.domain.note.NoteEntity;
  */
 public interface NoteResourceSyncService {
 
+    /**
+     * 返回当前 Resource 同步一致性策略。
+     */
+    default ResourceSyncConsistencyPolicy consistencyPolicy() {
+        return ResourceSyncConsistencyPolicy.defaultPolicy();
+    }
+
     void syncProjectedResources(NoteEntity note);
 
     void softDeleteByNote(NoteEntity note);

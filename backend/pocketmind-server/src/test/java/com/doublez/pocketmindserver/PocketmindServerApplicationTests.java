@@ -2,6 +2,7 @@ package com.doublez.pocketmindserver;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -9,6 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.amqp.rabbit.connection.Connection;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
 
 import com.doublez.pocketmindserver.auth.infra.persistence.UserAccountRepository;
 import com.doublez.pocketmindserver.note.infra.persistence.note.NoteMapper;
@@ -20,6 +22,8 @@ import com.doublez.pocketmindserver.attachment.infra.persistence.vision.Attachme
 import com.doublez.pocketmindserver.chat.infra.persistence.session.ChatSessionMapper;
 import com.doublez.pocketmindserver.chat.infra.persistence.message.ChatMessageMapper;
 import com.doublez.pocketmindserver.sync.infra.persistence.SyncChangeLogMapper;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 @SpringBootTest(properties = {
     // 避免 application.yml 默认激活 dev。
@@ -84,6 +88,9 @@ import com.doublez.pocketmindserver.sync.infra.persistence.SyncChangeLogMapper;
 })
 class PocketmindServerApplicationTests {
 
+    @Autowired(required = false)
+    private ScheduledAnnotationBeanPostProcessor scheduledPostProcessor;
+
     // Mock 所有 MyBatis Mapper 接口，避免 DataSource 不可用时容器启动失败
     @MockitoBean NoteMapper noteMapper;
     @MockitoBean CategoryMapper categoryMapper;
@@ -98,6 +105,7 @@ class PocketmindServerApplicationTests {
     @MockitoBean com.doublez.pocketmindserver.user.infra.persistence.UserPersonaMapper userPersonaMapper;
     @MockitoBean com.doublez.pocketmindserver.memory.infra.persistence.MemoryRecordMapper memoryRecordMapper;
     @MockitoBean com.doublez.pocketmindserver.resource.infra.persistence.ResourceRecordMapper resourceRecordMapper;
+    @MockitoBean com.doublez.pocketmindserver.resource.infra.persistence.ResourceIndexOutboxMapper resourceIndexOutboxMapper;
     @MockitoBean com.doublez.pocketmindserver.context.infra.persistence.ContextCatalogMapper contextCatalogMapper;
     @MockitoBean com.doublez.pocketmindserver.asset.domain.AssetMapper assetMapper;
     @MockitoBean(name = "embeddingModel") org.springframework.ai.embedding.EmbeddingModel embeddingModel;
@@ -132,6 +140,18 @@ class PocketmindServerApplicationTests {
 
     @Test
     void contextLoads() {
+    }
+
+    @Test
+    void shouldNotRegisterResourceOutboxPollingScheduleTask() {
+        if (scheduledPostProcessor == null) {
+            return;
+        }
+        boolean hasOutboxPollingTask = scheduledPostProcessor.getScheduledTasks().stream()
+                .map(Object::toString)
+                .anyMatch(task -> task.contains("ResourceCatalogProjectorScheduler")
+                        || task.contains("resourceCatalogProjectorScheduler"));
+        assertFalse(hasOutboxPollingTask);
     }
 
 }

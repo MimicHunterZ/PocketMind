@@ -55,6 +55,12 @@ public class ResourceRecordRepositoryImpl implements ResourceRecordRepository {
     }
 
     @Override
+    public Optional<ResourceRecordEntity> findByUuidAndUserIdIncludingDeleted(UUID uuid, long userId) {
+        ResourceRecordModel model = mapper.findByUuidAndUserIdIncludingDeleted(uuid, userId);
+        return Optional.ofNullable(model).map(structMapper::toDomain);
+    }
+
+    @Override
     public Optional<ResourceRecordEntity> findByRootUriAndUserId(String rootUri, long userId) {
         ResourceRecordModel model = mapper.selectOne(new LambdaQueryWrapper<ResourceRecordModel>()
                 .eq(ResourceRecordModel::getRootUri, rootUri)
@@ -75,5 +81,13 @@ public class ResourceRecordRepositoryImpl implements ResourceRecordRepository {
     @Override
     public List<ResourceRecordEntity> findByAssetUuid(long userId, UUID assetUuid) {
         return mapper.findByAssetUuid(userId, assetUuid).stream().map(structMapper::toDomain).toList();
+    }
+
+    @Override
+    public List<ResourceRecordEntity> searchByKeyword(long userId, String keyword, int limit) {
+        if (keyword == null || keyword.isBlank() || limit <= 0) {
+            return List.of();
+        }
+        return mapper.searchByKeyword(userId, keyword.trim(), limit).stream().map(structMapper::toDomain).toList();
     }
 }

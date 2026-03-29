@@ -11,10 +11,9 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * 基于 pgvector 余弦相似度的子节点搜索策略。
+ * 基于 pgvector 余弦相似度的平铺索引搜索策略。
  *
- * <p>替代关键词匹配的 DbChildSearchStrategy，使用 DashScope text-embedding-v3
- * 生成查询向量，通过 HNSW 索引在 context_catalog 表内完成语义搜索。
+ * <p>通过 HNSW 索引在 context_catalog 表内完成语义检索。
  */
 @Slf4j
 @Component
@@ -30,20 +29,7 @@ public class VectorChildSearchStrategy implements ChildSearchStrategy {
     }
 
     @Override
-    public List<ScoredNode> searchChildren(ContextUri parentUri, String queryText, long userId, int limit) {
-        float[] queryVector = embeddingService.embed(queryText);
-        if (queryVector == null) {
-            return List.of();
-        }
-
-        return catalogRepository.searchChildrenByVector(queryVector, parentUri.value(), userId, limit)
-                .stream()
-                .map(VectorChildSearchStrategy::toScoredNode)
-                .toList();
-    }
-
-    @Override
-    public List<ScoredNode> globalSearch(String queryText, long userId, ContextType contextType, int limit) {
+    public List<ScoredNode> search(String queryText, long userId, ContextType contextType, int limit) {
         float[] queryVector = embeddingService.embed(queryText);
         if (queryVector == null) {
             return List.of();
@@ -56,9 +42,14 @@ public class VectorChildSearchStrategy implements ChildSearchStrategy {
     }
 
     @Override
+    public List<ScoredNode> globalSearch(String queryText, long userId, ContextType contextType, int limit) {
+        return search(queryText, userId, contextType, limit);
+    }
+
+    @Override
     public List<ScoredNode> loadByUris(List<ContextUri> uris, long userId) {
         List<String> uriValues = uris.stream().map(ContextUri::value).toList();
-        return catalogRepository.findByUris(uriValues).stream()
+        return catalogRepository.findByUris(uriValues, userId).stream()
                 .map(node -> new ScoredNode(node, 0.0))
                 .toList();
     }

@@ -21,42 +21,41 @@ public interface ContextCatalogMapper extends BaseMapper<ContextCatalogModel> {
    */
   @Insert("""
       INSERT INTO context_catalog (
-        uuid, user_id, context_type, uri, parent_uri, name, abstract_text,
-        layer, status, is_leaf, active_count, updated_at, is_deleted
+        uuid, user_id, resource_uuid, context_type, uri, name, abstract_text,
+        active_count, updated_at, is_deleted
       ) VALUES (
-        #{uuid}, #{userId}, #{contextType}, #{uri}, #{parentUri}, #{name}, #{abstractText},
-        #{layer}, 'ACTIVE', #{isLeaf}, #{activeCount}, #{updatedAt}, false
+        #{uuid}, #{userId}, #{resourceUuid}, #{contextType}, #{uri}, #{name}, #{abstractText},
+        #{activeCount}, #{updatedAt}, false
       )
-      ON CONFLICT (uri) DO UPDATE SET
+      ON CONFLICT (resource_uuid) DO UPDATE SET
         user_id = EXCLUDED.user_id,
+        uri = EXCLUDED.uri,
         context_type = EXCLUDED.context_type,
-        parent_uri = EXCLUDED.parent_uri,
         name = EXCLUDED.name,
         abstract_text = EXCLUDED.abstract_text,
-        layer = EXCLUDED.layer,
-        status = 'ACTIVE',
-        is_leaf = EXCLUDED.is_leaf,
+        active_count = context_catalog.active_count,
         updated_at = EXCLUDED.updated_at,
         is_deleted = false
       """)
   int upsertByUri(@Param("uuid") java.util.UUID uuid,
           @Param("userId") Long userId,
+          @Param("resourceUuid") java.util.UUID resourceUuid,
           @Param("contextType") String contextType,
           @Param("uri") String uri,
-          @Param("parentUri") String parentUri,
           @Param("name") String name,
           @Param("abstractText") String abstractText,
-          @Param("layer") String layer,
-          @Param("isLeaf") boolean isLeaf,
           @Param("activeCount") Long activeCount,
           @Param("updatedAt") Long updatedAt);
+
+    @Update("UPDATE context_catalog SET is_deleted = true, updated_at = EXTRACT(EPOCH FROM NOW())::BIGINT * 1000 WHERE resource_uuid = #{resourceUuid}")
+    int deleteByResourceUuid(@Param("resourceUuid") java.util.UUID resourceUuid);
 
     /**
      * pgvector 余弦相似度搜索。
      */
     @Select("""
-            SELECT uri, parent_uri, context_type, layer, name, abstract_text,
-                   active_count, updated_at, is_leaf,
+            SELECT uri, resource_uuid, context_type, name, abstract_text,
+                   active_count, updated_at,
                    1 - (embedding <=> #{queryVector}::vector) AS similarity
             FROM context_catalog
             WHERE user_id = #{userId}
@@ -70,26 +69,6 @@ public interface ContextCatalogMapper extends BaseMapper<ContextCatalogModel> {
                                              @Param("userId") long userId,
                                              @Param("contextType") String contextType,
                                              @Param("limit") int limit);
-
-    /**
-     * pgvector 余弦相似度：限定 parentUri 搜索子节点。
-     */
-    @Select("""
-            SELECT uri, parent_uri, context_type, layer, name, abstract_text,
-                   active_count, updated_at, is_leaf,
-                   1 - (embedding <=> #{queryVector}::vector) AS similarity
-            FROM context_catalog
-            WHERE parent_uri = #{parentUri}
-              AND user_id = #{userId}
-              AND is_deleted = false
-              AND embedding IS NOT NULL
-            ORDER BY embedding <=> #{queryVector}::vector
-            LIMIT #{limit}
-            """)
-    List<Map<String, Object>> searchChildrenByVector(@Param("queryVector") String queryVector,
-                                                     @Param("parentUri") String parentUri,
-                                                     @Param("userId") long userId,
-                                                     @Param("limit") int limit);
 
     /**
      * 更新指定节点的向量嵌入。
