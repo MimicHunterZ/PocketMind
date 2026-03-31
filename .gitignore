@@ -40,3 +40,6 @@ OpenViking/
 # flutter
 .flutter-plugins-dependencies
 devtools_options.yaml
+
+# git worktrees
+.worktrees/
