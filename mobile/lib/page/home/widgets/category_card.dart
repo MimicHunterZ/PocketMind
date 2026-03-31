@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:pocketmind/util/theme_data.dart';
 
 bool disableThemedCategoryIconFloatAnimationForTest = false;
 
-class ThemedCategoryCard extends StatefulWidget {
-  const ThemedCategoryCard({
+class CategoryCard extends StatefulWidget {
+  const CategoryCard({
     super.key,
     required this.title,
     required this.description,
@@ -23,10 +24,10 @@ class ThemedCategoryCard extends StatefulWidget {
   final VoidCallback? onTap;
 
   @override
-  State<ThemedCategoryCard> createState() => _ThemedCategoryCardState();
+  State<CategoryCard> createState() => _CategoryCardState();
 }
 
-class _ThemedCategoryCardState extends State<ThemedCategoryCard>
+class _CategoryCardState extends State<CategoryCard>
     with SingleTickerProviderStateMixin {
   late final AnimationController _floatController;
   late final Animation<double> _floatAnimation;
@@ -58,6 +59,7 @@ class _ThemedCategoryCardState extends State<ThemedCategoryCard>
   @override
   Widget build(BuildContext context) {
     final ext = CategoryHomeColors.of(context);
+    final textTheme = Theme.of(context).textTheme;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _active = true),
@@ -68,7 +70,7 @@ class _ThemedCategoryCardState extends State<ThemedCategoryCard>
         onTapCancel: () => setState(() => _active = false),
         onTapUp: (_) => setState(() => _active = false),
         child: SizedBox(
-          height: 180,
+          height: 100.h,
           child: Stack(
             clipBehavior: Clip.none,
             children: [
@@ -136,13 +138,9 @@ class _ThemedCategoryCardState extends State<ThemedCategoryCard>
                           Expanded(
                             child: Text(
                               widget.title,
-                              maxLines: 1,
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: ext.titleText,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                              ),
+                              style: textTheme.titleMedium,
                             ),
                           ),
                         ],
@@ -153,11 +151,7 @@ class _ThemedCategoryCardState extends State<ThemedCategoryCard>
                           widget.description,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: ext.bodyText,
-                            fontSize: 12,
-                            height: 1.45,
-                          ),
+                          style: textTheme.bodyMedium,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -183,8 +177,8 @@ class _ThemedCategoryCardState extends State<ThemedCategoryCard>
                     );
                   },
                   child: SizedBox(
-                    width: 48,
-                    height: 48,
+                    width: 60,
+                    height: 60,
                     child: RepaintBoundary(
                       child: SvgPicture.asset(widget.iconPath),
                     ),

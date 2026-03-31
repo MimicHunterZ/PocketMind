@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/page/home/category_posts_screen.dart';
 import 'package:pocketmind/page/home/model/category_theme_icon_registry.dart';
-import 'package:pocketmind/page/home/widgets/themed_category_card.dart';
+import 'package:pocketmind/page/home/widgets/category_card.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 
-class ThemedCategoryGrid extends ConsumerWidget {
-  const ThemedCategoryGrid({super.key, required this.categories});
+class CategoryGrid extends ConsumerWidget {
+  const CategoryGrid({super.key, required this.categories});
 
   final List<Category> categories;
 
@@ -44,9 +45,9 @@ class ThemedCategoryGrid extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 96),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 24,
-            childAspectRatio: 0.82,
+            crossAxisSpacing: 12.w,
+            mainAxisSpacing: 24.h,
+            childAspectRatio: 0.90,
           ),
           itemCount: categories.length,
           itemBuilder: (context, index) {
@@ -58,7 +59,7 @@ class ThemedCategoryGrid extends ConsumerWidget {
                 ? '-'
                 : formatter.format(createdTime);
 
-            return ThemedCategoryCard(
+            return CategoryCard(
               title: category.name,
               description: category.description ?? '暂无描述',
               metaText: '$count 条 · $createdLabel',

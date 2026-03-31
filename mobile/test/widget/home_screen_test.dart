@@ -9,7 +9,7 @@ import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/page/home/category_posts_screen.dart';
 import 'package:pocketmind/page/home/home_screen.dart';
-import 'package:pocketmind/page/home/widgets/themed_category_card.dart';
+import 'package:pocketmind/page/home/widgets/category_card.dart';
 import 'package:pocketmind/providers/category_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';

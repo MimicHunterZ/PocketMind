@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocketmind/page/home/widgets/themed_home_top_bar.dart';
+import 'package:pocketmind/page/home/widgets/home_top_bar.dart';
 import 'package:pocketmind/util/theme_data.dart';
 
 void main() {
@@ -14,7 +14,7 @@ void main() {
         builder: (context, child) => MaterialApp(
           theme: calmBeigeTheme,
           home: Scaffold(
-            body: ThemedHomeTopBar(
+            body: HomeTopBar(
               onAvatarTap: () {},
               onSearchTap: () {},
               onAddTap: () {},

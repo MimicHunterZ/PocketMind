@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class ThemedHomeTopBar extends StatelessWidget {
-  const ThemedHomeTopBar({
+class HomeTopBar extends StatelessWidget {
+  const HomeTopBar({
     super.key,
     required this.onAvatarTap,
     required this.onSearchTap,

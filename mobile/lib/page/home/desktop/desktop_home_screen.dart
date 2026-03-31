@@ -8,7 +8,7 @@ import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/page/chat/chat_page.dart';
-import 'package:pocketmind/page/home/widgets/themed_category_grid.dart';
+import 'package:pocketmind/page/home/widgets/category_grid.dart';
 import 'package:pocketmind/page/widget/note_item.dart';
 import 'package:pocketmind/page/widget/desktop/desktop_header.dart';
 import 'package:pocketmind/page/home/note_add_sheet.dart';
@@ -206,7 +206,7 @@ class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
         if (visibleCategories.isEmpty) {
           return const SizedBox.shrink();
         }
-        return ThemedCategoryGrid(categories: visibleCategories);
+        return CategoryGrid(categories: visibleCategories);
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (_, _) => const Center(child: Text('分类加载失败')),

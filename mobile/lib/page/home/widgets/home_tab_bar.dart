@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
-enum ThemedHomeTab { everything, ai, category }
+enum HomeTab { everything, ai, category }
 
-class ThemedHomeTabBar extends StatelessWidget {
-  const ThemedHomeTabBar({
+class HomeTabBar extends StatelessWidget {
+  const HomeTabBar({
     super.key,
     required this.currentTab,
     required this.onChanged,
   });
 
-  final ThemedHomeTab currentTab;
-  final ValueChanged<ThemedHomeTab> onChanged;
+  final HomeTab currentTab;
+  final ValueChanged<HomeTab> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -33,24 +33,24 @@ class ThemedHomeTabBar extends StatelessWidget {
             Expanded(
               child: _TabItem(
                 label: 'Everything',
-                selected: currentTab == ThemedHomeTab.everything,
-                onTap: () => onChanged(ThemedHomeTab.everything),
+                selected: currentTab == HomeTab.everything,
+                onTap: () => onChanged(HomeTab.everything),
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
               child: _TabItem(
                 label: 'AI',
-                selected: currentTab == ThemedHomeTab.ai,
-                onTap: () => onChanged(ThemedHomeTab.ai),
+                selected: currentTab == HomeTab.ai,
+                onTap: () => onChanged(HomeTab.ai),
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
               child: _TabItem(
                 label: '分类',
-                selected: currentTab == ThemedHomeTab.category,
-                onTap: () => onChanged(ThemedHomeTab.category),
+                selected: currentTab == HomeTab.category,
+                onTap: () => onChanged(HomeTab.category),
               ),
             ),
           ],

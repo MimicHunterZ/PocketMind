@@ -9,8 +9,8 @@ import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/page/home/home_screen.dart';
 import 'package:pocketmind/page/home/category_posts_screen.dart';
 import 'package:pocketmind/page/home/widgets/note_feed_paged_view.dart';
-import 'package:pocketmind/page/home/widgets/themed_category_card.dart';
-import 'package:pocketmind/page/home/widgets/themed_category_grid.dart';
+import 'package:pocketmind/page/home/widgets/category_card.dart';
+import 'package:pocketmind/page/home/widgets/category_grid.dart';
 import 'package:pocketmind/providers/category_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';
@@ -40,10 +40,10 @@ void main() {
   });
 
   test('分类网格列数断点计算正确', () {
-    expect(ThemedCategoryGrid.columnsForWidth(390), 2);
-    expect(ThemedCategoryGrid.columnsForWidth(700), 3);
-    expect(ThemedCategoryGrid.columnsForWidth(1200), 4);
-    expect(ThemedCategoryGrid.columnsForWidth(1600), 5);
+    expect(CategoryGrid.columnsForWidth(390), 2);
+    expect(CategoryGrid.columnsForWidth(700), 3);
+    expect(CategoryGrid.columnsForWidth(1200), 4);
+    expect(CategoryGrid.columnsForWidth(1600), 5);
   });
 
   testWidgets('分类卡片点击后进入分类帖子页', (tester) async {
@@ -75,7 +75,7 @@ void main() {
           splitScreenMode: true,
           builder: (context, child) => MaterialApp(
             theme: calmBeigeTheme,
-            home: Scaffold(body: ThemedCategoryGrid(categories: [category])),
+            home: Scaffold(body: CategoryGrid(categories: [category])),
           ),
         ),
       ),

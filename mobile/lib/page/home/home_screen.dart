@@ -5,13 +5,12 @@ import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/page/chat/chat_page.dart';
-import 'package:pocketmind/page/home/category_posts_screen.dart';
 import 'package:pocketmind/page/home/mixin/search_logic_mixin.dart';
 import 'package:pocketmind/page/home/note_add_sheet.dart';
 import 'package:pocketmind/page/home/widgets/note_feed_paged_view.dart';
-import 'package:pocketmind/page/home/widgets/themed_category_grid.dart';
-import 'package:pocketmind/page/home/widgets/themed_home_tab_bar.dart';
-import 'package:pocketmind/page/home/widgets/themed_home_top_bar.dart';
+import 'package:pocketmind/page/home/widgets/category_grid.dart';
+import 'package:pocketmind/page/home/widgets/home_tab_bar.dart';
+import 'package:pocketmind/page/home/widgets/home_top_bar.dart';
 import 'package:pocketmind/page/home/widgets/unified_home_background.dart';
 import 'package:pocketmind/page/widget/add_category_dialog.dart';
 import 'package:pocketmind/providers/app_config_provider.dart';
@@ -20,7 +19,6 @@ import 'package:pocketmind/providers/chat_providers.dart';
 import 'package:pocketmind/providers/nav_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/router/route_paths.dart';
-import 'package:pocketmind/service/note_service.dart';
 import 'package:pocketmind/sync/sync_state_provider.dart';
 import 'package:pocketmind/util/logger_service.dart';
 import 'package:pocketmind/util/theme_data.dart';
@@ -43,7 +41,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> with SearchLogicMixin {
-  ThemedHomeTab _tab = ThemedHomeTab.everything;
+  HomeTab _tab = HomeTab.everything;
   final ScrollController _scrollController = ScrollController();
   bool _isSearchMode = false;
 
@@ -62,10 +60,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SearchLogicMixin {
       body: UnifiedHomeBackground(
         child: Column(
           children: [
-            if (_tab != ThemedHomeTab.everything)
+            if (_tab != HomeTab.everything)
               const SafeArea(top: true, bottom: false, child: SizedBox.shrink()),
-            if (_tab == ThemedHomeTab.everything)
-              ThemedHomeTopBar(
+            if (_tab == HomeTab.everything)
+              HomeTopBar(
                 showSearchInput: _isSearchMode,
                 searchController: searchController,
                 searchFocusNode: searchFocusNode,
@@ -78,13 +76,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SearchLogicMixin {
           ],
         ),
       ),
-      floatingActionButton: _tab == ThemedHomeTab.category
+      floatingActionButton: _tab == HomeTab.category
           ? FloatingActionButton(
               onPressed: _showAddCategory,
               child: const Icon(Icons.add),
             )
           : null,
-      bottomNavigationBar: ThemedHomeTabBar(
+      bottomNavigationBar: HomeTabBar(
         currentTab: _tab,
         onChanged: _handleTabChange,
       ),
@@ -93,14 +91,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SearchLogicMixin {
 
   Widget _buildBody() {
     return switch (_tab) {
-      ThemedHomeTab.everything => _EverythingPane(scrollController: _scrollController),
-      ThemedHomeTab.ai => const SizedBox.shrink(),
-      ThemedHomeTab.category => const _CategoryTab(),
+      HomeTab.everything => _EverythingPane(scrollController: _scrollController),
+      HomeTab.ai => const SizedBox.shrink(),
+      HomeTab.category => const _CategoryTab(),
     };
   }
 
-  Future<void> _handleTabChange(ThemedHomeTab tab) async {
-    if (tab == ThemedHomeTab.ai) {
+  Future<void> _handleTabChange(HomeTab tab) async {
+    if (tab == HomeTab.ai) {
       final previousTab = _tab;
       if (_isSearchMode) {
         setState(() {
@@ -110,13 +108,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SearchLogicMixin {
       }
 
       setState(() {
-        _tab = ThemedHomeTab.ai;
+        _tab = HomeTab.ai;
       });
       await _openGlobalAiSession();
       if (!mounted) return;
       setState(() {
-        _tab = previousTab == ThemedHomeTab.ai
-            ? ThemedHomeTab.everything
+        _tab = previousTab == HomeTab.ai
+            ? HomeTab.everything
             : previousTab;
       });
       return;
@@ -124,7 +122,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SearchLogicMixin {
 
     setState(() {
       _tab = tab;
-      if (tab != ThemedHomeTab.everything && _isSearchMode) {
+      if (tab != HomeTab.everything && _isSearchMode) {
         _isSearchMode = false;
         clearSearch();
       }
@@ -277,7 +275,7 @@ class _CategoryTab extends ConsumerWidget {
         if (visibleCategories.isEmpty) {
           return const SizedBox.shrink();
         }
-        return ThemedCategoryGrid(categories: visibleCategories);
+        return CategoryGrid(categories: visibleCategories);
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (_, _) => const Center(child: Text('分类加载失败')),
