@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/page/widget/add_category_dialog.dart';
 import 'package:pocketmind/page/widget/category_selector.dart';
-import 'package:pocketmind/providers/note_providers.dart';
-import 'package:pocketmind/providers/category_providers.dart';
 import 'package:pocketmind/providers/app_config_provider.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
+import 'package:pocketmind/service/category_service.dart';
+import 'package:pocketmind/service/note_service.dart';
 import 'package:intl/intl.dart';
 
 import 'package:pocketmind/page/widget/creative_time_picker.dart';
@@ -21,6 +22,8 @@ class EditNotePage extends ConsumerStatefulWidget {
   final void Function(Map<String, String> data) onDone;
   final int id;
   final String? webUrl;
+  final NoteService noteService;
+  final CategoryService categoryService;
 
   const EditNotePage({
     super.key,
@@ -29,6 +32,8 @@ class EditNotePage extends ConsumerStatefulWidget {
     required this.onDone,
     this.webUrl,
     required this.id,
+    required this.noteService,
+    required this.categoryService,
   });
 
   @override
@@ -81,8 +86,7 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
   }
 
   void _onDone() async {
-    final noteService = ref.read(noteServiceProvider);
-    await noteService.updateNote(
+    await widget.noteService.updateNote(
       id: widget.id,
       title: _titleEnabled ? _titleController.text : null, // 根据设置决定是否保存标题
       content: _contentController.text,
@@ -293,124 +297,118 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
   Future<void> _showAddCategoryDialog() async {
     final result = await showAddCategoryDialog(context);
     if (result != null) {
-      await ref
-          .read(categoryActionsProvider.notifier)
-          .addCategory(
-            name: result.name,
-            description: result.description,
-            iconPath: result.iconPath,
-          );
+      await widget.categoryService.addCategory(
+        name: result.name,
+        description: result.description,
+        iconPath: result.iconPath,
+      );
     }
   }
 
   // 构建分类选择页面
   Widget _buildCategoryContent(ColorScheme colorScheme) {
-    final categoriesAsync = ref.watch(allCategoriesProvider);
-
     return Container(
       padding: EdgeInsets.all(20.r),
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16.r),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          categoriesAsync.when(
-            data: (categories) {
-              if (categories.isEmpty) {
-                return Text(
-                  '暂无分类',
-                  style: TextStyle(color: colorScheme.secondary),
-                );
-              }
+      child: StreamBuilder<List<Category>>(
+        stream: widget.categoryService.watchAllCategories(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Text(
+              '加载分类失败: ${snapshot.error}',
+              style: TextStyle(color: colorScheme.error),
+            );
+          }
 
-              // 如果当前未选择分类，或默认分类找不到，选中第一个分类
-              final fallbackCategory = categories.first;
-              final matchedCategory = categories.firstWhere(
-                (category) => category.name == _selectedCategory,
-                orElse: () => fallbackCategory,
-              );
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-              // 异步更新选中的分类ID
-              if (_selectedCategoryId != matchedCategory.id) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (!mounted) return;
-                  setState(() {
-                    _selectedCategoryId = matchedCategory.id ?? 0;
-                    _selectedCategory = matchedCategory.name;
-                  });
-                });
-              }
+          final categories = snapshot.data!;
+          if (categories.isEmpty) {
+            return Text('暂无分类', style: TextStyle(color: colorScheme.secondary));
+          }
 
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ...categories.map((category) {
-                    final iconPath = getCategoryIcon(category);
-                    return RadioListTile<String>(
-                      contentPadding: EdgeInsets.zero,
-                      secondary: SvgPicture.asset(
-                        iconPath,
-                        width: 20.w,
-                        height: 20.w,
-                        colorFilter: ColorFilter.mode(
-                          _selectedCategory == category.name
-                              ? colorScheme.primary
-                              : colorScheme.onSurfaceVariant,
-                          BlendMode.srcIn,
-                        ),
-                      ),
-                      title: Text(
-                        category.name,
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                      value: category.name,
-                      groupValue: _selectedCategory,
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedCategory = value!;
-                          _selectedCategoryId = category.id ?? 0;
-                        });
-                      },
-                      activeColor: colorScheme.primary,
-                    );
-                  }),
-                  // 添加分类按钮 - 使用统一对话框
-                  SizedBox(height: 16.h),
-                  GestureDetector(
-                    onTap: _showAddCategoryDialog,
-                    child: Container(
-                      padding: EdgeInsets.all(12.r),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(50.r),
-                        border: Border.all(
-                          color: colorScheme.primary.withValues(alpha: 0.2),
-                          width: 1.w,
-                        ),
-                      ),
-                      child: Icon(
-                        Icons.add,
-                        color: colorScheme.primary,
-                        size: 24.sp,
+          // 如果当前未选择分类，或默认分类找不到，选中第一个分类
+          final fallbackCategory = categories.first;
+          final matchedCategory = categories.firstWhere(
+            (category) => category.name == _selectedCategory,
+            orElse: () => fallbackCategory,
+          );
+
+          // 异步更新选中的分类ID
+          if (_selectedCategoryId != matchedCategory.id) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              setState(() {
+                _selectedCategoryId = matchedCategory.id ?? 0;
+                _selectedCategory = matchedCategory.name;
+              });
+            });
+          }
+
+          return SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ...categories.map((category) {
+                  final iconPath = getCategoryIcon(category);
+                  return RadioListTile<String>(
+                    contentPadding: EdgeInsets.zero,
+                    secondary: SvgPicture.asset(
+                      iconPath,
+                      width: 20.w,
+                      height: 20.w,
+                      colorFilter: ColorFilter.mode(
+                        _selectedCategory == category.name
+                            ? colorScheme.primary
+                            : colorScheme.onSurfaceVariant,
+                        BlendMode.srcIn,
                       ),
                     ),
+                    title: Text(
+                      category.name,
+                      style: TextStyle(fontSize: 16.sp, color: colorScheme.onSurface),
+                    ),
+                    value: category.name,
+                    groupValue: _selectedCategory,
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedCategory = value!;
+                        _selectedCategoryId = category.id ?? 0;
+                      });
+                    },
+                    activeColor: colorScheme.primary,
+                  );
+                }),
+                // 添加分类按钮 - 使用统一对话框
+                SizedBox(height: 16.h),
+                GestureDetector(
+                  onTap: _showAddCategoryDialog,
+                  child: Container(
+                    padding: EdgeInsets.all(12.r),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(50.r),
+                      border: Border.all(
+                        color: colorScheme.primary.withValues(alpha: 0.2),
+                        width: 1.w,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.add,
+                      color: colorScheme.primary,
+                      size: 24.sp,
+                    ),
                   ),
-                ],
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, stack) => Text(
-              '加载分类失败: $error',
-              style: TextStyle(color: colorScheme.error),
+                ),
+              ],
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

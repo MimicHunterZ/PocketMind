@@ -13,11 +13,11 @@ import 'package:pocketmind/page/share/share_success_page.dart';
 import 'package:pocketmind/page/widget/flowing_background.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/providers/auth_providers.dart';
-import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';
+import 'package:pocketmind/data/repositories/isar_category_repository.dart';
 import 'package:pocketmind/data/repositories/isar_note_repository.dart';
 import 'package:pocketmind/service/call_back_dispatcher.dart';
-import 'package:pocketmind/service/metadata_manager.dart';
+import 'package:pocketmind/service/category_service.dart';
 import 'package:pocketmind/service/note_service.dart';
 import 'package:pocketmind/sync/model/mutation_entry.dart';
 import 'package:pocketmind/sync/model/sync_checkpoint.dart';
@@ -114,13 +114,14 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
 
   // 非 final：热引擎第二次分享时需要重建
   late NoteService noteService;
+  late CategoryService categoryService;
 
   @override
   void initState() {
     super.initState();
     // 初始化鉴权（恢复 token；无 token 时不影响功能）
     ref.read(authControllerProvider);
-    noteService = ref.read(noteServiceProvider);
+    _rebuildShareServices();
     _channel.setMethodCallHandler(_handleMethodCall);
     PMlog.d(tag, 'MyShareApp 初始化完成, 等待分享...');
 
@@ -131,9 +132,22 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
     });
   }
 
+  void _rebuildShareServices() {
+    final prefs = ref.read(sharedPreferencesProvider);
+    noteService = NoteService(
+      noteRepository: IsarNoteRepository(isar),
+      writeCoordinator: LocalWriteCoordinator(isar),
+      prefs: prefs,
+    );
+    categoryService = CategoryService(
+      categoryRepository: IsarCategoryRepository(isar),
+      writeCoordinator: LocalWriteCoordinator(isar),
+    );
+  }
+
   /// 热引擎场景：Isar 已被 _dismissUI 关闭，重新打开并重建 NoteService。
-  /// Providers 中的 isarProvider 是 keepAlive + overrideWithValue，
-  /// 运行时无法修改，所以直接绕过 Provider 链手动构建。
+  /// Providers 中的 isarProvider 是 keepAlive + overrideWithValue，运行时无法修改，
+  /// 因此分享页链路统一使用手动构建的 service，避免复用已关闭的 Isar 引用。
   Future<void> _ensureReady() async {
     if (!isar.isOpen) {
       PMlog.d(tag, '检测到 Isar 已关闭，正在重新打开...');
@@ -147,11 +161,8 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
         MutationEntrySchema,
         SyncCheckpointSchema,
       ], directory: dir.path);
-      noteService = NoteService(
-        noteRepository: IsarNoteRepository(isar),
-        writeCoordinator: LocalWriteCoordinator(isar),
-      );
-      PMlog.d(tag, 'Isar 重新打开，NoteService 已重建');
+      _rebuildShareServices();
+      PMlog.d(tag, 'Isar 重新打开，分享页服务已重建');
     }
   }
 
@@ -375,6 +386,8 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
           initialTitle: _currentShare?.title ?? '',
           initialContent: _currentShare?.content ?? '',
           webUrl: _currentShare?.url,
+          noteService: noteService,
+          categoryService: categoryService,
           onDone: _dismissUI,
         );
     }
