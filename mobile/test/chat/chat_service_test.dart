@@ -14,6 +14,14 @@ import 'package:pocketmind/service/chat_service.dart';
 class MockIsarChatMessageRepository extends Mock
     implements IsarChatMessageRepository {
   @override
+  Future<bool> hasMessages(String sessionUuid) =>
+      (super.noSuchMethod(
+            Invocation.method(#hasMessages, [sessionUuid]),
+            returnValue: Future<bool>.value(false),
+          )
+          as Future<bool>);
+
+  @override
   Future<List<ChatBranchSummaryModel>> buildLocalBranchSummaries(
     String sessionUuid,
   ) =>
@@ -108,6 +116,29 @@ class MockIsarChatSessionRepository extends Mock
 }
 
 class MockChatApiService extends Mock implements ChatApiService {
+  @override
+  Future<ChatSessionModel> createSession({String? noteUuid, String? title}) =>
+      (super.noSuchMethod(
+            Invocation.method(#createSession, [], {
+              #noteUuid: noteUuid,
+              #title: title,
+            }),
+            returnValue: Future<ChatSessionModel>.value(
+              ChatSessionModel(uuid: 'created-session', updatedAt: 0),
+            ),
+          )
+          as Future<ChatSessionModel>);
+
+  @override
+  Future<ChatSessionModel> getSession(String sessionUuid) =>
+      (super.noSuchMethod(
+            Invocation.method(#getSession, [sessionUuid]),
+            returnValue: Future<ChatSessionModel>.value(
+              ChatSessionModel(uuid: sessionUuid, updatedAt: 0),
+            ),
+          )
+          as Future<ChatSessionModel>);
+
   @override
   Future<void> editMessage(
     String sessionUuid,
@@ -219,6 +250,7 @@ void main() {
   late ChatService service;
 
   const sessionUuid = 'session-1';
+  const noteUuid = 'note-1';
   const messageUuid = 'msg-user-1';
   const assistantUuid = 'msg-ai-1';
 
@@ -445,26 +477,233 @@ void main() {
     });
   });
 
-  // ----------------------------------------------------------
-  // renameSession: 调用 API 后同步会话列表
-  // ----------------------------------------------------------
-  group('renameSession', () {
-    const newTitle = '新会话标题';
-
-    test('重命名成功：调用 API 后同步会话列表到本地', () async {
-      when(
-        apiService.renameSession(sessionUuid, newTitle),
-      ).thenAnswer((_) async {});
+  group('syncGlobalSessions', () {
+    test('调用 syncSessions(noteUuid: null) 同步全局会话', () async {
       when(apiService.listSessions(noteUuid: null)).thenAnswer((_) async => []);
       when(
         sessionRepo.upsertFromModels(<ChatSessionModel>[]),
       ).thenAnswer((_) async {});
 
+      await service.syncGlobalSessions();
+
+      verify(apiService.listSessions(noteUuid: null)).called(1);
+      verify(sessionRepo.upsertFromModels(<ChatSessionModel>[])).called(1);
+    });
+  });
+
+  group('note scoped sessions', () {
+    test('syncSessions(noteUuid) 会调用 note 级 listSessions 并 upsert', () async {
+      final models = <ChatSessionModel>[
+        const ChatSessionModel(uuid: 'note-session-1', scopeNoteUuid: noteUuid, updatedAt: 10),
+      ];
+      when(apiService.listSessions(noteUuid: noteUuid)).thenAnswer((_) async => models);
+      when(sessionRepo.upsertFromModels(models)).thenAnswer((_) async {});
+
+      await service.syncSessions(noteUuid: noteUuid);
+
+      verify(apiService.listSessions(noteUuid: noteUuid)).called(1);
+      verify(sessionRepo.upsertFromModels(models)).called(1);
+      verifyNever(apiService.listSessions(noteUuid: null));
+    });
+
+    test('syncSessions(noteUuid) 失败时不写入本地并向上抛出', () async {
+      when(apiService.listSessions(noteUuid: noteUuid)).thenThrow(Exception('网络错误'));
+
+      await expectLater(
+        service.syncSessions(noteUuid: noteUuid),
+        throwsException,
+      );
+
+      verify(apiService.listSessions(noteUuid: noteUuid)).called(1);
+      verifyZeroInteractions(sessionRepo);
+    });
+
+    test('createSession(noteUuid) 会创建服务端会话并返回本地会话', () async {
+      final createdModel = const ChatSessionModel(
+        uuid: 'created-note-session',
+        scopeNoteUuid: noteUuid,
+        updatedAt: 100,
+      );
+      final localSession = ChatSession()
+        ..uuid = createdModel.uuid
+        ..scopeNoteUuid = noteUuid
+        ..updatedAt = createdModel.updatedAt;
+
+      when(
+        apiService.createSession(noteUuid: noteUuid, title: null),
+      ).thenAnswer((_) async => createdModel);
+      when(sessionRepo.upsertFromModels([createdModel])).thenAnswer((_) async {});
+      when(sessionRepo.findByUuid(createdModel.uuid)).thenAnswer((_) async => localSession);
+
+      final session = await service.createSession(noteUuid: noteUuid);
+
+      expect(session, same(localSession));
+      verify(apiService.createSession(noteUuid: noteUuid, title: null)).called(1);
+      verify(sessionRepo.upsertFromModels([createdModel])).called(1);
+      verify(sessionRepo.findByUuid(createdModel.uuid)).called(1);
+    });
+
+    test('createSession(noteUuid,title) 会透传 note 作用域与标题', () async {
+      const title = '笔记会话标题';
+      final createdModel = const ChatSessionModel(
+        uuid: 'created-note-session-with-title',
+        scopeNoteUuid: noteUuid,
+        title: title,
+        updatedAt: 101,
+      );
+      final localSession = ChatSession()
+        ..uuid = createdModel.uuid
+        ..scopeNoteUuid = noteUuid
+        ..title = title
+        ..updatedAt = createdModel.updatedAt;
+
+      when(
+        apiService.createSession(noteUuid: noteUuid, title: title),
+      ).thenAnswer((_) async => createdModel);
+      when(sessionRepo.upsertFromModels([createdModel])).thenAnswer((_) async {});
+      when(sessionRepo.findByUuid(createdModel.uuid)).thenAnswer((_) async => localSession);
+
+      final session = await service.createSession(noteUuid: noteUuid, title: title);
+
+      expect(session.scopeNoteUuid, noteUuid);
+      expect(session.title, title);
+      verify(apiService.createSession(noteUuid: noteUuid, title: title)).called(1);
+      verify(sessionRepo.upsertFromModels([createdModel])).called(1);
+      verify(sessionRepo.findByUuid(createdModel.uuid)).called(1);
+    });
+
+    test('createSession 本地读取不到会话时抛出 StateError', () async {
+      final createdModel = const ChatSessionModel(
+        uuid: 'missing-local-session',
+        scopeNoteUuid: noteUuid,
+        updatedAt: 200,
+      );
+
+      when(
+        apiService.createSession(noteUuid: noteUuid, title: null),
+      ).thenAnswer((_) async => createdModel);
+      when(sessionRepo.upsertFromModels([createdModel])).thenAnswer((_) async {});
+      when(sessionRepo.findByUuid(createdModel.uuid)).thenAnswer((_) async => null);
+
+      await expectLater(
+        service.createSession(noteUuid: noteUuid),
+        throwsA(isA<StateError>()),
+      );
+
+      verify(apiService.createSession(noteUuid: noteUuid, title: null)).called(1);
+      verify(sessionRepo.upsertFromModels([createdModel])).called(1);
+      verify(sessionRepo.findByUuid(createdModel.uuid)).called(1);
+    });
+  });
+
+  group('checkSessionHasMessages', () {
+    test('本地有消息时返回 true', () async {
+      when(messageRepo.hasMessages(sessionUuid)).thenAnswer((_) async => true);
+
+      final hasMessages = await service.checkSessionHasMessages(sessionUuid);
+
+      expect(hasMessages, isTrue);
+      verify(messageRepo.hasMessages(sessionUuid)).called(1);
+    });
+
+    test('本地无消息时返回 false', () async {
+      when(messageRepo.hasMessages(sessionUuid)).thenAnswer((_) async => false);
+
+      final hasMessages = await service.checkSessionHasMessages(sessionUuid);
+
+      expect(hasMessages, isFalse);
+      verify(messageRepo.hasMessages(sessionUuid)).called(1);
+    });
+  });
+
+  group('syncSessionMessagesIfNeeded', () {
+    test('force=true 时即使已同步也会强制同步', () async {
+      final synced = <String>{sessionUuid};
+      final models = <ChatMessageModel>[];
+      when(
+        apiService.listMessages(sessionUuid, leafUuid: null),
+      ).thenAnswer((_) async => models);
+      when(messageRepo.upsertFromModels(models)).thenAnswer((_) async {});
+
+      await service.syncSessionMessagesIfNeeded(
+        sessionUuid,
+        force: true,
+        syncedSessionUuids: synced,
+      );
+
+      verify(apiService.listMessages(sessionUuid, leafUuid: null)).called(1);
+      verify(messageRepo.upsertFromModels(models)).called(1);
+    });
+
+    test('force=false 且已在 syncedSessionUuids 中时跳过同步', () async {
+      final synced = <String>{sessionUuid};
+
+      await service.syncSessionMessagesIfNeeded(
+        sessionUuid,
+        syncedSessionUuids: synced,
+      );
+
+      verifyNever(apiService.listMessages(sessionUuid, leafUuid: null));
+      verifyZeroInteractions(messageRepo);
+    });
+
+    test('force=false 且不在 syncedSessionUuids 中时执行同步并标记', () async {
+      final synced = <String>{};
+      final models = <ChatMessageModel>[];
+      when(
+        apiService.listMessages(sessionUuid, leafUuid: null),
+      ).thenAnswer((_) async => models);
+      when(messageRepo.upsertFromModels(models)).thenAnswer((_) async {});
+
+      await service.syncSessionMessagesIfNeeded(
+        sessionUuid,
+        syncedSessionUuids: synced,
+      );
+
+      verify(apiService.listMessages(sessionUuid, leafUuid: null)).called(1);
+      verify(messageRepo.upsertFromModels(models)).called(1);
+      expect(synced.contains(sessionUuid), isTrue);
+    });
+
+    test('未提供 syncedSessionUuids 时默认执行同步', () async {
+      final models = <ChatMessageModel>[];
+      when(
+        apiService.listMessages(sessionUuid, leafUuid: null),
+      ).thenAnswer((_) async => models);
+      when(messageRepo.upsertFromModels(models)).thenAnswer((_) async {});
+
+      await service.syncSessionMessagesIfNeeded(sessionUuid);
+
+      verify(apiService.listMessages(sessionUuid, leafUuid: null)).called(1);
+      verify(messageRepo.upsertFromModels(models)).called(1);
+    });
+  });
+
+  // ----------------------------------------------------------
+  // renameSession: 调用 API 后同步单会话
+  // ----------------------------------------------------------
+  group('renameSession', () {
+    const newTitle = '新会话标题';
+
+    test('重命名成功：调用 API 后同步单会话到本地', () async {
+      final model = ChatSessionModel(
+        uuid: sessionUuid,
+        title: newTitle,
+        updatedAt: 100,
+      );
+      when(
+        apiService.renameSession(sessionUuid, newTitle),
+      ).thenAnswer((_) async {});
+      when(apiService.getSession(sessionUuid)).thenAnswer((_) async => model);
+      when(
+        sessionRepo.upsertFromModels([model]),
+      ).thenAnswer((_) async {});
+
       await service.renameSession(sessionUuid, newTitle);
 
       verify(apiService.renameSession(sessionUuid, newTitle)).called(1);
-      // syncSessions 内部会调用 listSessions(noteUuid: null)
-      verify(apiService.listSessions(noteUuid: null)).called(1);
+      verify(apiService.getSession(sessionUuid)).called(1);
+      verify(sessionRepo.upsertFromModels([model])).called(1);
     });
 
     test('API 失败时抛出异常', () async {
@@ -489,8 +728,10 @@ void main() {
 
       await service.deleteSession(sessionUuid);
 
-      verify(apiService.deleteSession(sessionUuid)).called(1);
-      verify(sessionRepo.softDelete(sessionUuid)).called(1);
+      verifyInOrder([
+        apiService.deleteSession(sessionUuid),
+        sessionRepo.softDelete(sessionUuid),
+      ]);
     });
 
     test('API 失败时不软删本地记录', () async {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mockito/mockito.dart';
 import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/model/category.dart';
@@ -13,6 +14,7 @@ import 'package:pocketmind/page/home/widgets/category_card.dart';
 import 'package:pocketmind/providers/category_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';
+import 'package:pocketmind/router/route_paths.dart';
 import 'package:pocketmind/service/note_service.dart';
 import 'package:pocketmind/sync/sync_state_provider.dart';
 import 'package:pocketmind/util/theme_data.dart';
@@ -136,7 +138,7 @@ void main() {
     expect(find.byIcon(Icons.search), findsOneWidget);
   });
 
-  testWidgets('点击AI后会触发跳转并返回原页签', (tester) async {
+  testWidgets('点击AI后跳转到globalAi路由入口', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
 
@@ -159,22 +161,24 @@ void main() {
           designSize: const Size(400, 869),
           minTextAdapt: true,
           splitScreenMode: true,
-          builder: (context, child) => MaterialApp(
-            theme: calmBeigeTheme,
-            home: HomeScreen(
-              resolveGlobalSessionUuid: () async => 'global-session-1',
-              openChatSession: (context, sessionUuid) async {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => Scaffold(
-                      appBar: AppBar(title: const Text('Chat')),
-                      body: Text('chat:$sessionUuid'),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+          builder: (context, child) {
+            final router = GoRouter(
+              routes: [
+                GoRoute(
+                  path: RoutePaths.home,
+                  builder: (_, _) => const HomeScreen(),
+                ),
+                GoRoute(
+                  path: RoutePaths.globalAi,
+                  builder: (_, _) => const Scaffold(body: Text('global-ai-page')),
+                ),
+              ],
+            );
+            return MaterialApp.router(
+              theme: calmBeigeTheme,
+              routerConfig: router,
+            );
+          },
         ),
       ),
     );
@@ -182,12 +186,7 @@ void main() {
     await tester.tap(find.text('AI'));
     await tester.pumpAndSettle(const Duration(milliseconds: 120));
 
-    expect(find.text('chat:global-session-1'), findsOneWidget);
-
-    await tester.tap(find.byIcon(Icons.arrow_back));
-    await tester.pumpAndSettle(const Duration(milliseconds: 120));
-
-    expect(find.text('Everything'), findsOneWidget);
+    expect(find.text('global-ai-page'), findsOneWidget);
   });
 
   testWidgets('分类帖子页菜单包含删除/修改名称/修改描述', (tester) async {

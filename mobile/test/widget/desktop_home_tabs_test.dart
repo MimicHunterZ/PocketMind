@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mockito/mockito.dart';
 import 'package:pocketmind/model/nav_item.dart';
 import 'package:pocketmind/model/note.dart';
@@ -10,6 +11,7 @@ import 'package:pocketmind/page/widget/desktop/desktop_sidebar.dart';
 import 'package:pocketmind/providers/nav_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';
+import 'package:pocketmind/router/route_paths.dart';
 import 'package:pocketmind/sync/sync_state_provider.dart';
 import 'package:pocketmind/util/theme_data.dart';
 import 'package:pocketmind/service/note_service.dart';
@@ -95,6 +97,43 @@ void main() {
 
     expect(find.byType(FloatingActionButton), findsNothing);
     expect(find.byKey(const ValueKey('desktop_add_note_button')), findsOneWidget);
+    await tester.binding.setSurfaceSize(null);
+  });
+
+  testWidgets('桌面侧栏点击AI后跳转到globalAi路由', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1600, 1000));
+
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: RoutePaths.home,
+          builder: (_, _) => const Scaffold(body: DesktopSidebar()),
+        ),
+        GoRoute(
+          path: RoutePaths.globalAi,
+          builder: (_, _) => const Scaffold(body: Text('global-ai-page')),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: ScreenUtilInit(
+          designSize: const Size(1600, 1000),
+          minTextAdapt: true,
+          splitScreenMode: true,
+          builder: (context, child) => MaterialApp.router(
+            theme: calmBeigeTheme,
+            routerConfig: router,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('AI'));
+    await tester.pumpAndSettle(const Duration(milliseconds: 120));
+
+    expect(find.text('global-ai-page'), findsOneWidget);
     await tester.binding.setSurfaceSize(null);
   });
 }
