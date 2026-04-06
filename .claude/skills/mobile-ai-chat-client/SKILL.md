@@ -1,146 +1,204 @@
 ---
 name: mobile-ai-chat-client
-description: PocketMind 移动端 AI 对话实现规范（Riverpod + Isar + SSE + Markdown 流式渲染）。当用户要求实现/新增聊天会话、消息流式展示等相关功能时触发。
+description: Use when implementing or debugging PocketMind mobile chat flows, including note-scoped sessions, global multi-session switching, sync gating, stream send behavior, and dialog interaction regressions.
 ---
 
 # Mobile AI Chat Client（PocketMind）
 
-本 Skill 用于在 PocketMind `mobile/` 中稳定实现和维护 AI 聊天能力，确保代码与现有架构一致：
-- Clean Architecture 分层不越界
-- UI 持久化驱动（Isar stream）
-- Riverpod 3 + `@riverpod` 代码生成
-- 流式 Markdown 可读且稳定
+本 Skill 用于 PocketMind `mobile/` 聊天能力开发与排障，目标是让 Agent 与开发者都能快速建立统一认知：
+- 聊天链路如何在 note 级与全局级运行
+- 状态从 UI 到 Provider 到 Service 到 Repository 如何流动
+- 在线/离线、同步/禁发、分页/抽屉的边界如何落地
 
-## 触发场景
+## 快速导览
 
-当用户提出以下需求时使用：
-- 「点击 note 进入 AI 会话」/「会话不要重复创建」
-- 「聊天页流式渲染错乱、先叠在一起、最后才正常」
-- 「AI 回复支持 Markdown」
-- 「键盘弹出遮挡输入框」
-- 「统一用项目封装 AppBar」
+- 代码主入口（全局）：`mobile/lib/page/chat/global_ai_chat_shell.dart`
+- 代码主入口（note）：`mobile/lib/page/home/note_detail_page.dart` 的 `_goToSessionPressed()`
+- 会话状态中心：`mobile/lib/providers/chat_providers.dart`
+- 聊天业务编排：`mobile/lib/service/chat_service.dart`
+- 会话持久化：`mobile/lib/data/repositories/isar_chat_session_repository.dart`
+- 消息持久化：`mobile/lib/data/repositories/isar_chat_message_repository.dart`
+
+## 架构图（总览）
+
+```mermaid
+flowchart LR
+  UI[UI Layer\nChatPage / GlobalAiChatShell / NoteDetailPage]
+  P[Provider Layer\nchat_providers.dart]
+  S[Service Layer\nchat_service.dart]
+  R1[Session Repository\nisar_chat_session_repository.dart]
+  R2[Message Repository\nisar_chat_message_repository.dart]
+  API[Remote API\nchat_api_service.dart]
+  DB[(Isar)]
+
+  UI --> P
+  P --> S
+  S --> API
+  S --> R1
+  S --> R2
+  R1 --> DB
+  R2 --> DB
+  DB -.watch stream.-> UI
+```
+
+## 架构图（note 级会话链路）
+
+```mermaid
+sequenceDiagram
+  participant U as NoteDetailPage
+  participant Repo as SessionRepo(Isar)
+  participant CS as ChatService
+  participant API as ChatApiService
+  participant Router as GoRouter
+
+  U->>Repo: findByNoteUuid(noteUuid)
+  alt 本地命中
+    U->>Router: push(/chat/:sessionUuid)
+  else 本地未命中
+    U->>CS: syncSessions(noteUuid)
+    CS->>API: listSessions(noteUuid)
+    CS->>Repo: upsertFromModels(models)
+    U->>Repo: findByNoteUuid(noteUuid)
+    alt 同步后命中
+      U->>Router: push(/chat/:sessionUuid)
+    else 仍未命中
+      U->>CS: createSession(noteUuid)
+      CS->>API: createSession(noteUuid)
+      CS->>Repo: upsertFromModels([model])
+      CS->>Repo: findByUuid(model.uuid)
+      U->>Router: push(/chat/:sessionUuid)
+    end
+  end
+```
+
+## 架构图（全局多会话抽屉与刷新链路）
+
+```mermaid
+sequenceDiagram
+  participant UI as ChatPage Menu
+  participant Shell as GlobalAiChatShell
+  participant C as GlobalAiSessionController
+  participant S as ChatService
+  participant API as ChatApiService
+  participant DB as Isar SessionRepo
+
+  UI->>Shell: 点击“切换会话”
+  Shell->>C: refreshDrawerSessionsOnOpen()
+  alt 在线
+    C->>S: syncGlobalSessions()
+    S->>API: listSessions(noteUuid:null)
+    S->>DB: upsertFromModels
+  else 离线
+    C->>C: 跳过远端同步
+  end
+  C->>DB: loadLocalSessions()
+  C->>API: listSessions(page:0,size:N)
+  C->>C: merge sessions + visible uuids
+  Shell->>UI: show GlobalSessionSwitchSheet
+  UI->>C: loadMoreSessionsInDrawer() (触底)
+```
+
+## 关键状态机（发送门控）
+
+```mermaid
+stateDiagram-v2
+  [*] --> Offline
+  Offline --> SyncingCurrent: 网络恢复(onConnectivityChanged=true)
+  SyncingCurrent --> SendEnabled: syncCurrentSessionForSend 成功
+  SyncingCurrent --> SendBlocked: 同步失败
+  SendBlocked --> SyncingCurrent: retryCurrentSessionSync
+  SendEnabled --> Offline: 网络断开
+```
 
 ## 当前实现基线（必须对齐）
 
-### 1) 会话与消息数据链路
+### 1) note 级会话（Note -> Chat）
 
-- 会话仓库：`mobile/lib/data/repositories/isar_chat_session_repository.dart`
-  - `watchSessions({String? noteUuid})`
-  - `findByUuid(String uuid)`
-  - `findByNoteUuid(String noteUuid)`（用于 note -> session 精确查询，避免 stream 时序问题）
-- 消息仓库：`mobile/lib/data/repositories/isar_chat_message_repository.dart`
-- 业务层：`mobile/lib/service/chat_service.dart`
-  - `syncSessions` / `createSession` / `syncMessages` / `streamMessage`
-- Provider：`mobile/lib/providers/chat_providers.dart`
-  - `chatSessionsProvider(noteUuid)`
-  - `chatMessagesProvider(sessionUuid)`
-  - `chatSessionByUuidProvider(uuid)`
-  - `chatSendProvider(sessionUuid)`
+- 入口：`mobile/lib/page/home/note_detail_page.dart` `_goToSessionPressed()`
+- 固定顺序：
+  1. `findByNoteUuid(noteUuid)` 本地优先
+  2. 未命中则 `syncSessions(noteUuid: noteUuid)`
+  3. 再查本地仍无则 `createSession(noteUuid: noteUuid)`
+  4. `context.push(RoutePaths.chatOf(sessionUuid))`
+- 禁止仅依赖 `chatSessionsProvider(...).asData` 判断是否创建会话
 
-### 2) Note -> Chat 跳转策略
+### 2) 全局多会话（scopeNoteUuid == null）
 
-入口逻辑在：`mobile/lib/page/home/note_detail_page.dart` `_goToSessionPressed()`
+- 状态模型：`GlobalAiSessionState`
+  - `currentSessionUuid`
+  - `sessionUuidsVisibleInDrawer` / `drawerNextPage` / `hasMoreInDrawer`
+  - `isOnline` / `isSyncingCurrentSession` / `canSendCurrentSession` / `currentSessionSyncError`
+- 控制器：`GlobalAiSessionController`
+  - `ensureActiveSession()` / `createOrReuseEmptySession()` / `switchSession()` / `deleteSession()`
+  - `refreshDrawerSessionsOnOpen()` / `loadMoreSessionsInDrawer()`
+  - `onConnectivityChanged()` / `syncCurrentSessionForSend()` / `retryCurrentSessionSync()`
 
-严格顺序：
-1. 先查本地 Isar：`chatSessionRepositoryProvider.findByNoteUuid(noteUuid)`
-2. 本地无 -> `chatServiceProvider.syncSessions(noteUuid: noteUuid)`
-3. 再查本地仍无 -> `chatServiceProvider.createSession(noteUuid: noteUuid)`
-4. 最终 `context.push(RoutePaths.chatOf(sessionUuid))`
+### 3) ChatPage 行为基线
 
-> 禁止直接依赖 `chatSessionsProvider(...).asData?.value` 作为唯一判断依据来决定是否创建会话。
+- 文件：`mobile/lib/page/chat/chat_page.dart`
+- 菜单：新建会话 / 切换会话 / 重命名会话 / 查看分支 / 删除会话
+- 本地分页：首屏 10 条，触顶增量加载，切会话重置分页状态
+- 发送门控：`canSend=false` 时显示提示并禁止发送
 
-### 3) 聊天页 UI 规范
+### 4) 抽屉分页基线
 
-文件：`mobile/lib/page/chat/chat_page.dart`
+- 文件：`mobile/lib/page/chat/widgets/global_session_switch_sheet.dart`
+- 打开抽屉应触发首屏刷新，不依赖用户先滑动
+- `onLoadMore` 只在有效向下滚动接近底部触发
+- 展示字段：标题、更新时间、最后一条消息预览（单行省略）
 
-- 顶栏必须使用 `PMAppBar`（`mobile/lib/page/widget/pm_app_bar.dart`）
-- 不显示用户/AI 头像
-- 发送时立即显示用户消息（乐观 UI）
-  - 使用 `ChatSendState.streaming.pendingUserMessage`
-  - 渲染 `_PendingUserBubble`
-- AI 流式与最终消息都走统一 Markdown 组件
-  - `mobile/lib/page/widget/markdown_text.dart`
-- 键盘适配
-  - `Scaffold(resizeToAvoidBottomInset: true)`
+### 5) 重命名弹窗基线
 
-### 4) Markdown 流式渲染规范
+- `showInputDialog` 位于 `mobile/lib/page/widget/creative_toast.dart`
+- 输入框必须有 Material 祖先，避免 `No Material widget found`
 
-复用组件：`mobile/lib/page/widget/markdown_text.dart`
+## 回归测试地图（对 Agent 友好）
 
-必须包含：
-- `isStreaming` 模式
-- 流式文本预处理 `_sanitize`（至少处理未闭合代码围栏）
-- `ValueKey(isStreaming)` 强制流式/完成态切换时重建
-- 流式阶段建议 `selectable: false`，完成态再开启选中
+### 必跑用例
 
-## Riverpod 3.0 约束（关键）
+- `mobile/test/chat/chat_service_test.dart`
+  - note 级 `syncSessions(noteUuid)`
+  - note 级 `createSession(noteUuid, title)`
+  - `createSession` 本地回读失败抛 `StateError`
+- `mobile/test/chat/global_ai_session_controller_test.dart`
+  - 抽屉打开首屏刷新
+  - 远端同步失败降级
+  - `hasMore=false` 的分页 no-op 守卫
+- `mobile/test/widget/global_ai_chat_shell_test.dart`
+  - 菜单点击“切换会话”触发刷新并展示远端会话
+  - 离线禁发提示
+  - 重命名弹窗可正常打开
 
-在 `@riverpod` 代码生成模式中，family 参数写法必须为：
+### 推荐命令
 
-```dart
-@riverpod
-class ChatSend extends _$ChatSend {
-  @override
-  ChatSendState build(String sessionUuid) => const ChatSendState.idle();
-}
+```bash
+flutter test test/chat/chat_service_test.dart test/chat/global_ai_session_controller_test.dart test/widget/global_ai_chat_shell_test.dart
 ```
 
-不要写成 required constructor 参数（那是手写 `NotifierProvider.family` 的模式）。
+## 修改流程（执行清单）
 
-## 分层约束（PocketMind 特有）
-
-- UI / Provider 不直接操作 Isar transaction
-- Repository 负责数据库访问
-- Service 负责编排 API + Repository
-- UI 展示以 Isar stream 为准，不以网络响应直接驱动最终列表
-
-## 前后端协同契约（SSE / Markdown）
-
-### 客户端已可独立处理
-- 按 token/delta 逐步累积展示
-- Markdown 基础语法流式可读
-- 未闭合代码围栏容错
-
-### 建议后端配合（推荐）
-
-1. SSE 事件边界清晰：
-   - `delta`（文本增量）
-   - `done`（流结束）
-   - `error`（错误）
-2. `delta` 不要切分 UTF-16 surrogate 对 / emoji 中间字节
-3. 若可控，优先按“语义片段”切块（句子/段落）而非超细粒度字符
-4. `done` 时保证服务端持久化可被 `syncMessages(sessionUuid)` 立即读取
-
-## 变更执行清单（每次改聊天功能都要走）
-
-1. 修改代码（仅在目标层）
-2. 若改了 Freezed/Riverpod 注解：
+1. 先补测试（至少 1 条失败用例证明回归点）
+2. 再最小改实现
+3. 如动到 `@freezed`/`@riverpod`：
    - `flutter pub run build_runner build --delete-conflicting-outputs`
-3. 运行静态分析（最小范围）：
-   - `dart analyze lib/page/chat/chat_page.dart lib/providers/chat_providers.dart lib/service/chat_service.dart lib/data/repositories/isar_chat_session_repository.dart lib/page/widget/markdown_text.dart`
-4. 确认交互：
-   - note 点击后复用旧会话
-   - 发送后立即看到用户气泡
-   - AI 流式内容实时换行/代码块不堆叠
-   - 键盘弹出不遮挡输入区
+4. 最小分析：
+   - `dart analyze lib/providers/chat_providers.dart lib/page/chat/global_ai_chat_shell.dart lib/page/chat/chat_page.dart lib/page/chat/widgets/global_session_switch_sheet.dart lib/page/widget/creative_toast.dart lib/page/home/note_detail_page.dart`
+5. 跑关键回归测试并记录结果
 
-## 常见回归问题与修复
+## 常见回归与排查索引
 
-### 问题 A：每次进入都新建会话
-- 原因：读取 stream provider 的时序导致拿到旧值
-- 修复：改用 `findByNoteUuid` + `syncSessions` 二次查询
+- 现象：点击切换会话看不到远端新增
+  - 首查：`GlobalAiChatShell._showSessionSwitchSheet()` 是否调用 `refreshDrawerSessionsOnOpen()`
+- 现象：note 点击 AI 每次都新建会话
+  - 首查：`_goToSessionPressed()` 是否保持“本地查 -> 同步 -> 再查 -> 创建”顺序
+- 现象：离线还能发送
+  - 首查：`canSendCurrentSession` 是否受 `isOnline` 与同步状态共同约束
+- 现象：重命名弹窗红屏
+  - 首查：`showInputDialog` 根节点是否含 `Material`
 
-### 问题 B：流式文本先叠在一起，结束后才正常
-- 原因：流式阶段 Markdown 语法不完整 + Widget 状态残留
-- 修复：`MarkdownText(isStreaming: true)` + `_sanitize` + `ValueKey(isStreaming)`
+## 交付输出要求
 
-### 问题 C：软键盘挡住输入区
-- 原因：页面未随 inset 重新布局
-- 修复：`Scaffold(resizeToAvoidBottomInset: true)` 并保持底部输入区在 body 内
-
-## 输出要求（给用户的交付）
-
-- 明确列出修改文件
-- 明确说明是否涉及 build_runner
-- 给出 `dart analyze` 结果
-- 若涉及流式协议改动，明确“是否需要后端配合”以及契约点
+- 列出修改文件路径
+- 声明是否执行 build_runner
+- 给出 `dart analyze` 与测试命令结果
+- 若改同步策略，明确在线/离线与一致性边界
