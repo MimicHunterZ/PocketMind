@@ -254,17 +254,17 @@ final class PushCoordinatorProvider
 
 String _$pushCoordinatorHash() => r'5ac6a833442235d3548b65c909eadf8a90d9446d';
 
-/// SyncEngine Provider 鈥斺€?鍚屾寮曟搸鍞竴瀹炰緥
+/// SyncEngine Provider —— 同步引擎唯一实例
 
 @ProviderFor(syncEngine)
 const syncEngineProvider = SyncEngineProvider._();
 
-/// SyncEngine Provider 鈥斺€?鍚屾寮曟搸鍞竴瀹炰緥
+/// SyncEngine Provider —— 同步引擎唯一实例
 
 final class SyncEngineProvider
     extends $FunctionalProvider<SyncEngine, SyncEngine, SyncEngine>
     with $Provider<SyncEngine> {
-  /// SyncEngine Provider 鈥斺€?鍚屾寮曟搸鍞竴瀹炰緥
+  /// SyncEngine Provider —— 同步引擎唯一实例
   const SyncEngineProvider._()
     : super(
         from: null,
@@ -300,12 +300,12 @@ final class SyncEngineProvider
 
 String _$syncEngineHash() => r'48a5dfd85082a7b6886eefc94d3d97110e8f5251';
 
-/// ResourceFetchScheduler Provider 鈥斺€?绔晶鍏冩暟鎹姄鍙栬皟搴﹀櫒
+/// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器
 
 @ProviderFor(resourceFetchScheduler)
 const resourceFetchSchedulerProvider = ResourceFetchSchedulerProvider._();
 
-/// ResourceFetchScheduler Provider 鈥斺€?绔晶鍏冩暟鎹姄鍙栬皟搴﹀櫒
+/// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器
 
 final class ResourceFetchSchedulerProvider
     extends
@@ -315,7 +315,7 @@ final class ResourceFetchSchedulerProvider
           ResourceFetchScheduler
         >
     with $Provider<ResourceFetchScheduler> {
-  /// ResourceFetchScheduler Provider 鈥斺€?绔晶鍏冩暟鎹姄鍙栬皟搴﹀櫒
+  /// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器
   const ResourceFetchSchedulerProvider._()
     : super(
         from: null,
@@ -351,34 +351,34 @@ final class ResourceFetchSchedulerProvider
 }
 
 String _$resourceFetchSchedulerHash() =>
-    r'9a2d3649844ef2a46804f2ee9a59890fa5a2d127';
+    r'568d3c83711a159827b60cc07ee637705042c0a8';
 
-/// 鑷€傚簲杞 Provider 鈥斺€?鏍规嵁搴旂敤鐘舵€佽嚜鍔ㄨ皟鏁?Pull 闂撮殧銆?
+/// 自适应轮询 Provider —— 根据应用状态自动调整 Pull 间隔。
 ///
-/// 绛栫暐锛?
-/// - 鐧诲綍鐘舵€佷笅姣?30 绉掕Е鍙戜竴娆?SyncEngine.kick()
-/// - 缃戠粶鐘舵€佸彉鍖栨椂绔嬪嵆瑙﹀彂涓€娆?
-/// - 姝?Provider keepAlive锛孉pp 鐢熷懡鍛ㄦ湡鍐呮寔缁繍琛?
+/// 策略：
+/// - 登录状态下每 30 秒触发一次 SyncEngine.kick()
+/// - 网络状态变化时立即触发一次
+/// - 该 Provider 为 keepAlive，App 生命周期内持续运行
 
 @ProviderFor(adaptiveSyncScheduler)
 const adaptiveSyncSchedulerProvider = AdaptiveSyncSchedulerProvider._();
 
-/// 鑷€傚簲杞 Provider 鈥斺€?鏍规嵁搴旂敤鐘舵€佽嚜鍔ㄨ皟鏁?Pull 闂撮殧銆?
+/// 自适应轮询 Provider —— 根据应用状态自动调整 Pull 间隔。
 ///
-/// 绛栫暐锛?
-/// - 鐧诲綍鐘舵€佷笅姣?30 绉掕Е鍙戜竴娆?SyncEngine.kick()
-/// - 缃戠粶鐘舵€佸彉鍖栨椂绔嬪嵆瑙﹀彂涓€娆?
-/// - 姝?Provider keepAlive锛孉pp 鐢熷懡鍛ㄦ湡鍐呮寔缁繍琛?
+/// 策略：
+/// - 登录状态下每 30 秒触发一次 SyncEngine.kick()
+/// - 网络状态变化时立即触发一次
+/// - 该 Provider 为 keepAlive，App 生命周期内持续运行
 
 final class AdaptiveSyncSchedulerProvider
     extends $FunctionalProvider<void, void, void>
     with $Provider<void> {
-  /// 鑷€傚簲杞 Provider 鈥斺€?鏍规嵁搴旂敤鐘舵€佽嚜鍔ㄨ皟鏁?Pull 闂撮殧銆?
+  /// 自适应轮询 Provider —— 根据应用状态自动调整 Pull 间隔。
   ///
-  /// 绛栫暐锛?
-  /// - 鐧诲綍鐘舵€佷笅姣?30 绉掕Е鍙戜竴娆?SyncEngine.kick()
-  /// - 缃戠粶鐘舵€佸彉鍖栨椂绔嬪嵆瑙﹀彂涓€娆?
-  /// - 姝?Provider keepAlive锛孉pp 鐢熷懡鍛ㄦ湡鍐呮寔缁繍琛?
+  /// 策略：
+  /// - 登录状态下每 30 秒触发一次 SyncEngine.kick()
+  /// - 网络状态变化时立即触发一次
+  /// - 该 Provider 为 keepAlive，App 生命周期内持续运行
   const AdaptiveSyncSchedulerProvider._()
     : super(
         from: null,
@@ -413,4 +413,4 @@ final class AdaptiveSyncSchedulerProvider
 }
 
 String _$adaptiveSyncSchedulerHash() =>
-    r'fecba4fb28fc5967e18035e6c4ac9f016454142e';
+    r'efd019758be0345fe48e05748d1d8f41a612b779';

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/page/chat/branch_list_page.dart';
 import 'package:pocketmind/page/chat/chat_page.dart';
+import 'package:pocketmind/page/chat/global_ai_chat_shell.dart';
 import 'package:pocketmind/page/home/home_screen.dart';
 import 'package:pocketmind/page/home/desktop/desktop_home_screen.dart';
 import 'package:pocketmind/page/home/note_detail_page.dart';
@@ -87,9 +88,23 @@ final appRouter = GoRouter(
     ),
     // 聊天页 - 全屏，不含侧边栏
     GoRoute(
+      path: RoutePaths.globalAi,
+      builder: (context, state) => const GlobalAiChatShell(),
+    ),
+
+    // 聊天页 - 全屏，不含侧边栏
+    GoRoute(
       path: RoutePaths.chat,
       builder: (context, state) {
-        final sessionUuid = state.pathParameters['sessionUuid']!;
+        final sessionUuid = state.pathParameters['sessionUuid'];
+        if (sessionUuid == null || sessionUuid.isEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            context.go(RoutePaths.home);
+          });
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
         return ChatPage(sessionUuid: sessionUuid);
       },
       routes: [
@@ -97,7 +112,15 @@ final appRouter = GoRouter(
         GoRoute(
           path: 'branches',
           builder: (context, state) {
-            final sessionUuid = state.pathParameters['sessionUuid']!;
+            final sessionUuid = state.pathParameters['sessionUuid'];
+            if (sessionUuid == null || sessionUuid.isEmpty) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                context.go(RoutePaths.home);
+              });
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
             return BranchListPage(sessionUuid: sessionUuid);
           },
         ),

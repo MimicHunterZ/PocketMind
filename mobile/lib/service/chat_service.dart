@@ -42,6 +42,11 @@ class ChatService {
     }
   }
 
+  /// 同步全局会话（noteUuid = null）。
+  Future<void> syncGlobalSessions() {
+    return syncSessions(noteUuid: null);
+  }
+
   /// 同步单个会话。
   Future<void> syncSessionByUuid(String sessionUuid) async {
     try {
@@ -62,13 +67,16 @@ class ChatService {
     );
     await _sessionRepo.upsertFromModels([model]);
     final session = await _sessionRepo.findByUuid(model.uuid);
-    return session!;
+    if (session == null) {
+      throw StateError('创建会话后本地读取失败: sessionUuid=${model.uuid}');
+    }
+    return session;
   }
 
   /// 重命名会话（更新服务端，再重新同步本地）。
   Future<void> renameSession(String uuid, String title) async {
     await _apiService.renameSession(uuid, title);
-    await syncSessions();
+    await syncSessionByUuid(uuid);
   }
 
   /// 删除会话：服务端删除 + 本地软删除。
@@ -112,6 +120,30 @@ class ChatService {
       PMlog.w(_tag, '同步消息失败: $e');
       rethrow;
     }
+  }
+
+  /// 判断会话本地是否已有消息。
+  Future<bool> checkSessionHasMessages(String sessionUuid) {
+    return _messageRepo.hasMessages(sessionUuid);
+  }
+
+  /// 按需同步会话消息。
+  ///
+  /// 规则：
+  /// - [force] 为 true 时总是同步。
+  /// - [force] 为 false 且 [syncedSessionUuids] 已包含该会话时跳过。
+  /// - 其余情况执行同步，并在可用时写回 [syncedSessionUuids]。
+  Future<void> syncSessionMessagesIfNeeded(
+    String sessionUuid, {
+    bool force = false,
+    Set<String>? syncedSessionUuids,
+  }) async {
+    final alreadySynced = syncedSessionUuids?.contains(sessionUuid) ?? false;
+    if (!force && alreadySynced) {
+      return;
+    }
+    await syncMessages(sessionUuid);
+    syncedSessionUuids?.add(sessionUuid);
   }
 
   /// 发送消息，返回 SSE 事件流。

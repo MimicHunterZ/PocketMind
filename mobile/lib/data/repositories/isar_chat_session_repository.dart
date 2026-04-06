@@ -62,6 +62,24 @@ class IsarChatSessionRepository {
         .findAll();
   }
 
+  /// 分页查询全局会话（scopeNoteUuid == null），按 updatedAt 倒序。
+  Future<List<ChatSession>> findGlobalSessionsPaged({
+    required int page,
+    int size = 50,
+  }) {
+    final safePage = page < 0 ? 0 : page;
+    final safeSize = size <= 0 ? 50 : size;
+    return _isar.chatSessions
+        .filter()
+        .scopeNoteUuidIsNull()
+        .and()
+        .isDeletedEqualTo(false)
+        .sortByUpdatedAtDesc()
+        .offset(safePage * safeSize)
+        .limit(safeSize)
+        .findAll();
+  }
+
   // 写入
 
   /// 将服务端返回的会话列表全量 upsert（有则更新，无则插入）。

@@ -10,13 +10,14 @@ import 'package:pocketmind/providers/chat_providers.dart';
 import 'package:pocketmind/util/theme_data.dart';
 
 /// 聊天消息列表。
-class ChatMessageList extends ConsumerWidget {
+class ChatMessageList extends ConsumerStatefulWidget {
   final String sessionUuid;
   final ScrollController scrollController;
   final AsyncValue<List<ChatMessage>> asyncValue;
   final ChatSendState sendState;
   final ChatBubbleColors colors;
   final void Function(String uuid, String content) onStartEdit;
+  final VoidCallback onReachTop;
 
   const ChatMessageList({
     super.key,
@@ -26,32 +27,75 @@ class ChatMessageList extends ConsumerWidget {
     required this.sendState,
     required this.colors,
     required this.onStartEdit,
+    required this.onReachTop,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return asyncValue.when(
+  ConsumerState<ChatMessageList> createState() => _ChatMessageListState();
+}
+
+class _ChatMessageListState extends ConsumerState<ChatMessageList> {
+  bool _topReachNotified = false;
+
+  @override
+  void didUpdateWidget(covariant ChatMessageList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sessionUuid != widget.sessionUuid) {
+      _topReachNotified = false;
+    }
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification is! ScrollUpdateNotification ||
+        notification.dragDetails == null) {
+      return false;
+    }
+
+    final scrollDelta = notification.scrollDelta ?? 0;
+    if (scrollDelta >= 0) {
+      return false;
+    }
+
+    final metrics = notification.metrics;
+    final atTop = metrics.pixels <= metrics.minScrollExtent + 8;
+    if (atTop) {
+      if (!_topReachNotified) {
+        _topReachNotified = true;
+        widget.onReachTop();
+      }
+    } else {
+      _topReachNotified = false;
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.asyncValue.when(
       data: (messages) {
         final items = buildChatListItems(
           messages: messages,
-          sendState: sendState,
+          sendState: widget.sendState,
         );
         if (items.isEmpty) {
           return const ChatEmptyHint();
         }
-        return ListView.builder(
-          controller: scrollController,
-          padding: EdgeInsets.only(
-            left: 16.w,
-            right: 16.w,
-            top: 12.h,
-            bottom: 8.h,
+        return NotificationListener<ScrollNotification>(
+          onNotification: _handleScrollNotification,
+          child: ListView.builder(
+            controller: widget.scrollController,
+            padding: EdgeInsets.only(
+              left: 16.w,
+              right: 16.w,
+              top: 12.h,
+              bottom: 8.h,
+            ),
+            itemCount: items.length,
+            itemBuilder: (_, i) {
+              final item = items[i];
+              return _buildItem(context, ref, item);
+            },
           ),
-          itemCount: items.length,
-          itemBuilder: (_, i) {
-            final item = items[i];
-            return _buildItem(context, ref, item);
-          },
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -69,7 +113,7 @@ class ChatMessageList extends ConsumerWidget {
   Widget _buildItem(BuildContext context, WidgetRef ref, ChatListItem item) {
     switch (item) {
       case ChatListTimeDivider(:final time):
-        return ChatTimeDivider(time: time, colors: colors);
+        return ChatTimeDivider(time: time, colors: widget.colors);
       case ChatListMessageItem(
         :final message,
         :final isLeaf,
@@ -77,23 +121,23 @@ class ChatMessageList extends ConsumerWidget {
       ):
         return ChatMessageBubble(
           message: message,
-          colors: colors,
-          sessionUuid: sessionUuid,
+          colors: widget.colors,
+          sessionUuid: widget.sessionUuid,
           isLeaf: isLeaf,
           isLastUserMsg: isLastUserMsg,
-          onEditTap: isLastUserMsg ? onStartEdit : null,
+          onEditTap: isLastUserMsg ? widget.onStartEdit : null,
         );
       case ChatListPendingUserItem(:final content):
-        return ChatPendingUserBubble(content: content, colors: colors);
+        return ChatPendingUserBubble(content: content, colors: widget.colors);
       case ChatListStreamingItem(:final content):
-        return ChatStreamingBubble(content: content, colors: colors);
+        return ChatStreamingBubble(content: content, colors: widget.colors);
       case ChatListErrorItem():
         return Padding(
           padding: EdgeInsets.symmetric(vertical: 8.h),
           child: Center(
             child: InkWell(
               onTap: () =>
-                  ref.read(chatSendProvider(sessionUuid).notifier).reset(),
+                  ref.read(chatSendProvider(widget.sessionUuid).notifier).reset(),
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
                 decoration: BoxDecoration(

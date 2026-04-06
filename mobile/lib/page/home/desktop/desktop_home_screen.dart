@@ -1,13 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/model/note.dart';
-import 'package:pocketmind/page/chat/chat_page.dart';
 import 'package:pocketmind/page/home/widgets/category_grid.dart';
 import 'package:pocketmind/page/widget/note_item.dart';
 import 'package:pocketmind/page/widget/desktop/desktop_header.dart';
@@ -15,12 +13,10 @@ import 'package:pocketmind/page/home/note_add_sheet.dart';
 import 'package:pocketmind/page/home/mixin/search_logic_mixin.dart';
 import 'package:pocketmind/page/widget/add_category_dialog.dart';
 import 'package:pocketmind/providers/category_providers.dart';
-import 'package:pocketmind/providers/chat_providers.dart';
 import 'package:pocketmind/providers/nav_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/providers/ui_providers.dart';
 import 'package:pocketmind/providers/app_config_provider.dart';
-import 'package:pocketmind/router/route_paths.dart';
 import 'package:pocketmind/util/logger_service.dart';
 
 final String tag = 'DesktopHomeScreen';
@@ -37,7 +33,6 @@ class DesktopHomeScreen extends ConsumerStatefulWidget {
 class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
     with SearchLogicMixin {
   final ScrollController _scrollController = ScrollController();
-  bool _openingAiSession = false;
 
   @override
   void dispose() {
@@ -67,17 +62,6 @@ class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
     final searchResults = ref.watch(searchResultsProvider);
     final isAddingNote = ref.watch(isAddingNoteProvider);
     final activeIndex = ref.watch(activeNavIndexProvider);
-
-    if (activeIndex == 1 && !_openingAiSession) {
-      _openingAiSession = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        if (!mounted) return;
-        await _openGlobalAiSession();
-        if (!mounted) return;
-        ref.read(activeNavIndexProvider.notifier).set(0);
-        _openingAiSession = false;
-      });
-    }
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -177,22 +161,6 @@ class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
       name: result.name,
       description: result.description,
       iconPath: result.iconPath,
-    );
-  }
-
-  Future<void> _openGlobalAiSession() async {
-    final repo = ref.read(chatSessionRepositoryProvider);
-    final service = ref.read(chatServiceProvider);
-    final globalSessions = await repo.findGlobalSessions();
-    final sessionUuid = globalSessions.isNotEmpty
-        ? globalSessions.first.uuid
-        : (await service.createSession(noteUuid: null)).uuid;
-
-    if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ChatPage(sessionUuid: sessionUuid),
-      ),
     );
   }
 

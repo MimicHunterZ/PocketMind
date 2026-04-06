@@ -12,7 +12,7 @@ part of 'note_providers.dart';
 // dart format off
 T _$identity<T>(T value) => value;
 /// @nodoc
-mixin _$NoteDetailState {
+mixin _$NoteDetailState implements DiagnosticableTreeMixin {
 
  Note get note; bool get isLoading; List<String> get tags; bool get isSaving; Object? get error;
 /// Create a copy of NoteDetailState
@@ -22,6 +22,12 @@ mixin _$NoteDetailState {
 $NoteDetailStateCopyWith<NoteDetailState> get copyWith => _$NoteDetailStateCopyWithImpl<NoteDetailState>(this as NoteDetailState, _$identity);
 
 
+@override
+void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+  properties
+    ..add(DiagnosticsProperty('type', 'NoteDetailState'))
+    ..add(DiagnosticsProperty('note', note))..add(DiagnosticsProperty('isLoading', isLoading))..add(DiagnosticsProperty('tags', tags))..add(DiagnosticsProperty('isSaving', isSaving))..add(DiagnosticsProperty('error', error));
+}
 
 @override
 bool operator ==(Object other) {
@@ -33,7 +39,7 @@ bool operator ==(Object other) {
 int get hashCode => Object.hash(runtimeType,note,isLoading,const DeepCollectionEquality().hash(tags),isSaving,const DeepCollectionEquality().hash(error));
 
 @override
-String toString() {
+String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
   return 'NoteDetailState(note: $note, isLoading: $isLoading, tags: $tags, isSaving: $isSaving, error: $error)';
 }
 
@@ -208,7 +214,7 @@ return $default(_that.note,_that.isLoading,_that.tags,_that.isSaving,_that.error
 /// @nodoc
 
 
-class _NoteDetailState implements NoteDetailState {
+class _NoteDetailState with DiagnosticableTreeMixin implements NoteDetailState {
   const _NoteDetailState({required this.note, this.isLoading = false, final  List<String> tags = const [], this.isSaving = false, this.error}): _tags = tags;
   
 
@@ -231,6 +237,12 @@ class _NoteDetailState implements NoteDetailState {
 _$NoteDetailStateCopyWith<_NoteDetailState> get copyWith => __$NoteDetailStateCopyWithImpl<_NoteDetailState>(this, _$identity);
 
 
+@override
+void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+  properties
+    ..add(DiagnosticsProperty('type', 'NoteDetailState'))
+    ..add(DiagnosticsProperty('note', note))..add(DiagnosticsProperty('isLoading', isLoading))..add(DiagnosticsProperty('tags', tags))..add(DiagnosticsProperty('isSaving', isSaving))..add(DiagnosticsProperty('error', error));
+}
 
 @override
 bool operator ==(Object other) {
@@ -242,7 +254,7 @@ bool operator ==(Object other) {
 int get hashCode => Object.hash(runtimeType,note,isLoading,const DeepCollectionEquality().hash(_tags),isSaving,const DeepCollectionEquality().hash(error));
 
 @override
-String toString() {
+String toString({ DiagnosticLevel minLevel = DiagnosticLevel.info }) {
   return 'NoteDetailState(note: $note, isLoading: $isLoading, tags: $tags, isSaving: $isSaving, error: $error)';
 }
 

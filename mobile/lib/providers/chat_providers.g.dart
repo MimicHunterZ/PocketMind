@@ -694,6 +694,94 @@ final class ChatMessageByUuidFamily extends $Family
   String toString() => r'chatMessageByUuidProvider';
 }
 
+@ProviderFor(chatOnlineStatus)
+const chatOnlineStatusProvider = ChatOnlineStatusProvider._();
+
+final class ChatOnlineStatusProvider
+    extends $FunctionalProvider<AsyncValue<bool>, bool, Stream<bool>>
+    with $FutureModifier<bool>, $StreamProvider<bool> {
+  const ChatOnlineStatusProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'chatOnlineStatusProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$chatOnlineStatusHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
+
+  @override
+  Stream<bool> create(Ref ref) {
+    return chatOnlineStatus(ref);
+  }
+}
+
+String _$chatOnlineStatusHash() => r'2a0129df02fac9674b7e36c4da015cae7448547a';
+
+@ProviderFor(GlobalAiSessionController)
+const globalAiSessionControllerProvider = GlobalAiSessionControllerProvider._();
+
+final class GlobalAiSessionControllerProvider
+    extends $NotifierProvider<GlobalAiSessionController, GlobalAiSessionState> {
+  const GlobalAiSessionControllerProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'globalAiSessionControllerProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$globalAiSessionControllerHash();
+
+  @$internal
+  @override
+  GlobalAiSessionController create() => GlobalAiSessionController();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(GlobalAiSessionState value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<GlobalAiSessionState>(value),
+    );
+  }
+}
+
+String _$globalAiSessionControllerHash() =>
+    r'721fe85de6d42d03f63e32802f95b5768aa3d73f';
+
+abstract class _$GlobalAiSessionController
+    extends $Notifier<GlobalAiSessionState> {
+  GlobalAiSessionState build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final created = build();
+    final ref = this.ref as $Ref<GlobalAiSessionState, GlobalAiSessionState>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<GlobalAiSessionState, GlobalAiSessionState>,
+              GlobalAiSessionState,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, created);
+  }
+}
+
 /// 消息发送 Notifier，按 [sessionUuid] 分组（family）。
 
 @ProviderFor(ChatSend)
@@ -747,7 +835,7 @@ final class ChatSendProvider
   }
 }
 
-String _$chatSendHash() => r'8b52df9f58cc82bfc91c502193cc05449e54ffce';
+String _$chatSendHash() => r'84ecbc8e90a59ea0ed661ac4663c7d5e23fe5b3a';
 
 /// 消息发送 Notifier，按 [sessionUuid] 分组（family）。
 

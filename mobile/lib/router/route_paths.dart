@@ -15,6 +15,9 @@ class RoutePaths {
   /// 账号登录/注册
   static const String auth = '/settings/auth';
 
+  /// 全局 AI 入口
+  static const String globalAi = '/global-ai';
+
   /// 平台账号管理
   static const String platformAccounts = '/settings/platform-accounts';
 

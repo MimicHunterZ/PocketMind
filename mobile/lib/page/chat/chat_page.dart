@@ -20,14 +20,33 @@ import 'package:pocketmind/util/theme_data.dart';
 /// 导航方式：context.push(RoutePaths.chatOf(sessionUuid))
 class ChatPage extends ConsumerStatefulWidget {
   final String sessionUuid;
+  final bool canSend;
+  final bool isSyncingBeforeSend;
+  final String? sendGateHint;
+  final VoidCallback? onRetrySendGate;
+  final Future<void> Function()? onCreateSessionTap;
+  final Future<void> Function()? onSwitchSessionTap;
+  final Future<void> Function(String sessionUuid)? onDeleteSessionTap;
 
-  const ChatPage({super.key, required this.sessionUuid});
+  const ChatPage({
+    super.key,
+    required this.sessionUuid,
+    this.canSend = true,
+    this.isSyncingBeforeSend = false,
+    this.sendGateHint,
+    this.onRetrySendGate,
+    this.onCreateSessionTap,
+    this.onSwitchSessionTap,
+    this.onDeleteSessionTap,
+  });
 
   @override
   ConsumerState<ChatPage> createState() => _ChatPageState();
 }
 
 class _ChatPageState extends ConsumerState<ChatPage> {
+  static const int _localPageSize = 10;
+
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _textController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
@@ -43,6 +62,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   /// 用户在流式接收期间主动上滑时设为 true，暂停自动滚底。
   bool _userScrolledUp = false;
+
+  int _visibleMessageCount = _localPageSize;
+  bool _isLoadingMoreLocal = false;
 
   @override
   void initState() {
@@ -70,10 +92,34 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant ChatPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.sessionUuid == widget.sessionUuid) {
+      return;
+    }
+    setState(() {
+      _visibleMessageCount = _localPageSize;
+      _isLoadingMoreLocal = false;
+      _userScrolledUp = false;
+      _editingMessageUuid = null;
+      _editingOriginalContent = '';
+    });
+    _textController.clear();
+    Future.microtask(() {
+      if (!mounted) return;
+      ref.read(chatSendProvider(widget.sessionUuid).notifier).initSession();
+    });
+  }
+
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     final pos = _scrollController.position;
     final isAtBottom = pos.pixels >= pos.maxScrollExtent - 60;
+    if (isAtBottom && _userScrolledUp) {
+      setState(() => _userScrolledUp = false);
+      return;
+    }
     if (!isAtBottom && !_userScrolledUp) {
       setState(() => _userScrolledUp = true);
     }
@@ -116,6 +162,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _sendMessage() {
+    if (!widget.canSend) {
+      final hint = widget.sendGateHint;
+      if (hint != null && hint.isNotEmpty) {
+        CreativeToast.info(
+          context,
+          title: '当前不可发送',
+          message: hint,
+          direction: ToastDirection.bottom,
+        );
+      }
+      return;
+    }
+
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
@@ -155,38 +214,58 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16.r)),
       ),
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const ChatBottomSheetHandle(),
-            SizedBox(height: 8.h),
-            ChatSheetTile(
-              icon: Icons.edit_outlined,
-              label: '重命名会话',
-              onTap: () async {
-                Navigator.pop(ctx);
-                _showRenameDialog(context);
-              },
-            ),
-            ChatSheetTile(
-              icon: Icons.account_tree_outlined,
-              label: '查看分支',
-              onTap: () {
-                Navigator.pop(ctx);
-                context.push(RoutePaths.branchListOf(widget.sessionUuid));
-              },
-            ),
-            ChatSheetTile(
-              icon: Icons.delete_outline,
-              label: '删除会话',
-              color: Theme.of(context).colorScheme.error,
-              onTap: () async {
-                Navigator.pop(ctx);
-                _confirmDelete(context);
-              },
-            ),
-            SizedBox(height: 8.h),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const ChatBottomSheetHandle(),
+              SizedBox(height: 8.h),
+              if (widget.onCreateSessionTap != null)
+                ChatSheetTile(
+                  icon: Icons.add_circle_outline,
+                  label: '新建会话',
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await _handleCreateSessionTap(context);
+                  },
+                ),
+              if (widget.onSwitchSessionTap != null)
+                ChatSheetTile(
+                  icon: Icons.swap_horiz,
+                  label: '切换会话',
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await _handleSwitchSessionTap(context);
+                  },
+                ),
+              ChatSheetTile(
+                icon: Icons.edit_outlined,
+                label: '重命名会话',
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  _showRenameDialog(context);
+                },
+              ),
+              ChatSheetTile(
+                icon: Icons.account_tree_outlined,
+                label: '查看分支',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push(RoutePaths.branchListOf(widget.sessionUuid));
+                },
+              ),
+              ChatSheetTile(
+                icon: Icons.delete_outline,
+                label: '删除会话',
+                color: Theme.of(context).colorScheme.error,
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  _confirmDelete(context);
+                },
+              ),
+              SizedBox(height: 8.h),
+            ],
+          ),
         ),
       ),
     );
@@ -203,6 +282,34 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
   }
 
+  Future<void> _handleCreateSessionTap(BuildContext outerContext) async {
+    final callback = widget.onCreateSessionTap;
+    if (callback == null) {
+      CreativeToast.info(
+        outerContext,
+        title: '当前会话不支持该操作',
+        message: '请从全局 AI 入口使用多会话能力',
+        direction: ToastDirection.bottom,
+      );
+      return;
+    }
+    await callback();
+  }
+
+  Future<void> _handleSwitchSessionTap(BuildContext outerContext) async {
+    final callback = widget.onSwitchSessionTap;
+    if (callback == null) {
+      CreativeToast.info(
+        outerContext,
+        title: '当前会话不支持该操作',
+        message: '请从全局 AI 入口使用多会话能力',
+        direction: ToastDirection.bottom,
+      );
+      return;
+    }
+    await callback();
+  }
+
   void _confirmDelete(BuildContext outerContext) async {
     final confirm = await showConfirmDialog(
       outerContext,
@@ -210,10 +317,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       message: '删除后无法恢复，确认删除？',
     );
     if (confirm == true) {
+      final callback = widget.onDeleteSessionTap;
+      if (callback != null) {
+        await callback(widget.sessionUuid);
+        return;
+      }
       await ref.read(chatServiceProvider).deleteSession(widget.sessionUuid);
+      if (!outerContext.mounted) return;
+      outerContext.pop();
     }
-    if (!outerContext.mounted) return;
-    outerContext.pop();
   }
 
   void _onCameraTap() {
@@ -226,6 +338,47 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   void _onVoiceEnd() {
     // TODO: 停止录音并发送
+  }
+
+  void _onReachTopLoadMore() {
+    if (_isLoadingMoreLocal) return;
+
+    final allMessages = ref.read(chatMessagesProvider(widget.sessionUuid)).value;
+    if (allMessages == null || allMessages.length <= _visibleMessageCount) {
+      return;
+    }
+
+    double? previousMaxScrollExtent;
+    double? previousPixels;
+    if (_scrollController.hasClients) {
+      final position = _scrollController.position;
+      previousMaxScrollExtent = position.maxScrollExtent;
+      previousPixels = position.pixels;
+    }
+
+    setState(() {
+      _isLoadingMoreLocal = true;
+      _visibleMessageCount += _localPageSize;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      if (previousMaxScrollExtent != null &&
+          previousPixels != null &&
+          _scrollController.hasClients) {
+        final position = _scrollController.position;
+        final delta = position.maxScrollExtent - previousMaxScrollExtent;
+        final target = (previousPixels + (delta > 0 ? delta : 0)).clamp(
+          position.minScrollExtent,
+          position.maxScrollExtent,
+        );
+        _scrollController.jumpTo(target.toDouble());
+      }
+
+      if (!mounted) return;
+      setState(() => _isLoadingMoreLocal = false);
+    });
   }
 
   @override
@@ -249,6 +402,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
     final session = sessionAsync.asData?.value;
     final messagesAsync = ref.watch(chatMessagesProvider(widget.sessionUuid));
+    final visibleMessagesAsync = messagesAsync.whenData((messages) {
+      if (messages.length <= _visibleMessageCount) {
+        return messages;
+      }
+      return messages.sublist(messages.length - _visibleMessageCount);
+    });
     final sendState = ref.watch(chatSendProvider(widget.sessionUuid));
     final colors = ChatBubbleColors.of(context);
     final cs = Theme.of(context).colorScheme;
@@ -312,12 +471,37 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             child: ChatMessageList(
               sessionUuid: widget.sessionUuid,
               scrollController: _scrollController,
-              asyncValue: messagesAsync,
+              asyncValue: visibleMessagesAsync,
               sendState: sendState,
               colors: colors,
               onStartEdit: _startEdit,
+              onReachTop: _onReachTopLoadMore,
             ),
           ),
+          if (!widget.canSend)
+            Container(
+              width: double.infinity,
+              color: Theme.of(context).colorScheme.surfaceContainerHigh,
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.sendGateHint ?? '当前会话暂不可发送',
+                      key: const ValueKey('chat-send-gate-hint'),
+                      style: textTheme.bodySmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (widget.onRetrySendGate != null && !widget.isSyncingBeforeSend)
+                    TextButton(
+                      onPressed: widget.onRetrySendGate,
+                      child: const Text('重试'),
+                    ),
+                ],
+              ),
+            ),
           if (_editingMessageUuid != null)
             ChatEditModeBanner(onCancel: _cancelEdit),
           ChatInputBar(
@@ -326,6 +510,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             isVoiceMode: _isVoiceMode,
             hasText: _hasText,
             isSending: sendState is ChatSendStreaming,
+            canSend: widget.canSend,
             isEditMode: _editingMessageUuid != null,
             onToggleVoice: () => setState(() => _isVoiceMode = !_isVoiceMode),
             onSend: _sendMessage,

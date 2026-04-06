@@ -22,6 +22,7 @@ class ChatInputBar extends StatelessWidget {
   final bool isVoiceMode;
   final bool hasText;
   final bool isSending;
+  final bool canSend;
   final bool isEditMode;
   final VoidCallback onToggleVoice;
   final VoidCallback onSend;
@@ -36,6 +37,7 @@ class ChatInputBar extends StatelessWidget {
     required this.isVoiceMode,
     required this.hasText,
     required this.isSending,
+    required this.canSend,
     required this.isEditMode,
     required this.onToggleVoice,
     required this.onSend,
@@ -76,7 +78,7 @@ class ChatInputBar extends StatelessWidget {
                     : _TextInput(
                         controller: textController,
                         focusNode: focusNode,
-                        enabled: !isSending,
+                        enabled: !isSending && canSend,
                         hintText: isSending
                             ? '正在回复中…'
                             : isEditMode
@@ -96,7 +98,7 @@ class ChatInputBar extends StatelessWidget {
                     ? _SendButton(
                         key: const Key('send'),
                         onTap: onSend,
-                        isSending: isSending,
+                        isSending: isSending || !canSend,
                         cs: cs,
                       )
                     : _InputActionButton(

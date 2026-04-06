@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/model/note.dart';
-import 'package:pocketmind/page/chat/chat_page.dart';
 import 'package:pocketmind/page/home/mixin/search_logic_mixin.dart';
 import 'package:pocketmind/page/home/note_add_sheet.dart';
 import 'package:pocketmind/page/home/widgets/note_feed_paged_view.dart';
@@ -15,7 +14,6 @@ import 'package:pocketmind/page/home/widgets/unified_home_background.dart';
 import 'package:pocketmind/page/widget/add_category_dialog.dart';
 import 'package:pocketmind/providers/app_config_provider.dart';
 import 'package:pocketmind/providers/category_providers.dart';
-import 'package:pocketmind/providers/chat_providers.dart';
 import 'package:pocketmind/providers/nav_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/router/route_paths.dart';
@@ -26,15 +24,7 @@ import 'package:pocketmind/util/theme_data.dart';
 final String tag = 'HomeScreen';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({
-    super.key,
-    this.openChatSession,
-    this.resolveGlobalSessionUuid,
-  });
-
-  final Future<void> Function(BuildContext context, String sessionUuid)?
-      openChatSession;
-  final Future<String> Function()? resolveGlobalSessionUuid;
+  const HomeScreen({super.key});
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
@@ -99,7 +89,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SearchLogicMixin {
 
   Future<void> _handleTabChange(HomeTab tab) async {
     if (tab == HomeTab.ai) {
-      final previousTab = _tab;
       if (_isSearchMode) {
         setState(() {
           _isSearchMode = false;
@@ -107,16 +96,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SearchLogicMixin {
         clearSearch();
       }
 
-      setState(() {
-        _tab = HomeTab.ai;
-      });
-      await _openGlobalAiSession();
-      if (!mounted) return;
-      setState(() {
-        _tab = previousTab == HomeTab.ai
-            ? HomeTab.everything
-            : previousTab;
-      });
+      context.push(RoutePaths.globalAi);
       return;
     }
 
@@ -153,35 +133,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SearchLogicMixin {
         );
   }
 
-  Future<void> _openGlobalAiSession() async {
-    final customResolver = widget.resolveGlobalSessionUuid;
-    final sessionUuid = customResolver != null
-        ? await customResolver()
-        : await _resolveGlobalSessionUuid();
-
-    if (!mounted) return;
-    final customOpenChat = widget.openChatSession;
-    if (customOpenChat != null) {
-      await customOpenChat(context, sessionUuid);
-      return;
-    }
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ChatPage(sessionUuid: sessionUuid),
-      ),
-    );
-  }
-
-  Future<String> _resolveGlobalSessionUuid() async {
-    final repo = ref.read(chatSessionRepositoryProvider);
-    final service = ref.read(chatServiceProvider);
-    final globalSessions = await repo.findGlobalSessions();
-    if (globalSessions.isNotEmpty) {
-      return globalSessions.first.uuid;
-    }
-    final created = await service.createSession(noteUuid: null);
-    return created.uuid;
-  }
 }
 
 class _EverythingPane extends ConsumerWidget {

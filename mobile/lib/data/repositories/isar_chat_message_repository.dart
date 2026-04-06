@@ -30,6 +30,8 @@ class IsarChatMessageRepository {
     return _isar.chatMessages
         .filter()
         .uuidEqualTo(uuid)
+        .and()
+        .isDeletedEqualTo(false)
         .watch(fireImmediately: true)
         .map((list) => list.isEmpty ? null : list.first);
   }
@@ -37,6 +39,57 @@ class IsarChatMessageRepository {
   /// 按 UUID 一次性查找单条消息。
   Future<ChatMessage?> findByUuid(String uuid) {
     return _isar.chatMessages.filter().uuidEqualTo(uuid).findFirst();
+  }
+
+  /// 按会话一次性查找消息列表（时间升序）。
+  Future<List<ChatMessage>> findBySessionUuid(String sessionUuid) {
+    return _isar.chatMessages
+        .filter()
+        .sessionUuidEqualTo(sessionUuid)
+        .and()
+        .isDeletedEqualTo(false)
+        .sortByUpdatedAt()
+        .findAll();
+  }
+
+  /// 判断指定会话是否已有本地消息。
+  Future<bool> hasMessages(String sessionUuid) async {
+    final message = await _isar.chatMessages
+        .filter()
+        .sessionUuidEqualTo(sessionUuid)
+        .and()
+        .isDeletedEqualTo(false)
+        .findFirst();
+    return message != null;
+  }
+
+  /// 批量查询每个会话的最新一条消息预览（用于抽屉会话摘要）。
+  Future<Map<String, ChatMessage>> findLatestMessageBySessionUuids(
+    Iterable<String> sessionUuids,
+  ) async {
+    final requested = sessionUuids.toSet();
+    if (requested.isEmpty) {
+      return const {};
+    }
+
+    final all = await _isar.chatMessages
+        .filter()
+        .isDeletedEqualTo(false)
+        .sortByUpdatedAtDesc()
+        .findAll();
+
+    final result = <String, ChatMessage>{};
+    for (final message in all) {
+      final sessionUuid = message.sessionUuid;
+      if (!requested.contains(sessionUuid) || result.containsKey(sessionUuid)) {
+        continue;
+      }
+      result[sessionUuid] = message;
+      if (result.length >= requested.length) {
+        break;
+      }
+    }
+    return result;
   }
 
   /// 从本地消息构建分支摘要列表（离线降级使用）。
@@ -223,7 +276,6 @@ class IsarChatMessageRepository {
           .findFirst();
       if (msg != null) {
         msg.content = content;
-        msg.updatedAt = DateTime.now().millisecondsSinceEpoch;
         await _isar.chatMessages.put(msg);
       }
     });

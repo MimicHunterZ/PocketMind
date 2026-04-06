@@ -110,7 +110,7 @@ class DesktopSidebar extends ConsumerWidget {
                   isActive: activeIndex == 1,
                   onTap: () {
                     ref.read(activeNavIndexProvider.notifier).set(1);
-                    context.go(RoutePaths.home);
+                    context.push(RoutePaths.globalAi);
                   },
                 ),
                 SidebarItem(

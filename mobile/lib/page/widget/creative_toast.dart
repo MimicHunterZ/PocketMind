@@ -753,9 +753,11 @@ class _InputDialogState extends State<_InputDialog> {
     );
     const accentColor = Color(0xFF60A5FA);
 
-    return Center(
-      child: SingleChildScrollView(
-        child: Container(
+    return Material(
+      type: MaterialType.transparency,
+      child: Center(
+        child: SingleChildScrollView(
+          child: Container(
           width: 320.w,
           margin: EdgeInsets.symmetric(horizontal: 24.w, vertical: 24.h),
           decoration: BoxDecoration(
@@ -958,6 +960,7 @@ class _InputDialogState extends State<_InputDialog> {
                 ),
               ),
             ),
+          ),
           ),
         ),
       ),

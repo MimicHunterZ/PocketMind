@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:pocketmind/api/chat_api_service.dart';
@@ -92,6 +93,509 @@ Future<List<ChatBranchSummaryModel>> chatBranches(Ref ref, String sessionUuid) {
 @riverpod
 Stream<ChatMessage?> chatMessageByUuid(Ref ref, String uuid) {
   return ref.watch(chatMessageRepositoryProvider).watchByUuid(uuid);
+}
+
+@riverpod
+Stream<bool> chatOnlineStatus(Ref ref) async* {
+  final connectivity = Connectivity();
+  final initialResults = await connectivity.checkConnectivity();
+  yield initialResults.any((result) => result != ConnectivityResult.none);
+
+  yield* connectivity.onConnectivityChanged
+      .map((results) => results.any((result) => result != ConnectivityResult.none))
+      .distinct();
+}
+
+@freezed
+sealed class GlobalAiSessionState with _$GlobalAiSessionState {
+  const factory GlobalAiSessionState({
+    String? currentSessionUuid,
+    @Default(<ChatSession>[]) List<ChatSession> sessions,
+    @Default(<String>[]) List<String> sessionUuidsVisibleInDrawer,
+    @Default(<String, String>{}) Map<String, String> draftBySession,
+    @Default(<String>{}) Set<String> syncedSessionUuids,
+    @Default(true) bool isOnline,
+    @Default(false) bool isSyncingCurrentSession,
+    @Default(false) bool canSendCurrentSession,
+    String? currentSessionSyncError,
+    @Default(false) bool isEnsuringActiveSession,
+    @Default(false) bool isCreatingOrReusingSession,
+    @Default(false) bool isLoadingMoreInDrawer,
+    @Default(true) bool hasMoreInDrawer,
+    @Default(0) int drawerNextPage,
+    String? errorMessage,
+  }) = _GlobalAiSessionState;
+}
+
+@riverpod
+class GlobalAiSessionController extends _$GlobalAiSessionController {
+  bool _ensuringInFlight = false;
+  bool _creatingInFlight = false;
+  bool _syncCurrentInFlight = false;
+
+  @override
+  GlobalAiSessionState build() => const GlobalAiSessionState();
+
+  Future<void> loadLocalSessions() async {
+    final local = await ref
+        .read(chatSessionRepositoryProvider)
+        .findGlobalSessions();
+    state = state.copyWith(
+      sessions: local,
+      currentSessionUuid: _resolveCurrentSessionUuid(
+        local,
+        preferred: state.currentSessionUuid,
+      ),
+    );
+  }
+
+  Future<void> ensureActiveSession() async {
+    if (_ensuringInFlight) return;
+    _ensuringInFlight = true;
+    state = state.copyWith(isEnsuringActiveSession: true, errorMessage: null);
+    try {
+      await loadLocalSessions();
+      if (state.currentSessionUuid != null) {
+        await _evaluateSendGateForCurrent();
+        return;
+      }
+      await createOrReuseEmptySession();
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+    } finally {
+      state = state.copyWith(isEnsuringActiveSession: false);
+      _ensuringInFlight = false;
+    }
+  }
+
+  Future<void> createOrReuseEmptySession() async {
+    if (_creatingInFlight) return;
+    _creatingInFlight = true;
+    state = state.copyWith(
+      isCreatingOrReusingSession: true,
+      errorMessage: null,
+    );
+    try {
+      await loadLocalSessions();
+
+      final reused = await _tryReuseEmptyFromCurrentSessions();
+      if (reused) {
+        return;
+      }
+
+      await ref.read(chatServiceProvider).syncSessions(noteUuid: null);
+      await loadLocalSessions();
+
+      final reusedAfterResync = await _tryReuseEmptyFromCurrentSessions();
+      if (reusedAfterResync) {
+        return;
+      }
+
+      final created = await ref
+          .read(chatServiceProvider)
+          .createSession(noteUuid: null);
+      final merged = _mergeSessions(state.sessions, [created]);
+      state = state.copyWith(
+        sessions: merged,
+        currentSessionUuid: created.uuid,
+      );
+      await _evaluateSendGateForCurrent();
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+    } finally {
+      state = state.copyWith(isCreatingOrReusingSession: false);
+      _creatingInFlight = false;
+    }
+  }
+
+  Future<bool> _tryReuseEmptyFromCurrentSessions() async {
+    for (final session in state.sessions) {
+      final sessionUuid = session.uuid;
+      if (state.syncedSessionUuids.contains(sessionUuid)) {
+        if (await _isSessionEmpty(sessionUuid)) {
+          await switchSession(sessionUuid);
+          return true;
+        }
+        continue;
+      }
+
+      try {
+        await ref.read(chatServiceProvider).syncMessages(sessionUuid);
+        await markSessionSynced(sessionUuid);
+        if (await _isSessionEmpty(sessionUuid)) {
+          await switchSession(sessionUuid);
+          return true;
+        }
+      } catch (e) {
+        state = state.copyWith(
+          currentSessionUuid: sessionUuid,
+          errorMessage: e.toString(),
+        );
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> switchSession(String sessionUuid) async {
+    state = state.copyWith(
+      currentSessionUuid: sessionUuid,
+      errorMessage: null,
+      currentSessionSyncError: null,
+    );
+    await _evaluateSendGateForCurrent();
+  }
+
+  Future<void> onConnectivityChanged(bool isOnline) async {
+    if (state.isOnline == isOnline && state.currentSessionUuid == null) {
+      return;
+    }
+
+    if (!isOnline) {
+      state = state.copyWith(
+        isOnline: false,
+        canSendCurrentSession: false,
+        isSyncingCurrentSession: false,
+      );
+      return;
+    }
+
+    state = state.copyWith(isOnline: true);
+    await syncCurrentSessionForSend(force: true);
+
+    final current = state.currentSessionUuid;
+    if (current != null) {
+      unawaited(_syncOtherSessionsInBackground(excludeSessionUuid: current));
+    }
+  }
+
+  Future<void> retryCurrentSessionSync() {
+    return syncCurrentSessionForSend(force: true);
+  }
+
+  Future<void> syncCurrentSessionForSend({bool force = false}) async {
+    if (_syncCurrentInFlight) {
+      return;
+    }
+
+    final current = state.currentSessionUuid;
+    if (current == null) {
+      return;
+    }
+
+    if (!state.isOnline) {
+      state = state.copyWith(
+        canSendCurrentSession: false,
+        isSyncingCurrentSession: false,
+      );
+      return;
+    }
+
+    if (!force && state.syncedSessionUuids.contains(current)) {
+      state = state.copyWith(
+        canSendCurrentSession: true,
+        isSyncingCurrentSession: false,
+        currentSessionSyncError: null,
+      );
+      return;
+    }
+
+    _syncCurrentInFlight = true;
+    state = state.copyWith(
+      canSendCurrentSession: false,
+      isSyncingCurrentSession: true,
+      currentSessionSyncError: null,
+    );
+
+    try {
+      final nextSynced = Set<String>.from(state.syncedSessionUuids);
+      await ref.read(chatServiceProvider).syncSessionMessagesIfNeeded(
+        current,
+        force: force,
+        syncedSessionUuids: nextSynced,
+      );
+      state = state.copyWith(
+        syncedSessionUuids: nextSynced,
+        canSendCurrentSession: true,
+        isSyncingCurrentSession: false,
+        currentSessionSyncError: null,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        canSendCurrentSession: false,
+        isSyncingCurrentSession: false,
+        currentSessionSyncError: e.toString(),
+      );
+    } finally {
+      _syncCurrentInFlight = false;
+    }
+  }
+
+  Future<void> deleteSession(String sessionUuid) async {
+    try {
+      await ref.read(chatServiceProvider).deleteSession(sessionUuid);
+      final remained = state.sessions
+          .where((session) => session.uuid != sessionUuid)
+          .toList();
+      final nextDrafts = Map<String, String>.from(state.draftBySession)
+        ..remove(sessionUuid);
+      final nextSynced = Set<String>.from(state.syncedSessionUuids)
+        ..remove(sessionUuid);
+      final nextVisible = state.sessionUuidsVisibleInDrawer
+          .where((uuid) => uuid != sessionUuid)
+          .toList();
+
+      if (state.currentSessionUuid == sessionUuid) {
+        if (remained.isNotEmpty) {
+          state = state.copyWith(
+            sessions: remained,
+            currentSessionUuid: remained.first.uuid,
+            draftBySession: nextDrafts,
+            syncedSessionUuids: nextSynced,
+            sessionUuidsVisibleInDrawer: nextVisible,
+          );
+          await _evaluateSendGateForCurrent();
+          return;
+        }
+        final created = await ref
+            .read(chatServiceProvider)
+            .createSession(noteUuid: null);
+        state = state.copyWith(
+          sessions: [created],
+          currentSessionUuid: created.uuid,
+          draftBySession: nextDrafts,
+          syncedSessionUuids: nextSynced,
+          sessionUuidsVisibleInDrawer: nextVisible,
+        );
+        await _evaluateSendGateForCurrent();
+        return;
+      }
+
+      state = state.copyWith(
+        sessions: remained,
+        draftBySession: nextDrafts,
+        syncedSessionUuids: nextSynced,
+        sessionUuidsVisibleInDrawer: nextVisible,
+      );
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+    }
+  }
+
+  Future<void> loadMoreSessionsInDrawer({int pageSize = 50}) async {
+    if (state.isLoadingMoreInDrawer || !state.hasMoreInDrawer) {
+      return;
+    }
+
+    state = state.copyWith(isLoadingMoreInDrawer: true, errorMessage: null);
+    try {
+      final page = state.drawerNextPage;
+      final models = await ref
+          .read(chatApiServiceProvider)
+          .listSessions(noteUuid: null, page: page, size: pageSize);
+      final fetched = models.map(_fromSessionModel).toList();
+      final merged = _mergeSessions(state.sessions, fetched);
+
+      final existingVisible = state.sessionUuidsVisibleInDrawer;
+      final toAppend = fetched
+          .map((session) => session.uuid)
+          .where((uuid) => !existingVisible.contains(uuid))
+          .toList();
+
+      state = state.copyWith(
+        sessions: merged,
+        sessionUuidsVisibleInDrawer: [...existingVisible, ...toAppend],
+        drawerNextPage: page + 1,
+        hasMoreInDrawer: models.length >= pageSize,
+      );
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+    } finally {
+      state = state.copyWith(isLoadingMoreInDrawer: false);
+    }
+  }
+
+  Future<void> updateDraft(String sessionUuid, String draft) async {
+    final next = Map<String, String>.from(state.draftBySession);
+    if (draft.isEmpty) {
+      next.remove(sessionUuid);
+    } else {
+      next[sessionUuid] = draft;
+    }
+    state = state.copyWith(draftBySession: next);
+  }
+
+  String readDraft(String sessionUuid) {
+    return state.draftBySession[sessionUuid] ?? '';
+  }
+
+  Future<void> markSessionSynced(String sessionUuid) async {
+    final next = Set<String>.from(state.syncedSessionUuids)..add(sessionUuid);
+    state = state.copyWith(syncedSessionUuids: next);
+  }
+
+  Future<void> ensureDrawerVisibleFromSessions() async {
+    if (state.sessionUuidsVisibleInDrawer.isNotEmpty) {
+      return;
+    }
+    final sorted = [...state.sessions]
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    state = state.copyWith(
+      sessionUuidsVisibleInDrawer: sorted.map((e) => e.uuid).toList(),
+    );
+  }
+
+  Future<bool> _isSessionEmpty(String sessionUuid) async {
+    final messages = await ref
+        .read(chatMessageRepositoryProvider)
+        .findBySessionUuid(sessionUuid);
+    return messages.isEmpty;
+  }
+
+  Future<void> _evaluateSendGateForCurrent() async {
+    final current = state.currentSessionUuid;
+    if (current == null) {
+      state = state.copyWith(
+        canSendCurrentSession: false,
+        isSyncingCurrentSession: false,
+        currentSessionSyncError: null,
+      );
+      return;
+    }
+
+    if (!state.isOnline) {
+      state = state.copyWith(
+        canSendCurrentSession: false,
+        isSyncingCurrentSession: false,
+        currentSessionSyncError: null,
+      );
+      return;
+    }
+
+    if (state.syncedSessionUuids.contains(current)) {
+      state = state.copyWith(
+        canSendCurrentSession: true,
+        isSyncingCurrentSession: false,
+        currentSessionSyncError: null,
+      );
+      return;
+    }
+
+    unawaited(syncCurrentSessionForSend());
+  }
+
+  Future<void> _syncOtherSessionsInBackground({
+    required String excludeSessionUuid,
+  }) async {
+    if (!state.isOnline) {
+      return;
+    }
+
+    final nextSynced = Set<String>.from(state.syncedSessionUuids);
+    bool changed = false;
+    for (final session in state.sessions) {
+      final sessionUuid = session.uuid;
+      if (sessionUuid == excludeSessionUuid || nextSynced.contains(sessionUuid)) {
+        continue;
+      }
+      try {
+        await ref.read(chatServiceProvider).syncSessionMessagesIfNeeded(
+          sessionUuid,
+          syncedSessionUuids: nextSynced,
+        );
+        changed = true;
+      } catch (_) {
+        // 后台同步失败不打断当前会话可发状态。
+      }
+    }
+
+    if (changed) {
+      state = state.copyWith(syncedSessionUuids: nextSynced);
+    }
+  }
+
+  Future<void> refreshDrawerSessionsOnOpen({int pageSize = 50}) async {
+    if (state.isLoadingMoreInDrawer) {
+      return;
+    }
+
+    state = state.copyWith(isLoadingMoreInDrawer: true, errorMessage: null);
+    try {
+      if (state.isOnline) {
+        try {
+          await ref.read(chatServiceProvider).syncGlobalSessions();
+        } catch (_) {
+          // 远端同步失败时继续展示本地会话，避免阻塞抽屉打开。
+        }
+      }
+
+      await loadLocalSessions();
+
+      final models = await ref
+          .read(chatApiServiceProvider)
+          .listSessions(noteUuid: null, page: 0, size: pageSize);
+      final fetched = models.map(_fromSessionModel).toList();
+      final merged = _mergeSessions(state.sessions, fetched);
+      final visible = fetched.isNotEmpty
+          ? fetched.map((e) => e.uuid).toList()
+          : merged.take(pageSize).map((e) => e.uuid).toList();
+
+      state = state.copyWith(
+        sessions: merged,
+        sessionUuidsVisibleInDrawer: visible,
+        drawerNextPage: 1,
+        hasMoreInDrawer: models.length >= pageSize,
+      );
+    } catch (e) {
+      final sorted = [...state.sessions]
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      state = state.copyWith(
+        sessionUuidsVisibleInDrawer: sorted.map((e) => e.uuid).toList(),
+        errorMessage: e.toString(),
+      );
+    } finally {
+      state = state.copyWith(isLoadingMoreInDrawer: false);
+    }
+  }
+
+  String? _resolveCurrentSessionUuid(
+    List<ChatSession> sessions, {
+    required String? preferred,
+  }) {
+    if (sessions.isEmpty) {
+      return null;
+    }
+    if (preferred != null &&
+        sessions.any((session) => session.uuid == preferred)) {
+      return preferred;
+    }
+    return sessions.first.uuid;
+  }
+
+  List<ChatSession> _mergeSessions(
+    List<ChatSession> current,
+    List<ChatSession> incoming,
+  ) {
+    final map = <String, ChatSession>{};
+    for (final session in current) {
+      map[session.uuid] = session;
+    }
+    for (final session in incoming) {
+      map[session.uuid] = session;
+    }
+    final merged = map.values.toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return merged;
+  }
+
+  ChatSession _fromSessionModel(ChatSessionModel model) {
+    return ChatSession()
+      ..uuid = model.uuid
+      ..scopeNoteUuid = model.scopeNoteUuid
+      ..title = model.title
+      ..updatedAt = model.updatedAt
+      ..isDeleted = false;
+  }
 }
 
 // 发送状态
@@ -445,6 +949,12 @@ class ChatSend extends _$ChatSend {
     }
 
     await _notifyStop(requestId);
+
+    if (state is ChatSendStreaming) {
+      _activeCancelToken?.cancel('user stop fallback');
+      state = const ChatSendState.idle();
+      _cleanupActiveRequest();
+    }
   }
 
   Future<void> _notifyStop(String requestId) async {

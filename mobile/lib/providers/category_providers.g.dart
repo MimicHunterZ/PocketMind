@@ -206,7 +206,7 @@ final class CategoryActionsProvider
   }
 }
 
-String _$categoryActionsHash() => r'd6cbcff8950b67cdbe1da0c8d787eee4d8f1769a';
+String _$categoryActionsHash() => r'49c8be5fcfb942e745668f7355e3065efa014293';
 
 /// 分类操作 Notifier - 封装所有分类相关的业务操作
 ///
