@@ -760,7 +760,7 @@ final class GlobalAiSessionControllerProvider
 }
 
 String _$globalAiSessionControllerHash() =>
-    r'721fe85de6d42d03f63e32802f95b5768aa3d73f';
+    r'20ea68d5c26a4b1ab20511e2f67770b959d551e6';
 
 abstract class _$GlobalAiSessionController
     extends $Notifier<GlobalAiSessionState> {

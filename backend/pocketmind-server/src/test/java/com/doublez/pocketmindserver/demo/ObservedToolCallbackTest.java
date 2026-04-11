@@ -30,6 +30,11 @@ class ObservedToolCallbackTest {
             public String call(String toolInput) {
                 return "bash_id: shell_1\nnoise\nExit code: 0\nnoise\n";
             }
+
+            @Override
+            public String call(String toolInput, ToolContext toolContext) {
+                return "bash_id: shell_1\nnoise\nExit code: 0\nnoise\n";
+            }
         };
 
         ObservedToolCallback callback = new ObservedToolCallback(
@@ -45,5 +50,44 @@ class ObservedToolCallbackTest {
         Assertions.assertTrue(result.contains("bash_id: shell_1"));
         Assertions.assertTrue(result.contains("Exit code: 0"));
         Assertions.assertTrue(result.contains("noise"));
+    }
+
+    @Test
+    void shouldPassDefaultToolContextWhenCallWithoutContext() {
+        ToolCallback delegate = new ToolCallback() {
+            @Override
+            public ToolDefinition getToolDefinition() {
+                return ToolDefinition.builder()
+                        .name("Bash")
+                        .inputSchema("{}")
+                        .build();
+            }
+
+            @Override
+            public ToolMetadata getToolMetadata() {
+                return ToolMetadata.builder().build();
+            }
+
+            @Override
+            public String call(String toolInput) {
+                return "deprecated";
+            }
+
+            @Override
+            public String call(String toolInput, ToolContext toolContext) {
+                return toolContext == null ? "null" : "ok";
+            }
+        };
+
+        ObservedToolCallback callback = new ObservedToolCallback(
+                delegate,
+                "deepseek-chat",
+                true,
+                1000,
+                true
+        );
+
+        String result = callback.call("{}");
+        Assertions.assertEquals("ok", result);
     }
 }

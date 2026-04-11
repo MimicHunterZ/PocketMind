@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:go_router/go_router.dart';
+import 'package:pocketmind/router/route_paths.dart';
 
 class HomeTopBar extends StatelessWidget {
   const HomeTopBar({
@@ -109,6 +112,12 @@ class _ActionsBar extends StatelessWidget {
           ),
         ),
         const Spacer(),
+        if (kDebugMode)
+          IconButton(
+            onPressed: () => context.push(RoutePaths.genuiDemo),
+            icon: const Icon(Icons.auto_awesome),
+            tooltip: 'A2UI Demo',
+          ),
         IconButton(
           onPressed: onSearchTap,
           icon: const Icon(Icons.search),

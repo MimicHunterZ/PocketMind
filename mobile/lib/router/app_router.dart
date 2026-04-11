@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pocketmind/demo/a2ui/genui_demo_page.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/page/chat/branch_list_page.dart';
 import 'package:pocketmind/page/chat/chat_page.dart';
@@ -90,6 +91,12 @@ final appRouter = GoRouter(
     GoRoute(
       path: RoutePaths.globalAi,
       builder: (context, state) => const GlobalAiChatShell(),
+    ),
+
+    // A2UI Demo 页面 - 全屏，不含侧边栏
+    GoRoute(
+      path: RoutePaths.genuiDemo,
+      builder: (context, state) => const GenUiDemoPage(),
     ),
 
     // 聊天页 - 全屏，不含侧边栏

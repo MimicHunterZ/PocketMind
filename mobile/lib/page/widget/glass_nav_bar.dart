@@ -1,4 +1,5 @@
 // 用于 ImageFilter.blur
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +13,7 @@ import 'package:pocketmind/page/widget/categories_bar.dart' show CategoriesBar;
 /// 使用 Riverpod 进行依赖注入和状态管理。
 /// 集成了搜索按钮和布局切换功能
 ///
+@Deprecated('暂时弃用')
 class GlassNavBar extends ConsumerWidget {
   final VoidCallback? onSearchPressed;
 
@@ -59,6 +61,7 @@ class GlassNavBar extends ConsumerWidget {
     required IconData icon,
     required VoidCallback onPressed,
     required bool isDark,
+    String? tooltip,
   }) {
     return Container(
       decoration: BoxDecoration(

@@ -56,7 +56,7 @@ const SyncCheckpointSchema = CollectionSchema(
   getId: _syncCheckpointGetId,
   getLinks: _syncCheckpointGetLinks,
   attach: _syncCheckpointAttach,
-  version: '3.3.0-dev.3',
+  version: '3.3.2',
 );
 
 int _syncCheckpointEstimateSize(

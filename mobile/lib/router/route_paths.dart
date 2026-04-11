@@ -18,6 +18,9 @@ class RoutePaths {
   /// 全局 AI 入口
   static const String globalAi = '/global-ai';
 
+  /// A2UI Demo 页面
+  static const String genuiDemo = '/genui-demo';
+
   /// 平台账号管理
   static const String platformAccounts = '/settings/platform-accounts';
 

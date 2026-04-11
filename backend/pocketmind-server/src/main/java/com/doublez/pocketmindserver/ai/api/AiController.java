@@ -40,4 +40,5 @@ public class AiController {
         aiAnalysePollingService.accept(userId, request);
         return ResponseEntity.accepted().body(new AiAnalyseAcceptResponse(request.uuid(), request.url()));
     }
+
 }

@@ -109,7 +109,7 @@ const MutationEntrySchema = CollectionSchema(
   getId: _mutationEntryGetId,
   getLinks: _mutationEntryGetLinks,
   attach: _mutationEntryAttach,
-  version: '3.3.0-dev.3',
+  version: '3.3.2',
 );
 
 int _mutationEntryEstimateSize(

@@ -93,7 +93,7 @@ const ChatSessionSchema = CollectionSchema(
   getId: _chatSessionGetId,
   getLinks: _chatSessionGetLinks,
   attach: _chatSessionAttach,
-  version: '3.3.0-dev.3',
+  version: '3.3.2',
 );
 
 int _chatSessionEstimateSize(

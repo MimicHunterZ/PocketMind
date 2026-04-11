@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_streaming_text_markdown/flutter_streaming_text_markdown.dart';
 import 'package:pocketmind/model/chat_message.dart';
 import 'package:pocketmind/page/chat/widgets/chat_branch_sheet.dart';
 import 'package:pocketmind/page/widget/creative_toast.dart';
-import 'package:pocketmind/page/widget/markdown_text.dart';
 import 'package:pocketmind/providers/chat_providers.dart';
 import 'package:pocketmind/util/theme_data.dart';
 
@@ -63,11 +63,12 @@ class ChatMessageBubble extends ConsumerWidget {
                             color: colors.userBubbleText,
                           ),
                         )
-                      : MarkdownText(
-                          data: message.content,
-                          baseStyle: textTheme.bodyLarge?.copyWith(
-                            color: colors.assistantBubbleText,
-                          ),
+                      : StreamingTextMarkdown.chatGPT(
+                          text: message.content,
+                          markdownEnabled: true,
+                          animationsEnabled: false,
+                          isLoading: false,
+                          padding: EdgeInsets.zero,
                         ),
                 ),
                 SizedBox(height: 4.h),
@@ -159,12 +160,12 @@ class ChatStreamingBubble extends StatelessWidget {
                         color: colors.assistantBubbleText,
                       ),
                     )
-                  : MarkdownText(
-                      data: content,
-                      isStreaming: true,
-                      baseStyle: textTheme.bodyLarge?.copyWith(
-                        color: colors.assistantBubbleText,
-                      ),
+                  : StreamingTextMarkdown.chatGPT(
+                      text: content,
+                      markdownEnabled: true,
+                      animationsEnabled: false,
+                      isLoading: false,
+                      padding: EdgeInsets.zero,
                     ),
             ),
           ),

@@ -54,7 +54,7 @@ public class ObservedToolCallback implements ToolCallback {
 
     @Override
     public @NotNull String call(@NotNull String toolInput) {
-        return observe(toolInput, null);
+        return observe(toolInput, new ToolContext(Map.of()));
     }
 
     @Override
@@ -89,7 +89,7 @@ public class ObservedToolCallback implements ToolCallback {
         }
 
         try {
-            String rawResult = toolContext == null ? delegate.call(toolInput) : delegate.call(toolInput, toolContext);
+            String rawResult = delegate.call(toolInput, toolContext == null ? new ToolContext(Map.of()) : toolContext);
             // 按你的要求：不对工具输出做任何“精简/压缩/改写”。
             updateState(state, toolInput, rawResult);
             long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
