@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pocketmind/demo/a2ui/genui_demo_hub_page.dart';
 import 'package:pocketmind/demo/a2ui/genui_demo_page.dart';
+import 'package:pocketmind/demo/a2ui/markdown_sse_mock_demo_page.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/page/chat/branch_list_page.dart';
 import 'package:pocketmind/page/chat/chat_page.dart';
@@ -93,10 +95,22 @@ final appRouter = GoRouter(
       builder: (context, state) => const GlobalAiChatShell(),
     ),
 
-    // A2UI Demo 页面 - 全屏，不含侧边栏
+    // Demo Hub 页面 - 全屏，不含侧边栏
     GoRoute(
       path: RoutePaths.genuiDemo,
+      builder: (context, state) => const GenUiDemoHubPage(),
+    ),
+
+    // A2UI Stream Demo 页面 - 全屏，不含侧边栏
+    GoRoute(
+      path: RoutePaths.genuiDemoA2ui,
       builder: (context, state) => const GenUiDemoPage(),
+    ),
+
+    // Markdown SSE Mock Demo 页面 - 全屏，不含侧边栏
+    GoRoute(
+      path: RoutePaths.genuiDemoMarkdownSse,
+      builder: (context, state) => const MarkdownSseMockDemoPage(),
     ),
 
     // 聊天页 - 全屏，不含侧边栏

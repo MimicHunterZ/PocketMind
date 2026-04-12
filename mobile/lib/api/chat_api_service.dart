@@ -292,68 +292,102 @@ class ChatApiService {
     CancelToken? cancelToken,
   ) async* {
     // SSE 行缓冲区（用于处理跨 chunk 的不完整行）
-    final buffer = StringBuffer();
+    final lineBuffer = StringBuffer();
     String? currentEvent;
+    final dataLines = <String>[];
+
+    Stream<ChatStreamEvent> emitCurrentEvent() async* {
+      final event = currentEvent;
+      if (event == null || dataLines.isEmpty) {
+        currentEvent = null;
+        dataLines.clear();
+        return;
+      }
+
+      final data = dataLines.join('\n');
+      currentEvent = null;
+      dataLines.clear();
+
+      switch (event) {
+        case 'delta':
+          yield ChatDeltaEvent(data);
+        case 'done':
+          try {
+            final json = jsonDecode(data) as Map<String, dynamic>;
+            yield ChatDoneEvent(
+              json['messageUuid'] as String,
+              requestId: json['requestId'] as String?,
+            );
+          } catch (_) {
+            PMlog.w(_tag, 'done 事件解析失败: $data');
+          }
+        case 'paused':
+          try {
+            final json = jsonDecode(data) as Map<String, dynamic>;
+            yield ChatPausedEvent(
+              requestId: json['requestId'] as String?,
+              messageUuid: json['messageUuid'] as String?,
+            );
+          } catch (_) {
+            yield const ChatPausedEvent();
+          }
+        case 'error':
+          try {
+            final json = jsonDecode(data) as Map<String, dynamic>;
+            yield ChatErrorEvent(json['message'] as String? ?? 'AI 服务异常');
+          } catch (_) {
+            yield ChatErrorEvent(data);
+          }
+      }
+    }
+
+    Stream<ChatStreamEvent> parseLine(String line) async* {
+      if (line.isEmpty) {
+        yield* emitCurrentEvent();
+        return;
+      }
+
+      if (line.startsWith(':')) {
+        return;
+      }
+
+      if (line.startsWith('event:')) {
+        currentEvent = line.substring(6).trim();
+        return;
+      }
+
+      if (line.startsWith('data:')) {
+        final value = line.substring(5);
+        dataLines.add(value);
+      }
+    }
 
     try {
-      await for (final chunk in rawStream) {
+      await for (final textChunk in utf8.decoder.bind(rawStream)) {
         if (cancelToken != null && cancelToken.isCancelled) break;
 
-        buffer.write(utf8.decode(chunk, allowMalformed: true));
-        final raw = buffer.toString();
+        lineBuffer.write(textChunk);
+        final merged = lineBuffer.toString();
+        final lines = merged.split(RegExp(r'\r?\n'));
+        lineBuffer
+          ..clear()
+          ..write(lines.removeLast());
 
-        // 找到所有完整行（以 \n 结尾）
-        final newlineIdx = raw.lastIndexOf('\n');
-        if (newlineIdx == -1) continue; // 尚无完整行
-
-        final completeLines = raw.substring(0, newlineIdx + 1);
-        buffer.clear();
-        buffer.write(raw.substring(newlineIdx + 1)); // 剩余不完整内容
-
-        for (final rawLine in completeLines.split('\n')) {
-          final line = rawLine.trimRight(); // 去掉 \r
-
-          if (line.startsWith('event:')) {
-            currentEvent = line.substring(6).trim();
-          } else if (line.startsWith('data:')) {
-            final data = line.substring(5).trim();
-            final event = currentEvent;
-            currentEvent = null;
-
-            switch (event) {
-              case 'delta':
-                yield ChatDeltaEvent(data);
-              case 'done':
-                try {
-                  final json = jsonDecode(data) as Map<String, dynamic>;
-                  yield ChatDoneEvent(
-                    json['messageUuid'] as String,
-                    requestId: json['requestId'] as String?,
-                  );
-                } catch (_) {
-                  PMlog.w(_tag, 'done 事件解析失败: $data');
-                }
-              case 'paused':
-                try {
-                  final json = jsonDecode(data) as Map<String, dynamic>;
-                  yield ChatPausedEvent(
-                    requestId: json['requestId'] as String?,
-                    messageUuid: json['messageUuid'] as String?,
-                  );
-                } catch (_) {
-                  yield const ChatPausedEvent();
-                }
-              case 'error':
-                try {
-                  final json = jsonDecode(data) as Map<String, dynamic>;
-                  yield ChatErrorEvent(json['message'] as String? ?? 'AI 服务异常');
-                } catch (_) {
-                  yield ChatErrorEvent(data);
-                }
-            }
+        for (final line in lines) {
+          await for (final event in parseLine(line)) {
+            yield event;
           }
-          // 空行（SSE 事件分隔符）直接跳过
         }
+      }
+
+      if (lineBuffer.isNotEmpty) {
+        await for (final event in parseLine(lineBuffer.toString())) {
+          yield event;
+        }
+      }
+
+      await for (final event in emitCurrentEvent()) {
+        yield event;
       }
     } catch (e) {
       if (cancelToken != null && cancelToken.isCancelled) {
@@ -363,4 +397,10 @@ class ChatApiService {
       yield ChatErrorEvent(e.toString());
     }
   }
+
+  /// 仅供测试使用：直接解析原始 SSE 字节流。
+  Stream<ChatStreamEvent> parseForTest(
+    Stream<List<int>> rawStream,
+    CancelToken? cancelToken,
+  ) => _parseSseStream(rawStream, cancelToken);
 }

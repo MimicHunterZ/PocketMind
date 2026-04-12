@@ -21,6 +21,12 @@ class RoutePaths {
   /// A2UI Demo 页面
   static const String genuiDemo = '/genui-demo';
 
+  /// A2UI 流式 Demo 页面
+  static const String genuiDemoA2ui = '/genui-demo/a2ui';
+
+  /// Markdown SSE Mock Demo 页面
+  static const String genuiDemoMarkdownSse = '/genui-demo/markdown-sse';
+
   /// 平台账号管理
   static const String platformAccounts = '/settings/platform-accounts';
 
