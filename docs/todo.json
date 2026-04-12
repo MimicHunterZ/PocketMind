@@ -1,0 +1,302 @@
+{
+  "projectName": "PocketMind",
+  "version": "1.0",
+  "lastUpdated": "2026-04-12",
+  "description": "后端架构演进规划 - 从务实 DDD 风格向标准 DDD 演进",
+  
+  "overallStatus": {
+    "currentArchitecture": "务实的 DDD 风格分层架构",
+    "targetArchitecture": "标准 DDD 战术模式实现",
+    "completionRate": "60%"
+  },
+  
+  "tasks": [
+    {
+      "id": "DDD-001",
+      "title": "补充领域服务层",
+      "priority": "HIGH",
+      "status": "PENDING",
+      "description": "创建 domain/service 包,抽取跨聚合业务逻辑到领域服务",
+      "context": "当前跨聚合业务逻辑散落在 Application Service 中 (如 PostService.computeAiStatus)",
+      "objective": "将跨聚合业务规则从应用层下沉到领域层,确保业务逻辑集中管理",
+      "affectedModules": ["note", "memory", "chat", "resource"],
+      "subtasks": [
+        {
+          "id": "DDD-001-1",
+          "description": "识别现有应用服务中的跨聚合业务逻辑",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-001-2",
+          "description": "创建 domain/service 包结构",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-001-3",
+          "description": "实现关键领域服务 (NoteSharingService, NoteTaggingService 等)",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-001-4",
+          "description": "重构应用服务调用领域服务",
+          "status": "PENDING"
+        }
+      ],
+      "references": ["docs/architecture/backend/ddd-architecture.md#领域服务"]
+    },
+    
+    {
+      "id": "DDD-002",
+      "title": "引入标准领域事件机制",
+      "priority": "HIGH",
+      "status": "PENDING",
+      "description": "实现 DDD 标准领域事件模式,替代当前的 Spring 事件",
+      "context": "当前使用 Spring ApplicationEvent, 聚合根不持有未提交事件列表",
+      "objective": "聚合根内部发布事件,Repository 保存后统一发布,实现事件驱动架构",
+      "affectedModules": ["所有领域模块", "shared", "infrastructure"],
+      "subtasks": [
+        {
+          "id": "DDD-002-1",
+          "description": "定义 DomainEvent 接口 (shared/domain/event/)",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-002-2",
+          "description": "创建 AggregateRoot 基类,管理 domainEvents 列表",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-002-3",
+          "description": "实现 DomainEventPublisher (infrastructure/messaging/)",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-002-4",
+          "description": "重构现有事件为领域事件 (NoteAiPipelineEvent → NotePublishedEvent)",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-002-5",
+          "description": "修改 Repository 实现,在保存后发布聚合内事件",
+          "status": "PENDING"
+        }
+      ],
+      "references": ["docs/architecture/backend/ddd-architecture.md#领域事件"]
+    },
+    
+    {
+      "id": "DDD-003",
+      "title": "明确聚合根标识和边界",
+      "priority": "HIGH",
+      "status": "PENDING",
+      "description": "显式标识聚合根,定义聚合事务边界",
+      "context": "Note、Tag、Category 各自独立持久化,没有明确聚合边界",
+      "objective": "明确每个聚合根的职责范围,确保一个事务只修改一个聚合",
+      "affectedModules": ["note", "tag", "category", "memory", "chat", "resource"],
+      "subtasks": [
+        {
+          "id": "DDD-003-1",
+          "description": "定义 @AggregateRoot 注解 (shared/domain/annotation/)",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-003-2",
+          "description": "标识所有聚合根 (NoteEntity, TagEntity, MemoryRecordEntity 等)",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-003-3",
+          "description": "编写聚合边界文档 (docs/architecture/backend/aggregate-boundaries.md)",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-003-4",
+          "description": "审查现有事务边界,确保一个事务一个聚合",
+          "status": "PENDING"
+        }
+      ],
+      "references": ["docs/architecture/backend/ddd-architecture.md#聚合根"]
+    },
+    
+    {
+      "id": "DDD-004",
+      "title": "应用服务重构为纯编排",
+      "priority": "MEDIUM",
+      "status": "PENDING",
+      "description": "将应用服务中的业务逻辑下沉到领域层",
+      "context": "PostService 中的 computeAiStatus 等业务逻辑应该在领域层",
+      "objective": "应用服务只做编排: 加载聚合 → 调用领域方法 → 保存聚合",
+      "affectedModules": ["note/application", "memory/application", "chat/application"],
+      "subtasks": [
+        {
+          "id": "DDD-004-1",
+          "description": "识别应用服务中的业务逻辑方法",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-004-2",
+          "description": "将业务规则下沉到 Entity 或 Domain Service",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-004-3",
+          "description": "应用服务只保留事务边界和 DTO 转换",
+          "status": "PENDING"
+        }
+      ],
+      "references": ["docs/architecture/backend/ddd-architecture.md#应用服务"]
+    },
+    
+    {
+      "id": "DDD-005",
+      "title": "补充 AI 模块防腐层",
+      "priority": "MEDIUM",
+      "status": "PENDING",
+      "description": "定义领域层 AI 抽象,隔离 Spring AI 依赖",
+      "context": "AI 模块直接暴露 Spring AI 的 Prompt, ChatResponse 等类型",
+      "objective": "领域层定义 LlmService 接口,基础设施层提供适配器实现",
+      "affectedModules": ["ai"],
+      "subtasks": [
+        {
+          "id": "DDD-005-1",
+          "description": "定义领域接口 ai/domain/LlmService.java",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-005-2",
+          "description": "创建适配器 ai/infra/SpringAiLlmAdapter.java",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-005-3",
+          "description": "重构现有 AI 调用代码使用领域接口",
+          "status": "PENDING"
+        }
+      ],
+      "references": ["docs/architecture/backend/ddd-architecture.md#防腐层"]
+    },
+    
+    {
+      "id": "DDD-006",
+      "title": "建立领域异常体系",
+      "priority": "MEDIUM",
+      "status": "PENDING",
+      "description": "创建领域特定异常,替代通用 BusinessException",
+      "context": "使用通用 BusinessException, 缺少领域语义",
+      "objective": "定义领域异常基类和具体异常,提升异常语义化",
+      "affectedModules": ["所有领域模块", "shared"],
+      "subtasks": [
+        {
+          "id": "DDD-006-1",
+          "description": "定义 DomainException 基类 (shared/domain/exception/)",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-006-2",
+          "description": "创建具体异常类 (NoteNotFoundException, InvalidTagNameException 等)",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-006-3",
+          "description": "重构代码使用领域异常",
+          "status": "PENDING"
+        }
+      ]
+    },
+    
+    {
+      "id": "DDD-007",
+      "title": "抽取 AggregateRoot 基类",
+      "priority": "LOW",
+      "status": "PENDING",
+      "description": "创建统一的聚合根基类,管理领域事件",
+      "context": "每个聚合根独立实现,缺少统一抽象",
+      "objective": "提供 AggregateRoot 基类,统一管理 domainEvents 列表",
+      "affectedModules": ["shared", "所有聚合根"],
+      "dependsOn": ["DDD-002"],
+      "subtasks": [
+        {
+          "id": "DDD-007-1",
+          "description": "创建 AggregateRoot 基类 (shared/domain/)",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-007-2",
+          "description": "所有聚合根继承 AggregateRoot",
+          "status": "PENDING"
+        }
+      ]
+    },
+    
+    {
+      "id": "DDD-008",
+      "title": "复杂创建逻辑抽取为 Factory",
+      "priority": "LOW",
+      "status": "PENDING",
+      "description": "将复杂的实体创建逻辑抽取为独立的 Factory 类",
+      "context": "部分实体创建逻辑复杂,静态工厂方法过长",
+      "objective": "提升创建逻辑可测试性和可维护性",
+      "affectedModules": ["note", "memory"],
+      "subtasks": [
+        {
+          "id": "DDD-008-1",
+          "description": "识别复杂创建逻辑的实体",
+          "status": "PENDING"
+        },
+        {
+          "id": "DDD-008-2",
+          "description": "创建 XxxFactory 类封装创建逻辑",
+          "status": "PENDING"
+        }
+      ]
+    }
+  ],
+  
+  "notes": [
+    "项目当前架构质量很高,采用了 DDD 的核心思想 (分层、Repository 模式、值对象)",
+    "建议渐进式演进,优先实现高优先级项 (领域服务、领域事件、聚合边界)",
+    "不必强求 100% 符合 DDD,务实的 DDD 风格已经足够好",
+    "重点关注业务价值,避免为了 DDD 而 DDD"
+  ],
+  
+  "asyncTasks": [
+    {
+      "id": "ASYNC-001",
+      "title": "封装统一异步模块",
+      "priority": "MEDIUM",
+      "status": "PENDING",
+      "description": "创建统一的 Async 模块,提供虚拟线程、平台线程执行器和异步工具类",
+      "context": "当前异步功能分散: Thread.ofVirtual() 手动创建、依赖 Spring Boot 默认配置、无统一异常处理",
+      "objective": "封装统一 Async 模块,提供标准化的异步任务执行方式",
+      "affectedModules": ["config", "common"],
+      "subtasks": [
+        {
+          "id": "ASYNC-001-1",
+          "description": "创建 AsyncConfig 配置类,显式配置 @EnableAsync",
+          "status": "PENDING"
+        },
+        {
+          "id": "ASYNC-001-2",
+          "description": "定义 virtualThreadExecutor Bean,封装虚拟线程创建",
+          "status": "PENDING"
+        },
+        {
+          "id": "ASYNC-001-3",
+          "description": "配置 AsyncConfigurer,自定义执行器和统一异常处理器",
+          "status": "PENDING"
+        },
+        {
+          "id": "ASYNC-001-4",
+          "description": "创建 AsyncHelper 工具类,封装 CompletableFuture 常用模式",
+          "status": "PENDING"
+        },
+        {
+          "id": "ASYNC-001-5",
+          "description": "重构现有分散的 Thread.ofVirtual() 使用统一 Bean",
+          "status": "PENDING"
+        }
+      ],
+      "references": ["docs/architecture/backend/async-tasks.md"]
+    }
+  ]
+}
