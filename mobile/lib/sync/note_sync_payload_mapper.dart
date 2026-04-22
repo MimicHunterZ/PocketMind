@@ -1,5 +1,6 @@
 import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/model/note.dart';
+import 'package:pocketmind/sync/resource_status_state_machine.dart';
 import 'package:pocketmind/util/tag_list_utils.dart';
 
 /// Note 同步 payload 映射工具。
@@ -16,12 +17,14 @@ abstract final class NoteSyncPayloadMapper {
     required Map<String, dynamic> payload,
     required int serverVersion,
     String? fallbackPreviewImageUrl,
+    String? fallbackResourceStatus,
   }) {
     final existingPreviewImageUrl =
         fallbackPreviewImageUrl ?? target.previewImageUrl;
     final existingPreviewTitle = target.previewTitle;
     final existingPreviewDescription = target.previewDescription;
     final existingPreviewContent = target.previewContent;
+    final existingResourceStatus = fallbackResourceStatus ?? target.resourceStatus;
 
     target
       ..uuid = payload['uuid'] as String?
@@ -36,7 +39,11 @@ abstract final class NoteSyncPayloadMapper {
       ..previewTitle = existingPreviewTitle
       ..previewDescription = existingPreviewDescription
       ..previewContent = existingPreviewContent
-      ..resourceStatus = payload['resourceStatus'] as String?
+      ..resourceStatus = ResourceStatusStateMachine.reduce(
+        current: existingResourceStatus,
+        event: ResourceStatusEvent.serverSnapshot,
+        incoming: payload['resourceStatus'] as String?,
+      )
       ..aiSummary = payload['aiSummary'] as String?
       ..serverVersion = serverVersion;
 
@@ -74,6 +81,7 @@ abstract final class NoteSyncPayloadMapper {
     required Map<String, dynamic> payload,
     required int serverVersion,
     String? fallbackPreviewImageUrl,
+    String? fallbackResourceStatus,
   }) {
     final note = Note();
     applyServerSnapshot(
@@ -81,6 +89,7 @@ abstract final class NoteSyncPayloadMapper {
       payload: payload,
       serverVersion: serverVersion,
       fallbackPreviewImageUrl: fallbackPreviewImageUrl,
+      fallbackResourceStatus: fallbackResourceStatus,
     );
     return note;
   }

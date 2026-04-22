@@ -128,6 +128,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     ref.read(authControllerProvider);
 
     // 启动时检查是否有待处理的 URL 回调
+    //todo
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(noteServiceProvider).processPendingUrls();
       // 检查并轮询待处理的 AI 分析结果

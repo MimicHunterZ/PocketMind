@@ -57,9 +57,6 @@ class AppConstants {
   /// 抓取成功（正文可用）
   static const String resourceStatusCrawled = 'CRAWLED';
 
-  /// 向量化/Embedding 完成
-  static const String resourceStatusEmbedded = 'EMBEDDED';
-
   /// 抓取失败（终态，不再重试）
   static const String resourceStatusFailed = 'FAILED';
 

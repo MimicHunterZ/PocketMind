@@ -4,6 +4,7 @@ import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/data/repositories/isar_note_repository.dart';
 import 'package:pocketmind/sync/local_write_coordinator.dart';
+import 'package:pocketmind/sync/resource_status_state_machine.dart';
 import 'package:pocketmind/sync/sync_engine.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/util/logger_service.dart';
@@ -74,7 +75,10 @@ class NoteService {
       ..previewDescription = previewDescription
       ..aiSummary = aiSummary
       ..resourceStatus = (url != null && url.isNotEmpty)
-          ? AppConstants.resourceStatusPending
+          ? ResourceStatusStateMachine.reduce(
+              current: null,
+              event: ResourceStatusEvent.localCreatedWithUrl,
+            )
           : null;
 
     final savedId = await _writeCoordinator.writeNote(note);
@@ -219,9 +223,48 @@ class NoteService {
     _syncEngine?.kick();
   }
 
-  /// 持久化 resourceStatus 字段（不更新 updatedAt，由 [ResourceFetchScheduler] 调用）。
-  Future<void> persistResourceStatus(Note note, String status) async {
-    await _noteRepository.updateResourceStatus(note, status);
+  /// 应用资源状态事件。
+  ///
+  /// - 当 [syncAcrossDevices] 为 true：走统一写入口并入队 mutation。
+  /// - 否则仅本地更新 resourceStatus（不修改 updatedAt）。
+  Future<void> applyResourceStatusEvent(
+    Note note,
+    ResourceStatusEvent event, {
+    String? incomingStatus,
+    bool syncAcrossDevices = false,
+    bool triggerSync = true,
+  }) async {
+    final nextStatus = ResourceStatusStateMachine.reduce(
+      current: note.resourceStatus,
+      event: event,
+      incoming: incomingStatus,
+    );
+
+    if (nextStatus == note.resourceStatus || nextStatus == null) {
+      return;
+    }
+
+    note.resourceStatus = nextStatus;
+
+    if (syncAcrossDevices) {
+      await persistDerivedNoteForSync(note, triggerSync: triggerSync);
+      return;
+    }
+
+    await _noteRepository.updateResourceStatus(note, nextStatus);
+  }
+
+  /// 用户强制完成 loading 预览。
+  ///
+  /// 跨设备语义：将状态写为 FAILED 并入队同步，
+  /// 后台若后续成功可再升级为 CRAWLED。
+  Future<void> forceCompleteByUser(Note note) async {
+    await applyResourceStatusEvent(
+      note,
+      ResourceStatusEvent.userForceComplete,
+      syncAcrossDevices: true,
+      triggerSync: true,
+    );
   }
 
   // ─────────────────── 分享 URL 队列管理（Workmanager 流程）───────────────────

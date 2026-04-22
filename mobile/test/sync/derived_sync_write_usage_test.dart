@@ -9,9 +9,13 @@ void main() {
 
     final aiPollingPath = p.join('lib', 'service', 'ai_polling_service.dart');
     final callbackPath = p.join('lib', 'service', 'call_back_dispatcher.dart');
+    final schedulerPath = p.join('lib', 'sync', 'resource_fetch_scheduler.dart');
 
     final aiContent = File(p.join(root, aiPollingPath)).readAsStringSync();
     final callbackContent = File(p.join(root, callbackPath)).readAsStringSync();
+    final schedulerContent = File(
+      p.join(root, schedulerPath),
+    ).readAsStringSync();
 
     expect(
       aiContent.contains('persistDerivedNoteForSync('),
@@ -23,6 +27,11 @@ void main() {
       isTrue,
       reason: '后台回调必须通过统一入口持久化并入队同步',
     );
+    expect(
+      schedulerContent.contains('persistDerivedNoteForSync('),
+      isTrue,
+      reason: '抓取调度器必须通过统一入口持久化并入队同步',
+    );
 
     expect(
       aiContent.contains('saveSyncInternalNote('),
@@ -33,6 +42,31 @@ void main() {
       callbackContent.contains('saveSyncInternalNote('),
       isFalse,
       reason: '后台回调不应再使用旁路写 saveSyncInternalNote',
+    );
+    expect(
+      schedulerContent.contains('saveSyncInternalNote('),
+      isFalse,
+      reason: '抓取调度器不应再使用旁路写 saveSyncInternalNote',
+    );
+
+    final forbiddenDirectStatusAssignment = RegExp(
+      r'resourceStatus\s*=\s*AppConstants\.resourceStatus',
+    );
+
+    expect(
+      forbiddenDirectStatusAssignment.hasMatch(aiContent),
+      isFalse,
+      reason: 'AiPollingService 不应直接赋值 resourceStatus，应走状态机入口',
+    );
+    expect(
+      forbiddenDirectStatusAssignment.hasMatch(callbackContent),
+      isFalse,
+      reason: '后台回调不应直接赋值 resourceStatus，应走状态机入口',
+    );
+    expect(
+      forbiddenDirectStatusAssignment.hasMatch(schedulerContent),
+      isFalse,
+      reason: '抓取调度器不应直接赋值 resourceStatus，应走状态机入口',
     );
   });
 }

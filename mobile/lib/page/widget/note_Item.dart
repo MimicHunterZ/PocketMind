@@ -8,6 +8,7 @@ import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/service/note_service.dart';
 import 'package:pocketmind/util/url_helper.dart';
 import 'package:pocketmind/util/image_prefetcher.dart';
+import 'creative_toast.dart';
 import 'preview_card/link_preview_card.dart';
 import 'pm_image.dart';
 import 'local_text_card.dart';
@@ -59,6 +60,17 @@ class _NoteItemState extends ConsumerState<NoteItem>
 
     return note.resourceStatus == AppConstants.resourceStatusScraping ||
         note.resourceStatus == AppConstants.resourceStatusPending;
+  }
+
+  Future<void> _forceCompletePreview() async {
+    await widget.noteService.forceCompleteByUser(widget.note);
+    if (!mounted) return;
+    CreativeToast.success(
+      context,
+      title: '已强制完成',
+      message: '卡片已切换为可预览状态，后台任务仍会继续。',
+      direction: ToastDirection.top,
+    );
   }
 
   @override
@@ -149,6 +161,7 @@ class _NoteItemState extends ConsumerState<NoteItem>
             isWaterfall: widget.isWaterfall,
             hasContent: false,
             onTap: () {},
+            onForceComplete: _forceCompletePreview,
             isDesktop: widget.isDesktop,
             publishDate: _formatDate(widget.note.time),
             isHovered: _isHovered,
@@ -244,6 +257,7 @@ class _NoteItemState extends ConsumerState<NoteItem>
                       isWaterfall: widget.isWaterfall,
                       hasContent: content != null && content.isNotEmpty,
                       onTap: () => _showNoteDetail(context),
+                      onForceComplete: _forceCompletePreview,
                       isDesktop: widget.isDesktop,
                       publishDate: _formatDate(widget.note.time),
                       isHovered: _isHovered,

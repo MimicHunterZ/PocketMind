@@ -105,5 +105,65 @@ void main() {
       expect(note.previewDescription, 'local-desc');
       expect(note.previewContent, 'local-content');
     });
+
+    test('本地 CRAWLED 时服务端回流 PENDING 不应降级', () {
+      final note = Note()..resourceStatus = 'CRAWLED';
+
+      NoteSyncPayloadMapper.applyServerSnapshot(
+        target: note,
+        payload: {
+          'uuid': 'u5',
+          'updatedAt': 11,
+          'isDeleted': false,
+          'categoryId': 1,
+          'tags': const <String>[],
+          'resourceStatus': 'PENDING',
+          'serverVersion': 11,
+        },
+        serverVersion: 11,
+      );
+
+      expect(note.resourceStatus, 'CRAWLED');
+    });
+
+    test('本地 FAILED 时服务端回流 CRAWLED 可升级', () {
+      final note = Note()..resourceStatus = 'FAILED';
+
+      NoteSyncPayloadMapper.applyServerSnapshot(
+        target: note,
+        payload: {
+          'uuid': 'u6',
+          'updatedAt': 12,
+          'isDeleted': false,
+          'categoryId': 1,
+          'tags': const <String>[],
+          'resourceStatus': 'CRAWLED',
+          'serverVersion': 12,
+        },
+        serverVersion: 12,
+      );
+
+      expect(note.resourceStatus, 'CRAWLED');
+    });
+
+    test('本地 CRAWLED 时服务端回流 FAILED 仍保持 CRAWLED', () {
+      final note = Note()..resourceStatus = 'CRAWLED';
+
+      NoteSyncPayloadMapper.applyServerSnapshot(
+        target: note,
+        payload: {
+          'uuid': 'u7',
+          'updatedAt': 13,
+          'isDeleted': false,
+          'categoryId': 1,
+          'tags': const <String>[],
+          'resourceStatus': 'FAILED',
+          'serverVersion': 13,
+        },
+        serverVersion: 13,
+      );
+
+      expect(note.resourceStatus, 'CRAWLED');
+    });
   });
 }

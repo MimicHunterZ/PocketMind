@@ -6,6 +6,7 @@ import 'package:pocketmind/sync/model/mutation_entry.dart';
 import 'package:pocketmind/sync/model/sync_checkpoint.dart';
 import 'package:pocketmind/sync/model/sync_dto.dart';
 import 'package:pocketmind/sync/note_sync_payload_mapper.dart';
+import 'package:pocketmind/sync/resource_status_state_machine.dart';
 import 'package:pocketmind/sync/sync_checkpoint_policy.dart';
 import 'package:pocketmind/util/logger_service.dart';
 import 'package:pocketmind/util/tag_list_utils.dart';
@@ -148,6 +149,7 @@ class PullCoordinator {
           payload: change.payload,
           serverVersion: change.serverVersion,
           fallbackPreviewImageUrl: local.previewImageUrl,
+          fallbackResourceStatus: local.resourceStatus,
         )..id = local.id;
         final linkedCategory = await _isar.categorys.get(updated.categoryId);
         updated.category.value = linkedCategory;
@@ -184,7 +186,11 @@ class PullCoordinator {
       );
     }
     if (p['resourceStatus'] != null) {
-      local.resourceStatus = p['resourceStatus'] as String?;
+      local.resourceStatus = ResourceStatusStateMachine.reduce(
+        current: local.resourceStatus,
+        event: ResourceStatusEvent.serverSnapshot,
+        incoming: p['resourceStatus'] as String?,
+      );
     }
     final serverPreviewTitle = p['previewTitle'] as String?;
     if (serverPreviewTitle != null && serverPreviewTitle.trim().isNotEmpty) {

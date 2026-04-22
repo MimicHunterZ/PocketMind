@@ -49,7 +49,7 @@ class Note {
   /// 后端返回解析后的 Markdown 正文
   String? previewContent;
 
-  /// 资源抓取状态：SCRAPING / PENDING / CRAWLED / EMBEDDED / FAILED
+  /// 资源抓取状态：SCRAPING / PENDING / CRAWLED / FAILED
   ///
   /// 注意：失败时仍保持 previewContent 为 null，遵循"失败静默"。
   String? resourceStatus;

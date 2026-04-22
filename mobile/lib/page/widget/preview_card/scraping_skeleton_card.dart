@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:pocketmind/page/widget/creative_toast.dart';
 import 'package:pocketmind/util/theme_data.dart';
 import 'package:pocketmind/util/url_helper.dart';
 
@@ -9,12 +10,14 @@ class ScrapingSkeletonCard extends StatefulWidget {
   final bool isVertical;
   final String? url;
   final String? publishDate;
+  final VoidCallback? onForceComplete;
 
   const ScrapingSkeletonCard({
     super.key,
     required this.isVertical,
     required this.url,
     this.publishDate,
+    this.onForceComplete,
   });
 
   @override
@@ -62,18 +65,21 @@ class _ScrapingSkeletonCardState extends State<ScrapingSkeletonCard>
     final innerInset = 1.5.w;
     final innerRadius = widget.isVertical ? 22.r : 18.r;
 
+    final onForceComplete = widget.onForceComplete;
     final content = widget.isVertical
         ? _WaterfallScrapingContent(
             pulseController: _pulseController,
             domain: domain,
             publishDate: date,
             topImageRadius: innerRadius,
+            onForceComplete: onForceComplete,
           )
         : _ClassicListScrapingContent(
             pulseController: _pulseController,
             domain: domain,
             publishDate: date,
             leftImageRadius: innerRadius,
+            onForceComplete: onForceComplete,
           );
 
     final shell = ClipRRect(
@@ -150,12 +156,14 @@ class _WaterfallScrapingContent extends StatelessWidget {
   final String domain;
   final String publishDate;
   final double topImageRadius;
+  final VoidCallback? onForceComplete;
 
   const _WaterfallScrapingContent({
     required this.pulseController,
     required this.domain,
     required this.publishDate,
     required this.topImageRadius,
+    required this.onForceComplete,
   });
 
   @override
@@ -207,18 +215,30 @@ class _WaterfallScrapingContent extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      domain,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: textColor.withValues(alpha: 0.42),
-                        fontWeight: FontWeight.w600,
+                    Expanded(
+                      child: Text(
+                        domain,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: textColor.withValues(alpha: 0.42),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                    Text(
-                      publishDate,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: textColor.withValues(alpha: 0.24),
-                        fontWeight: FontWeight.w600,
+                    SizedBox(width: 8.w),
+                    if (onForceComplete != null)
+                      _ForceCompleteAction(onForceComplete: onForceComplete!),
+                    SizedBox(width: 8.w),
+                    Flexible(
+                      child: Text(
+                        publishDate,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: textColor.withValues(alpha: 0.24),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -238,12 +258,14 @@ class _ClassicListScrapingContent extends StatelessWidget {
   final String domain;
   final String publishDate;
   final double leftImageRadius;
+  final VoidCallback? onForceComplete;
 
   const _ClassicListScrapingContent({
     required this.pulseController,
     required this.domain,
     required this.publishDate,
     required this.leftImageRadius,
+    required this.onForceComplete,
   });
 
   @override
@@ -308,12 +330,19 @@ class _ClassicListScrapingContent extends StatelessWidget {
                         ),
                       ),
                     ),
-                    SizedBox(width: 8.w),
-                    Text(
-                      publishDate,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: textColor.withValues(alpha: 0.24),
-                        fontWeight: FontWeight.w600,
+                    if (onForceComplete != null) ...[
+                      SizedBox(width: 8.w),
+                      _ForceCompleteAction(onForceComplete: onForceComplete!),
+                      SizedBox(width: 8.w),
+                    ],
+                    Flexible(
+                      child: Text(
+                        publishDate,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: textColor.withValues(alpha: 0.24),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -323,6 +352,46 @@ class _ClassicListScrapingContent extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ForceCompleteAction extends StatelessWidget {
+  final VoidCallback onForceComplete;
+
+  const _ForceCompleteAction({required this.onForceComplete});
+
+  Future<void> _confirmForceComplete(BuildContext context) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '强制完成',
+      message: '确认强制结束 loading 并进入预览吗？该状态将同步到其他设备。',
+      cancelText: '取消',
+      confirmText: '强制完成',
+    );
+    if (confirmed != true) return;
+    onForceComplete();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onLongPress: () => _confirmForceComplete(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          '长按强制完成',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: Theme.of(context).colorScheme.tertiary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
     );
   }
 }

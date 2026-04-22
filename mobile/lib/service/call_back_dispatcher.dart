@@ -12,6 +12,7 @@ import 'package:pocketmind/model/chat_session.dart';
 import 'package:pocketmind/model/chat_message.dart';
 import 'package:pocketmind/sync/model/mutation_entry.dart';
 import 'package:pocketmind/sync/model/sync_checkpoint.dart';
+import 'package:pocketmind/sync/resource_status_state_machine.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';
 import 'package:pocketmind/service/notification_service.dart';
@@ -163,9 +164,9 @@ Future<void> scrapeAndSave(
     // 0. 标记为抓取中
     final processingNotes = await noteService.findNotesWithUrls(urls);
     for (final note in processingNotes) {
-      await noteService.persistResourceStatus(
+      await noteService.applyResourceStatusEvent(
         note,
-        AppConstants.resourceStatusScraping,
+        ResourceStatusEvent.fetchStarted,
       );
     }
 
@@ -275,7 +276,10 @@ Future<void> scrapeAndSave(
         await _enqueueAiAnalysis(prefs, note.uuid!);
 
         // 元数据处理完成，通过统一入口落库并入队同步
-        note.resourceStatus = AppConstants.resourceStatusCrawled;
+        await noteService.applyResourceStatusEvent(
+          note,
+          ResourceStatusEvent.fetchSucceeded,
+        );
         await noteService.persistDerivedNoteForSync(note);
 
         final platform = _getPlatformName(url, metaData?.source);
@@ -285,9 +289,9 @@ Future<void> scrapeAndSave(
         PMlog.d(tag, '笔记处理成功: $url');
       } catch (e) {
         PMlog.e(tag, '笔记处理失败: $url, e=$e');
-        await noteService.persistResourceStatus(
+        await noteService.applyResourceStatusEvent(
           note,
-          AppConstants.resourceStatusPending,
+          ResourceStatusEvent.fetchFailed,
         );
         failedUrls.add(url);
         lastErrorMessage = e.toString().length > 80
@@ -355,9 +359,9 @@ Future<void> scrapeAndSave(
     final processingNotes = await noteService.findNotesWithUrls(urls);
     for (final note in processingNotes) {
       if (note.resourceStatus == AppConstants.resourceStatusScraping) {
-        await noteService.persistResourceStatus(
+        await noteService.applyResourceStatusEvent(
           note,
-          AppConstants.resourceStatusPending,
+          ResourceStatusEvent.fetchFailed,
         );
       }
     }

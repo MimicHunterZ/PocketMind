@@ -27,6 +27,7 @@ class LinkPreviewCard extends ConsumerWidget {
   final String? publishDate;
   final bool isHovered;
   final bool isLoading;
+  final VoidCallback? onForceComplete;
 
   const LinkPreviewCard({
     super.key,
@@ -38,6 +39,7 @@ class LinkPreviewCard extends ConsumerWidget {
     this.publishDate,
     this.isHovered = false,
     this.isLoading = false,
+    this.onForceComplete,
   });
 
   @override
@@ -47,6 +49,7 @@ class LinkPreviewCard extends ConsumerWidget {
         isVertical: isWaterfall,
         url: note.url,
         publishDate: publishDate,
+        onForceComplete: onForceComplete,
       );
     }
 

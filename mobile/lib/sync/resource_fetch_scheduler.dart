@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/service/metadata_manager.dart';
 import 'package:pocketmind/service/note_service.dart';
+import 'package:pocketmind/sync/resource_status_state_machine.dart';
 import 'package:pocketmind/util/logger_service.dart';
 
 /// 资源抓取调度器 —— 监听网络恢复事件，自动驱动 PENDING 笔记完成元数据抓取。
@@ -85,11 +86,11 @@ class ResourceFetchScheduler {
         final url = note.url;
         if (url == null || url.isEmpty) continue;
 
-        try {
-          // 标记为抓取中
-          await _noteService.persistResourceStatus(
+          try {
+            // 标记为抓取中
+          await _noteService.applyResourceStatusEvent(
             note,
-            AppConstants.resourceStatusScraping,
+            ResourceStatusEvent.fetchStarted,
           );
 
           // 调用 MetadataManager（端侧抓取：LinkPreview / 平台专属爬虫）
@@ -102,24 +103,28 @@ class ResourceFetchScheduler {
               ..previewDescription =
                   metadata.displayDescription ?? note.previewDescription
               ..previewImageUrl = metadata.firstImage ?? note.previewImageUrl
-              ..previewContent = metadata.previewContent ?? note.previewContent
-              ..resourceStatus = AppConstants.resourceStatusCrawled;
+              ..previewContent = metadata.previewContent ?? note.previewContent;
+
+            await _noteService.applyResourceStatusEvent(
+              note,
+              ResourceStatusEvent.fetchSucceeded,
+            );
 
             // 通过统一入口落库并入队 mutation，内部自动触发同步。
             await _noteService.persistDerivedNoteForSync(note);
             PMlog.d(_tag, '笔记 ${note.uuid} 抓取成功，状态: CRAWLED');
           } else {
-            await _noteService.persistResourceStatus(
+            await _noteService.applyResourceStatusEvent(
               note,
-              AppConstants.resourceStatusFailed,
+              ResourceStatusEvent.fetchFailed,
             );
             PMlog.w(_tag, '笔记 ${note.uuid} 抓取结果无效，标记 FAILED');
           }
         } catch (e) {
           PMlog.e(_tag, '笔记 ${note.uuid} 抓取出错: $e');
-          await _noteService.persistResourceStatus(
+          await _noteService.applyResourceStatusEvent(
             note,
-            AppConstants.resourceStatusFailed,
+            ResourceStatusEvent.fetchFailed,
           );
         }
       }
