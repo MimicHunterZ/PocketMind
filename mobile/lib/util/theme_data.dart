@@ -339,7 +339,7 @@ final ThemeData calmBeigeTheme = ThemeData(
     onTertiary: Color(0xFFFFFFFF),
     // 侧边栏/次级背景色
     surfaceContainerLow: Color(0xFFF2F0ED),
-    surfaceContainerHighest: Color(0xFFD97757),
+    surfaceContainerHighest: Color(0xFFE5E3DF),
     outline: Color(0xFFE0DDD9), // 分割线颜色
     onSurfaceVariant: Color(0xFF9B9691),
     outlineVariant: Color(0xFFD6D2CE),
@@ -469,8 +469,7 @@ final ThemeData quietNightTheme = ThemeData(
     onTertiary: Color(0xFF09090B),
     // 侧边栏/次级背景色 - 纯黑
     surfaceContainerLow: Color(0xFF151515),
-    // 点睛色
-    surfaceContainerHighest: Color(0xFFE58F6F),
+    surfaceContainerHighest: Color(0xFF333336),
     outline: Color(0xBB838282), // 分割线颜色
     onSurfaceVariant: Color(0xFFC6C1C1),
     outlineVariant: Color(0xFF3F3F46),
