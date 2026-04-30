@@ -24,6 +24,16 @@ class _SafeMockIsarNoteRepository extends _MockIsarNoteRepository {
         )
         as Future<void>;
   }
+
+  @override
+  Future<Note?> getById(int id) {
+    return super.noSuchMethod(
+          Invocation.method(#getById, [id]),
+          returnValue: Future<Note?>.value(null),
+          returnValueForMissingStub: Future<Note?>.value(null),
+        )
+        as Future<Note?>;
+  }
 }
 
 class _SafeMockLocalWriteCoordinator extends _MockLocalWriteCoordinator {
@@ -81,5 +91,79 @@ void main() {
     verify(coordinator.writeNote(note)).called(1);
     verify(syncEngine.kick()).called(1);
     verifyZeroInteractions(repo);
+  });
+
+  group('updateNote resourceStatus 不可降级', () {
+    test('CRAWLED 笔记调用 updateNote(resourceStatus: PENDING) 后仍为 CRAWLED',
+        () async {
+      final existingNote = Note()
+        ..id = 42
+        ..uuid = 'uuid-42'
+        ..title = '已完成笔记'
+        ..resourceStatus = AppConstants.resourceStatusCrawled;
+
+      when(repo.getById(42)).thenAnswer((_) async => existingNote);
+
+      await service.updateNote(
+        id: 42,
+        resourceStatus: AppConstants.resourceStatusPending,
+      );
+
+      verify(coordinator.writeNote(existingNote)).called(1);
+      expect(existingNote.resourceStatus, AppConstants.resourceStatusCrawled);
+    });
+
+    test('CRAWLED 笔记调用 updateNote(resourceStatus: FAILED) 后仍为 CRAWLED',
+        () async {
+      final existingNote = Note()
+        ..id = 43
+        ..uuid = 'uuid-43'
+        ..title = '已完成笔记2'
+        ..resourceStatus = AppConstants.resourceStatusCrawled;
+
+      when(repo.getById(43)).thenAnswer((_) async => existingNote);
+
+      await service.updateNote(
+        id: 43,
+        resourceStatus: AppConstants.resourceStatusFailed,
+      );
+
+      verify(coordinator.writeNote(existingNote)).called(1);
+      expect(existingNote.resourceStatus, AppConstants.resourceStatusCrawled);
+    });
+
+    test('PENDING 笔记调用 updateNote(resourceStatus: CRAWLED) 可正常升级',
+        () async {
+      final existingNote = Note()
+        ..id = 44
+        ..uuid = 'uuid-44'
+        ..title = '待抓取笔记'
+        ..resourceStatus = AppConstants.resourceStatusPending;
+
+      when(repo.getById(44)).thenAnswer((_) async => existingNote);
+
+      await service.updateNote(
+        id: 44,
+        resourceStatus: AppConstants.resourceStatusCrawled,
+      );
+
+      verify(coordinator.writeNote(existingNote)).called(1);
+      expect(existingNote.resourceStatus, AppConstants.resourceStatusCrawled);
+    });
+
+    test('updateNote 不传 resourceStatus 时保持原值不变', () async {
+      final existingNote = Note()
+        ..id = 45
+        ..uuid = 'uuid-45'
+        ..title = '不修改状态'
+        ..resourceStatus = AppConstants.resourceStatusCrawled;
+
+      when(repo.getById(45)).thenAnswer((_) async => existingNote);
+
+      await service.updateNote(id: 45, title: '新标题');
+
+      verify(coordinator.writeNote(existingNote)).called(1);
+      expect(existingNote.resourceStatus, AppConstants.resourceStatusCrawled);
+    });
   });
 }

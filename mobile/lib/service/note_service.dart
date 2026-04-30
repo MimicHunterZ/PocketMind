@@ -118,8 +118,18 @@ class NoteService {
       ..previewDescription =
           previewDescription ?? existingNote.previewDescription
       ..previewContent = previewContent ?? existingNote.previewContent
-      ..resourceStatus = resourceStatus ?? existingNote.resourceStatus
       ..aiSummary = aiSummary ?? existingNote.aiSummary;
+
+    // resourceStatus 变更必须经过状态机决策，防止 CRAWLED 终态被降级
+    if (resourceStatus != null &&
+        resourceStatus != existingNote.resourceStatus) {
+      existingNote.resourceStatus = ResourceStatusStateMachine.reduce(
+            current: existingNote.resourceStatus,
+            event: ResourceStatusEvent.serverSnapshot,
+            incoming: resourceStatus,
+          ) ??
+          existingNote.resourceStatus;
+    }
     if (tags != null) existingNote.tags = tags;
 
     final savedId = await _writeCoordinator.writeNote(existingNote);
