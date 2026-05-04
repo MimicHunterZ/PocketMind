@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:lottie/lottie.dart';
-import 'package:pocketmind/util/theme_data.dart' show SharePageThemeColors;
+import 'package:pocketmind/util/theme_data.dart';
 
 class ShareSuccessPage extends ConsumerStatefulWidget {
   final VoidCallback onDismiss;
@@ -58,9 +58,8 @@ class _ShareSuccessPageState extends ConsumerState<ShareSuccessPage>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final shareColors = Theme.of(context).extension<SharePageThemeColors>();
+    final shareColors = context.shareColors;
+    final appColor = context.appColors;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -136,7 +135,7 @@ class _ShareSuccessPageState extends ConsumerState<ShareSuccessPage>
               width:
                   MediaQuery.of(context).size.width * _progressController.value,
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest, // 点睛色
+                color: appColor?.themeDataColor, // 点睛色
                 borderRadius: BorderRadius.circular(1.r),
               ),
             );

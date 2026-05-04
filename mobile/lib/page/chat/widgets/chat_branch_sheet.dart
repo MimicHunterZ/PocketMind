@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/providers/chat_providers.dart';
 import 'package:pocketmind/page/chat/widgets/chat_common_widgets.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 /// 新分支底部弹窗（从某条 AI 消息节点开始新对话）。
 class ChatBranchSheet extends ConsumerStatefulWidget {
@@ -41,8 +42,8 @@ class _ChatBranchSheetState extends ConsumerState<ChatBranchSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final cs = context.colorScheme;
+    final textTheme = context.textTheme;
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,

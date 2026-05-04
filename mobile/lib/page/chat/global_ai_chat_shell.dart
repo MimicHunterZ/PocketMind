@@ -5,6 +5,7 @@ import 'package:pocketmind/model/chat_message.dart';
 import 'package:pocketmind/page/chat/chat_page.dart';
 import 'package:pocketmind/page/chat/widgets/global_session_switch_sheet.dart';
 import 'package:pocketmind/providers/chat_providers.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 typedef GlobalAiChatPageBuilder =
     Widget Function({required String sessionUuid, required Key key});
@@ -170,7 +171,7 @@ class _GlobalAiChatShellState extends ConsumerState<GlobalAiChatShell> {
     await showModalBottomSheet<void>(
       context: outerContext,
       isScrollControlled: true,
-      backgroundColor: Theme.of(outerContext).cardColor,
+      backgroundColor: outerContext.theme.cardColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16.r)),
       ),

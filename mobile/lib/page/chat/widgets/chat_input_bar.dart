@@ -48,7 +48,7 @@ class ChatInputBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colorScheme;
 
     return Container(
       decoration: BoxDecoration(
@@ -133,7 +133,7 @@ class _TextInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme = context.textTheme;
     return Container(
       constraints: BoxConstraints(minHeight: 40.h, maxHeight: 120.h),
       decoration: BoxDecoration(
@@ -170,7 +170,7 @@ class _VoiceHoldButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme = context.textTheme;
     return GestureDetector(
       onLongPressStart: (_) => actions.onVoiceStart(),
       onLongPressEnd: (_) => actions.onVoiceEnd(),

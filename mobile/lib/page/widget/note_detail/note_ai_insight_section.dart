@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/page/widget/creative_toast.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 class NoteAIInsightSection extends StatelessWidget {
   String aiSummary;
@@ -8,7 +9,7 @@ class NoteAIInsightSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
 
     // 解析 Q&A 格式
     String? question;

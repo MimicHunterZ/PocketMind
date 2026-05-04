@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 enum HomeTab { everything, ai, category }
 
@@ -14,7 +15,7 @@ class HomeTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
 
     return SafeArea(
       top: false,
@@ -73,7 +74,7 @@ class _TabItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),

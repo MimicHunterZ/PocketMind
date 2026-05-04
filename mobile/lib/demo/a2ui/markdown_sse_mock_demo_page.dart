@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_streaming_text_markdown/flutter_streaming_text_markdown.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 class MarkdownSseMockDemoPage extends StatefulWidget {
   const MarkdownSseMockDemoPage({super.key});
@@ -38,7 +39,7 @@ class _MarkdownSseMockDemoPageState extends State<MarkdownSseMockDemoPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Markdown SSE Mock Demo')),
       body: Column(
@@ -50,7 +51,7 @@ class _MarkdownSseMockDemoPageState extends State<MarkdownSseMockDemoPage> {
               children: [
                 Text(
                   '数据源: $_mockFullAsset',
-                  style: Theme.of(context).textTheme.bodySmall,
+                  style: context.textTheme.bodySmall,
                 ),
                 const SizedBox(height: 8),
                 Row(

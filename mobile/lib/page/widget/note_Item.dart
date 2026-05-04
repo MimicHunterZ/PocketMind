@@ -12,6 +12,7 @@ import 'creative_toast.dart';
 import 'preview_card/link_preview_card.dart';
 import 'pm_image.dart';
 import 'local_text_card.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 String tag = 'noteItem';
 
@@ -78,8 +79,8 @@ class _NoteItemState extends ConsumerState<NoteItem>
     // 必须调用 super.build，让 AutomaticKeepAliveClientMixin 工作
     super.build(context);
 
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = context.colorScheme;
+    final textTheme = context.textTheme;
 
     // 判断是否为纯文本笔记
     final isTextOnly = widget.note.url == null ? true : false;
@@ -136,14 +137,14 @@ class _NoteItemState extends ConsumerState<NoteItem>
           ]
         : [
             BoxShadow(
-              color: Theme.of(context).shadowColor,
+              color: context.theme.shadowColor,
               blurRadius: 20,
               spreadRadius: -5,
               offset: const Offset(0, 4),
             ),
           ];
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = context.isDark;
     final borderColor = isDark
         ? Colors.white.withValues(alpha: 0.2)
         : Colors.black.withValues(alpha: 0.1);
@@ -180,7 +181,7 @@ class _NoteItemState extends ConsumerState<NoteItem>
         transformAlignment: Alignment.center,
         margin: margin,
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
+          color: context.theme.cardColor,
           borderRadius: BorderRadius.circular(16.r),
           border: Border.all(color: borderColor, width: 1),
           boxShadow: shadow,

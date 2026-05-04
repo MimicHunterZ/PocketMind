@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 class NoteLastEditedInfo extends StatelessWidget {
   final String formattedDate;
@@ -7,7 +8,7 @@ class NoteLastEditedInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
 
     return Text(
       'Last edited on $formattedDate',

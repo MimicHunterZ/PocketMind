@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocketmind/providers/app_config_provider.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 /// 布局切换按钮组件
 /// 用于切换卡片布局和列表布局
@@ -13,7 +14,7 @@ class LayoutToggleButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final config = ref.watch(appConfigProvider);
     final isGridMode = config.waterfallLayoutEnabled;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = context.isDark;
 
     return Container(
       decoration: BoxDecoration(
@@ -72,8 +73,8 @@ class _LayoutButtonState extends State<_LayoutButton> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = context.colorScheme;
+    final isDark = context.isDark;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -131,8 +132,8 @@ class _ThemeToggleButtonState extends State<ThemeToggleButton> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = context.colorScheme;
+    final isDark = context.isDark;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -184,7 +185,7 @@ class DesktopHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     final screenWidth = MediaQuery.of(context).size.width;
 
     // Windows 平台预留右侧窗口控制按钮空间
@@ -262,8 +263,8 @@ class _DesktopSearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = context.colorScheme;
+    final isDark = context.isDark;
 
     return Container(
       height: 40.w,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:pocketmind/page/widget/category_icon_picker.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 /// 添加分类的结果数据
 class AddCategoryResult {
@@ -58,7 +59,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     final isDesktop = MediaQuery.of(context).size.width > 600;
 
     // 响应式尺寸

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/providers/app_config_provider.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 /// 纯文本卡片变体类型
 enum TextCardVariant {
@@ -122,8 +123,8 @@ class _SnippetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = context.colorScheme;
+    final textTheme = context.textTheme;
     final padding = isDesktop ? 24.w : 16.w;
 
     return Padding(
@@ -173,8 +174,8 @@ class _QuoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = context.colorScheme;
+    final textTheme = context.textTheme;
     final padding = isDesktop ? 28.w : 20.w;
 
     return Stack(
@@ -291,8 +292,8 @@ class _HeadlineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = context.colorScheme;
+    final textTheme = context.textTheme;
     final padding = isDesktop ? 28.w : 20.w;
 
     return Container(
@@ -424,8 +425,8 @@ class _EssayCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = context.colorScheme;
+    final textTheme = context.textTheme;
     final padding = isDesktop ? 24.w : 16.w;
 
     return Padding(

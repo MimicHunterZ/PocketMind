@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:pocketmind/model/chat_message.dart';
 import 'package:pocketmind/model/chat_session.dart';
 import 'package:pocketmind/page/chat/widgets/chat_common_widgets.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 typedef GlobalSessionLoadMore = Future<void> Function();
 typedef GlobalSessionTap = Future<void> Function(String sessionUuid);
@@ -45,7 +46,7 @@ class GlobalSessionSwitchSheet extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
             child: Row(
               children: [
-                Text('切换会话', style: Theme.of(context).textTheme.titleMedium),
+                Text('切换会话', style: context.textTheme.titleMedium),
               ],
             ),
           ),
@@ -116,18 +117,16 @@ class GlobalSessionSwitchSheet extends StatelessWidget {
                             key: ValueKey('session-title-${session.uuid}'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyLarge,
+                            style: context.textTheme.bodyLarge,
                           ),
                         ),
                         SizedBox(width: 8.w),
                         Text(
                           _formatTime(session.updatedAt),
                           key: ValueKey('session-time-${session.uuid}'),
-                          style: Theme.of(context).textTheme.bodySmall
+                          style: context.textTheme.bodySmall
                               ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
+                                color: context.colorScheme.onSurfaceVariant,
                               ),
                         ),
                       ],
@@ -137,13 +136,13 @@ class GlobalSessionSwitchSheet extends StatelessWidget {
                       key: ValueKey('session-preview-${session.uuid}'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: context.textTheme.bodySmall,
                     ),
                     trailing: isCurrent
                         ? Icon(
                             Icons.check_circle,
                             size: 18.sp,
-                            color: Theme.of(context).colorScheme.primary,
+                            color: context.colorScheme.primary,
                           )
                         : null,
                   );

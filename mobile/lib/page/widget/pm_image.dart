@@ -181,7 +181,7 @@ class PMImage extends StatelessWidget {
     return Container(
       width: width,
       height: height,
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      color: context.colorScheme.surfaceContainerHighest,
       child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
     );
   }

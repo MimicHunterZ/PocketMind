@@ -31,7 +31,7 @@ class ChatMessageBubble extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isUser = message.role == 'USER';
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme = context.textTheme;
 
     if (message.messageType == 'TOOL_CALL' ||
         message.messageType == 'TOOL_RESULT') {
@@ -105,7 +105,7 @@ class ChatPendingUserBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme = context.textTheme;
     return Padding(
       padding: EdgeInsets.only(bottom: 10.h),
       child: Row(
@@ -143,7 +143,7 @@ class ChatStreamingBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme = context.textTheme;
     return Padding(
       padding: EdgeInsets.only(bottom: 10.h),
       child: Row(
@@ -183,8 +183,8 @@ class ChatToolCallCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final cs = Theme.of(context).colorScheme;
+    final textTheme = context.textTheme;
+    final cs = context.colorScheme;
     final isCall = message.messageType == 'TOOL_CALL';
 
     return Padding(
@@ -240,7 +240,7 @@ class ChatBubbleShape extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shadowColor = Theme.of(context).shadowColor;
+    final shadowColor = context.theme.shadowColor;
     const r = Radius.circular(18);
     const userShape = BorderRadius.only(
       topLeft: r,
@@ -294,7 +294,7 @@ class ChatMessageActionBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colorScheme;
     final notifier = ref.read(chatSendProvider(sessionUuid).notifier);
     final isSending =
         ref.watch(chatSendProvider(sessionUuid)) is ChatSendStreaming;
@@ -318,7 +318,7 @@ class ChatMessageActionBar extends ConsumerWidget {
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
-        backgroundColor: Theme.of(context).cardColor,
+        backgroundColor: context.theme.cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
         ),

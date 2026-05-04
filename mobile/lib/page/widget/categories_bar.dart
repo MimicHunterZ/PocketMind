@@ -6,8 +6,10 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/providers/category_providers.dart';
 import 'package:pocketmind/providers/nav_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 import 'item_bar.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 class CategoriesBar extends ConsumerWidget {
   const CategoriesBar({super.key});
@@ -20,7 +22,7 @@ class CategoriesBar extends ConsumerWidget {
     final activeIndex = ref.watch(activeNavIndexProvider);
 
     // 获取当前主题亮度
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = context.isDark;
     return navItemsAsync.when(
       data: (navItems) {
         // 如果没有导航项，返回空容器
@@ -113,7 +115,7 @@ class CategoriesBar extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) {
-        final colorScheme = Theme.of(context).colorScheme;
+        final colorScheme = context.colorScheme;
         return AlertDialog(
           backgroundColor: colorScheme.surface,
           title: Text('删除分类', style: TextStyle(color: colorScheme.primary)),

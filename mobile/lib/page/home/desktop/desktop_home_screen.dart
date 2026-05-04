@@ -18,6 +18,7 @@ import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/providers/ui_providers.dart';
 import 'package:pocketmind/providers/app_config_provider.dart';
 import 'package:pocketmind/util/logger_service.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 final String tag = 'DesktopHomeScreen';
 
@@ -53,7 +54,7 @@ class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     final noteService = ref.watch(noteServiceProvider);
     final currentLayout = ref.watch(appConfigProvider).waterfallLayoutEnabled
         ? NoteLayout.grid
@@ -195,7 +196,7 @@ class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
 
   /// 构建空状态占位
   Widget _buildEmptyState() {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -208,14 +209,12 @@ class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
           SizedBox(height: 24.h),
           Text(
             '你的思绪将汇聚于此',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(color: colorScheme.secondary),
+            style: context.textTheme.titleLarge?.copyWith(color: colorScheme.secondary),
           ),
           SizedBox(height: 12.h),
           Text(
             '点击右下角，捕捉第一个灵感',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            style: context.textTheme.bodyMedium?.copyWith(
               color: colorScheme.secondary.withValues(alpha: 0.6),
             ),
           ),
@@ -247,7 +246,7 @@ class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
 
   /// 构建搜索结果为空状态
   Widget _buildSearchEmptyState() {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -260,14 +259,12 @@ class _DesktopHomeScreenState extends ConsumerState<DesktopHomeScreen>
           SizedBox(height: 24.h),
           Text(
             '未找到相关笔记',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(color: colorScheme.secondary),
+            style: context.textTheme.titleLarge?.copyWith(color: colorScheme.secondary),
           ),
           SizedBox(height: 12.h),
           Text(
             '尝试使用其他关键词',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            style: context.textTheme.bodyMedium?.copyWith(
               color: colorScheme.secondary.withValues(alpha: 0.6),
             ),
           ),

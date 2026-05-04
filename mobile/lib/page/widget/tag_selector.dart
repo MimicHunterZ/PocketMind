@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 /// 标签选择器
 ///
@@ -69,7 +70,7 @@ class _TagSelectorState extends State<TagSelector> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     final borderColor = colorScheme.outline.withValues(alpha: 0.2);
     final iconColor = colorScheme.onSurfaceVariant;
 
@@ -94,7 +95,7 @@ class _TagSelectorState extends State<TagSelector> {
   }
 
   Widget _buildTagChip(BuildContext context, String tag) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
@@ -129,7 +130,7 @@ class _TagSelectorState extends State<TagSelector> {
   }
 
   Widget _buildInput(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     final borderColor = colorScheme.outline.withValues(alpha: 0.2);
 
     return Container(

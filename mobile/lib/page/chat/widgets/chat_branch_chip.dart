@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/providers/chat_providers.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 /// 分支标签（显示在 AppBar 标题旁，指示当前所在分支）。
 class ChatBranchChip extends ConsumerWidget {
@@ -15,8 +16,8 @@ class ChatBranchChip extends ConsumerWidget {
         .watch(chatSessionStreamProvider(sessionUuid))
         .asData
         ?.value;
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final cs = context.colorScheme;
+    final textTheme = context.textTheme;
     final leafUuid = session?.activeLeafUuid;
 
     final leafMessage = leafUuid != null

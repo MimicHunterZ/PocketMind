@@ -55,8 +55,8 @@ class _ScrapingSkeletonCardState extends State<ScrapingSkeletonCard>
   @override
   Widget build(BuildContext context) {
     final appColors = AppColors.of(context);
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = context.colorScheme;
+    final isDark = context.isDark;
     final domain = UrlHelper.extractDomain(widget.url).isEmpty
         ? ''
         : UrlHelper.extractDomain(widget.url);
@@ -123,7 +123,7 @@ class _ScrapingSkeletonCardState extends State<ScrapingSkeletonCard>
                 padding: EdgeInsets.all(innerInset),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
+                    color: context.theme.cardColor,
                     borderRadius: BorderRadius.circular(innerRadius),
                     border: Border.all(
                       color: appColors.cardBorder.withValues(
@@ -169,7 +169,7 @@ class _WaterfallScrapingContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appColors = AppColors.of(context);
-    final textColor = Theme.of(context).colorScheme.onSurface;
+    final textColor = context.colorScheme.onSurface;
 
     return Column(
       children: [
@@ -220,7 +220,7 @@ class _WaterfallScrapingContent extends StatelessWidget {
                         domain,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        style: context.textTheme.bodySmall?.copyWith(
                           color: textColor.withValues(alpha: 0.42),
                           fontWeight: FontWeight.w600,
                         ),
@@ -235,7 +235,7 @@ class _WaterfallScrapingContent extends StatelessWidget {
                         publishDate,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        style: context.textTheme.bodySmall?.copyWith(
                           color: textColor.withValues(alpha: 0.24),
                           fontWeight: FontWeight.w600,
                         ),
@@ -271,7 +271,7 @@ class _ClassicListScrapingContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appColors = AppColors.of(context);
-    final textColor = Theme.of(context).colorScheme.onSurface;
+    final textColor = context.colorScheme.onSurface;
 
     return Row(
       children: [
@@ -324,7 +324,7 @@ class _ClassicListScrapingContent extends StatelessWidget {
                         domain,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        style: context.textTheme.bodySmall?.copyWith(
                           color: textColor.withValues(alpha: 0.42),
                           fontWeight: FontWeight.w600,
                         ),
@@ -339,7 +339,7 @@ class _ClassicListScrapingContent extends StatelessWidget {
                       child: Text(
                         publishDate,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        style: context.textTheme.bodySmall?.copyWith(
                           color: textColor.withValues(alpha: 0.24),
                           fontWeight: FontWeight.w600,
                         ),
@@ -381,13 +381,13 @@ class _ForceCompleteAction extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.16),
+          color: context.colorScheme.tertiary.withValues(alpha: 0.16),
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
           '长按强制完成',
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Theme.of(context).colorScheme.tertiary,
+          style: context.textTheme.labelSmall?.copyWith(
+            color: context.colorScheme.tertiary,
             fontWeight: FontWeight.w600,
           ),
         ),

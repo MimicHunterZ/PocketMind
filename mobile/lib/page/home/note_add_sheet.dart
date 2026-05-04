@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/page/home/mixin/note_editor_logic_mixin.dart';
 import 'package:pocketmind/page/widget/category_selector.dart';
 import 'package:pocketmind/page/widget/tag_selector.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 class NoteEditorRoute extends PageRouteBuilder {
   NoteEditorRoute()
@@ -83,7 +84,7 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
   // --- UI 构建方法 ---
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     final bg = colorScheme.surface;
 
     final media = MediaQuery.of(context);
@@ -154,7 +155,7 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
 
   // 1. 顶部工具栏
   Widget _buildHeader(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
 
     return Container(
       height: 60.h,
@@ -179,7 +180,7 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
           // 标题
           Text(
             'NEW ENTRY',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            style: context.textTheme.labelSmall?.copyWith(
               fontWeight: FontWeight.bold,
               letterSpacing: 1.5,
               color: colorScheme.onSurface.withValues(alpha: 0.38),
@@ -201,7 +202,7 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
             icon: Icon(Icons.check, size: 16.sp),
             label: Text(
               'Save',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              style: context.textTheme.labelLarge?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: colorScheme.onPrimary,
               ),
@@ -214,7 +215,7 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
 
   // 2. 元数据栏 (分类、标签、工具按钮)
   Widget _buildMetadataBar(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     final borderColor = colorScheme.outline.withValues(alpha: 0.2);
 
     return Wrap(
@@ -248,7 +249,7 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
       return const SizedBox.shrink();
     }
 
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
 
     return Padding(
       padding: EdgeInsets.only(bottom: 16.h),
@@ -289,8 +290,8 @@ class _NoteEditorSheetState extends ConsumerState<NoteEditorSheet>
 
   // 4. 主要输入区域 (标题、内容)
   Widget _buildMainInputs(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = context.colorScheme;
+    final textTheme = context.textTheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

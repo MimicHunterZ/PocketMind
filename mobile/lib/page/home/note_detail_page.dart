@@ -11,6 +11,7 @@ import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/util/image_prefetcher.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/util/responsive_breakpoints.dart';
+import 'package:pocketmind/util/theme_data.dart';
 import 'package:pocketmind/util/url_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../router/route_paths.dart';
@@ -104,8 +105,8 @@ class _NoteDetailPageState extends ConsumerState<NoteDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = context.colorScheme;
+    final textTheme = context.textTheme;
     final screenWidth = MediaQuery.of(context).size.width;
     final showSidebar = ResponsiveBreakpoints.shouldShowNoteDetailSidebar(
       screenWidth,

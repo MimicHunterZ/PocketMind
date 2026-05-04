@@ -1,4 +1,3 @@
-// 用于 ImageFilter.blur
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -6,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocketmind/router/route_paths.dart';
 import 'package:pocketmind/page/widget/categories_bar.dart' show CategoriesBar;
+import 'package:pocketmind/util/theme_data.dart';
 
 ///
 /// 这是包含 ItemBar 的主导航栏。
@@ -22,7 +22,7 @@ class GlassNavBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // 获取当前主题亮度
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = context.isDark;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -87,7 +87,7 @@ class GlassNavBar extends ConsumerWidget {
       child: IconButton(
         icon: Icon(icon),
         onPressed: onPressed,
-        color: Theme.of(context).colorScheme.primary,
+        color: context.colorScheme.primary,
         iconSize: 22.sp,
       ),
     );

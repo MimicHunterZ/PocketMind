@@ -27,6 +27,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.errorIcon,
     required this.errorText,
     required this.cardBorder,
+    required this.themeDataColor,
   });
 
   /// 骨架屏底色
@@ -47,6 +48,9 @@ class AppColors extends ThemeExtension<AppColors> {
   /// 卡片边框颜色
   final Color cardBorder;
 
+  /// 点睛色
+  final Color themeDataColor;
+
   @override
   AppColors copyWith({
     Color? skeletonBase,
@@ -55,6 +59,7 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? errorIcon,
     Color? errorText,
     Color? cardBorder,
+    Color? themeDataColor,
   }) {
     return AppColors(
       skeletonBase: skeletonBase ?? this.skeletonBase,
@@ -63,6 +68,7 @@ class AppColors extends ThemeExtension<AppColors> {
       errorIcon: errorIcon ?? this.errorIcon,
       errorText: errorText ?? this.errorText,
       cardBorder: cardBorder ?? this.cardBorder,
+      themeDataColor: themeDataColor ?? this.themeDataColor,
     );
   }
 
@@ -80,6 +86,7 @@ class AppColors extends ThemeExtension<AppColors> {
       errorIcon: Color.lerp(errorIcon, other.errorIcon, t)!,
       errorText: Color.lerp(errorText, other.errorText, t)!,
       cardBorder: Color.lerp(cardBorder, other.cardBorder, t)!,
+      themeDataColor: Color.lerp(themeDataColor, other.themeDataColor, t)!,
     );
   }
 
@@ -96,6 +103,7 @@ const lightAppColors = AppColors(
   errorIcon: Color(0xFFD0D0D0),
   errorText: Color(0xFF9E9E9E),
   cardBorder: Color(0x1A000000), // black 10%
+  themeDataColor: Color(0xFFD97757),
 );
 
 /// 暗色模式扩展颜色
@@ -106,6 +114,7 @@ const darkAppColors = AppColors(
   errorIcon: Color(0xFF4A4A4A),
   errorText: Color(0xFF6A6A6A),
   cardBorder: Color(0x33FFFFFF), // white 20%
+  themeDataColor: Color(0xFFD97757),
 );
 
 class SharePageThemeColors extends ThemeExtension<SharePageThemeColors> {
@@ -691,3 +700,42 @@ const darkChatBubbleColors = ChatBubbleColors(
   inputBarBackground: Color(0xFF2C2C2E),
   streamingDot: Color(0xFFE58F6F),
 );
+
+/// BuildContext 主题扩展 —— 消除页面中重复的 Theme.of(context) 模板代码
+extension ThemeContextExt on BuildContext {
+  /// 完整 ThemeData
+  ThemeData get theme => Theme.of(this);
+
+  /// Material 3 颜色方案
+  ColorScheme get colorScheme => Theme.of(this).colorScheme;
+
+  /// 文字样式集
+  TextTheme get textTheme => Theme.of(this).textTheme;
+
+  /// 当前是否为暗色模式
+  bool get isDark => Theme.of(this).brightness == Brightness.dark;
+
+  /// 全局扩展颜色（骨架屏、卡片边框、点睛色等）
+  /// 未注册时回退到对应亮/暗默认值，确保不崩溃
+  AppColors get appColors =>
+      Theme.of(this).extension<AppColors>() ??
+      (isDark ? darkAppColors : lightAppColors);
+
+  /// 分享页专属配色
+  /// 未注册时回退到对应亮/暗默认值，确保不崩溃
+  SharePageThemeColors get shareColors =>
+      Theme.of(this).extension<SharePageThemeColors>() ??
+      (isDark ? darkShareColors : lightShareColors);
+
+  /// 分类首页专属配色
+  /// 未注册时回退到对应亮/暗默认值，确保不崩溃
+  CategoryHomeColors get categoryHomeColors =>
+      Theme.of(this).extension<CategoryHomeColors>() ??
+      (isDark ? darkCategoryHomeColors : lightCategoryHomeColors);
+
+  /// 聊天气泡配色
+  /// 未注册时回退到对应亮/暗默认值，确保不崩溃
+  ChatBubbleColors get chatBubbleColors =>
+      Theme.of(this).extension<ChatBubbleColors>() ??
+      (isDark ? darkChatBubbleColors : lightChatBubbleColors);
+}

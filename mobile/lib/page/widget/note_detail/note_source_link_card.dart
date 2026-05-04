@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 class NoteSourceLinkCard extends StatelessWidget {
   final String url;
@@ -15,7 +16,7 @@ class NoteSourceLinkCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     final domain = Uri.tryParse(url)?.host ?? url;
 
     return GestureDetector(

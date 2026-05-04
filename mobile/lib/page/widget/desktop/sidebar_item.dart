@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 /// 侧边栏分类条目组件
 /// 可复用的侧边栏导航项，支持选中态和悬停效果
@@ -26,8 +27,8 @@ class _SidebarItemState extends State<SidebarItem> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = context.colorScheme;
+    final isDark = context.isDark;
 
     // 背景颜色逻辑
     Color backgroundColor;

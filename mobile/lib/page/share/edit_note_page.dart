@@ -9,6 +9,7 @@ import 'package:pocketmind/providers/app_config_provider.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/service/category_service.dart';
 import 'package:pocketmind/service/note_service.dart';
+import 'package:pocketmind/util/theme_data.dart';
 import 'package:intl/intl.dart';
 
 import 'package:pocketmind/page/widget/creative_time_picker.dart';
@@ -120,7 +121,7 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
 
   // 构建顶部导航栏
   Widget _buildTopNavBar() {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
 
     return Container(
       color: Colors.transparent, // 透明背景以显示底层 FlowingBackground
@@ -757,7 +758,7 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
     final topPadding = MediaQuery.of(context).padding.top;
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
 
     return Padding(
       padding: EdgeInsets.only(

@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/page/widget/pm_image.dart';
 import 'package:pocketmind/page/widget/common/category_badge.dart';
 import 'package:pocketmind/page/widget/common/date_label.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 class HeroGallery extends StatefulWidget {
   final List<String> images;
@@ -91,7 +92,7 @@ class _HeroGalleryState extends State<HeroGallery> {
     final totalHeight = widget.height ?? defaultHeight;
 
     // 获取背景色
-    final bgColor = Theme.of(context).scaffoldBackgroundColor;
+    final bgColor = context.theme.scaffoldBackgroundColor;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -190,7 +191,7 @@ class _HeroGalleryState extends State<HeroGallery> {
 
   /// 构建文字内容
   Widget _buildTextContent() {
-    final textScheme = Theme.of(context).textTheme;
+    final textScheme = context.textTheme;
 
     final hasCategory =
         widget.categoryLabel != null && widget.categoryLabel!.isNotEmpty;

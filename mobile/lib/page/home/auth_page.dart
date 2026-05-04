@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/page/widget/creative_toast.dart';
 import 'package:pocketmind/page/widget/pm_app_bar.dart';
 import 'package:pocketmind/providers/auth_providers.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 class AuthPage extends ConsumerStatefulWidget {
   const AuthPage({super.key});
@@ -82,11 +83,10 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final session = ref.watch(authControllerProvider);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: context.theme.scaffoldBackgroundColor,
       appBar: const PMAppBar(title: Text('账号')),
       body: Center(
         child: SingleChildScrollView(
@@ -98,9 +98,9 @@ class _AuthPageState extends ConsumerState<AuthPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (session.isLoggedIn) ...[
-                  _buildLoggedInView(theme, session),
+                  _buildLoggedInView(session),
                 ] else ...[
-                  _buildAuthForm(theme),
+                  _buildAuthForm(),
                 ],
               ],
             ),
@@ -110,14 +110,14 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     );
   }
 
-  Widget _buildLoggedInView(ThemeData theme, AuthSessionState session) {
+  Widget _buildLoggedInView(AuthSessionState session) {
     return Card(
-      color: theme.cardColor,
+      color: context.theme.cardColor,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(24.r),
         side: BorderSide(
-          color: theme.colorScheme.outline.withValues(alpha: 0.2),
+          color: context.colorScheme.outline.withValues(alpha: 0.2),
         ),
       ),
       child: Padding(
@@ -128,25 +128,25 @@ class _AuthPageState extends ConsumerState<AuthPage> {
               width: 80.r,
               height: 80.r,
               decoration: BoxDecoration(
-                color: theme.colorScheme.tertiary.withValues(alpha: 0.1),
+                color: context.colorScheme.tertiary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.person_rounded,
                 size: 40.r,
-                color: theme.colorScheme.tertiary,
+                color: context.colorScheme.tertiary,
               ),
             ),
             SizedBox(height: 24.h),
             Text(
               '已登录',
-              style: theme.textTheme.titleLarge?.copyWith(fontSize: 24.sp),
+              style: context.textTheme.titleLarge?.copyWith(fontSize: 24.sp),
             ),
             SizedBox(height: 8.h),
             Text(
               '用户ID：${session.userId ?? ''}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.secondary,
+              style: context.textTheme.bodyMedium?.copyWith(
+                color: context.colorScheme.secondary,
               ),
             ),
             SizedBox(height: 32.h),
@@ -158,7 +158,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                     : () => ref.read(authControllerProvider.notifier).logout(),
                 style: OutlinedButton.styleFrom(
                   padding: EdgeInsets.symmetric(vertical: 16.h),
-                  side: BorderSide(color: theme.colorScheme.outline),
+                  side: BorderSide(color: context.colorScheme.outline),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12.r),
                   ),
@@ -166,7 +166,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                 child: Text(
                   '退出登录',
                   style: TextStyle(
-                    color: theme.colorScheme.error,
+                    color: context.colorScheme.error,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -178,23 +178,23 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     );
   }
 
-  Widget _buildAuthForm(ThemeData theme) {
+  Widget _buildAuthForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           _isLoginMode ? '欢迎回来' : '创建账号',
-          style: theme.textTheme.titleLarge?.copyWith(
+          style: context.textTheme.titleLarge?.copyWith(
             fontSize: 32.sp,
-            color: theme.colorScheme.primary,
+            color: context.colorScheme.primary,
           ),
           textAlign: TextAlign.center,
         ),
         SizedBox(height: 12.h),
         Text(
           _isLoginMode ? '登录以同步您的第二大脑数据' : '注册账号，开启您的知识管理之旅',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.secondary,
+          style: context.textTheme.bodyMedium?.copyWith(
+            color: context.colorScheme.secondary,
           ),
           textAlign: TextAlign.center,
         ),
@@ -202,7 +202,6 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
         // 用户名输入框
         _buildTextField(
-          theme,
           controller: _usernameController,
           label: '用户名',
           icon: Icons.person_outline_rounded,
@@ -212,7 +211,6 @@ class _AuthPageState extends ConsumerState<AuthPage> {
 
         // 密码输入框
         _buildTextField(
-          theme,
           controller: _passwordController,
           label: '密码',
           icon: Icons.lock_outline_rounded,
@@ -226,8 +224,8 @@ class _AuthPageState extends ConsumerState<AuthPage> {
         FilledButton(
           onPressed: _submitting ? null : _submit,
           style: FilledButton.styleFrom(
-            backgroundColor: theme.colorScheme.tertiary,
-            foregroundColor: theme.colorScheme.onTertiary,
+            backgroundColor: context.colorScheme.tertiary,
+            foregroundColor: context.colorScheme.onTertiary,
             padding: EdgeInsets.symmetric(vertical: 16.h),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16.r),
@@ -240,7 +238,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                   width: 20.r,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: theme.colorScheme.onTertiary,
+                    color: context.colorScheme.onTertiary,
                   ),
                 )
               : Text(
@@ -260,8 +258,8 @@ class _AuthPageState extends ConsumerState<AuthPage> {
           children: [
             Text(
               _isLoginMode ? '还没有账号？' : '已有账号？',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.secondary,
+              style: context.textTheme.bodyMedium?.copyWith(
+                color: context.colorScheme.secondary,
               ),
             ),
             TextButton(
@@ -275,7 +273,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                       });
                     },
               style: TextButton.styleFrom(
-                foregroundColor: theme.colorScheme.tertiary,
+                foregroundColor: context.colorScheme.tertiary,
               ),
               child: Text(
                 _isLoginMode ? '立即注册' : '直接登录',
@@ -291,8 +289,8 @@ class _AuthPageState extends ConsumerState<AuthPage> {
             child: Text(
               '未登录时依然可以使用全部本地功能\n登录后将启用后端资源抓取/分析能力',
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.secondary.withValues(alpha: 0.5),
+              style: context.textTheme.bodySmall?.copyWith(
+                color: context.colorScheme.secondary.withValues(alpha: 0.5),
               ),
             ),
           ),
@@ -302,7 +300,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   }
 
   Widget _buildTextField(
-    ThemeData theme, {
+    {
     required TextEditingController controller,
     required String label,
     required IconData icon,
@@ -312,11 +310,11 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: theme.cardColor,
+        color: context.theme.cardColor,
         borderRadius: BorderRadius.circular(16.r),
         boxShadow: [
           BoxShadow(
-            color: theme.shadowColor.withValues(alpha: 0.05),
+            color: context.theme.shadowColor.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -327,11 +325,11 @@ class _AuthPageState extends ConsumerState<AuthPage> {
         obscureText: obscureText,
         textInputAction: textInputAction,
         onSubmitted: onSubmitted,
-        style: theme.textTheme.bodyLarge,
+        style: context.textTheme.bodyLarge,
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: TextStyle(color: theme.colorScheme.secondary),
-          prefixIcon: Icon(icon, color: theme.colorScheme.secondary),
+          labelStyle: TextStyle(color: context.colorScheme.secondary),
+          prefixIcon: Icon(icon, color: context.colorScheme.secondary),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16.r),
             borderSide: BorderSide.none,
@@ -343,12 +341,12 @@ class _AuthPageState extends ConsumerState<AuthPage> {
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16.r),
             borderSide: BorderSide(
-              color: theme.colorScheme.tertiary.withValues(alpha: 0.5),
+              color: context.colorScheme.tertiary.withValues(alpha: 0.5),
               width: 1.5,
             ),
           ),
           filled: true,
-          fillColor: theme.cardColor,
+          fillColor: context.theme.cardColor,
           contentPadding: EdgeInsets.symmetric(
             horizontal: 20.w,
             vertical: 16.h,

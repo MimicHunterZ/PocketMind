@@ -59,7 +59,7 @@ class _CategoryCardState extends State<CategoryCard>
   @override
   Widget build(BuildContext context) {
     final ext = CategoryHomeColors.of(context);
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme = context.textTheme;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _active = true),

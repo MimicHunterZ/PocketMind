@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 enum ToastType { success, error, info, warning }
 
@@ -236,8 +237,7 @@ class _ToastWidgetState extends State<_ToastWidget>
   @override
   Widget build(BuildContext context) {
     final config = _toastConfigs[widget.type]!;
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final cs = context.colorScheme;
     final mq = MediaQuery.of(context);
     final width = math.min(mq.size.width - 32.w, 380.0.w);
 
@@ -328,7 +328,7 @@ class _ToastWidgetState extends State<_ToastWidget>
                                 children: [
                                   Text(
                                     widget.title,
-                                    style: theme.textTheme.titleMedium
+                                    style: context.textTheme.titleMedium
                                         ?.copyWith(
                                           fontSize: 15.sp,
                                           fontWeight: FontWeight.w600,
@@ -340,7 +340,7 @@ class _ToastWidgetState extends State<_ToastWidget>
                                   SizedBox(height: 2.h),
                                   Text(
                                     widget.message,
-                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                    style: context.textTheme.bodyMedium?.copyWith(
                                       fontSize: 13.sp,
                                       color: cs.secondary,
                                       decoration: TextDecoration.none,
@@ -486,8 +486,7 @@ class _ConfirmDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final cs = context.colorScheme;
     const gradient = LinearGradient(
       colors: [Color(0xFFE58F6F), Color(0xFFFACC15)],
       begin: Alignment.topLeft,
@@ -567,7 +566,7 @@ class _ConfirmDialog extends StatelessWidget {
                       SizedBox(height: 20.h),
                       Text(
                         title,
-                        style: theme.textTheme.titleLarge?.copyWith(
+                        style: context.textTheme.titleLarge?.copyWith(
                           fontSize: 18.sp,
                           fontWeight: FontWeight.w600,
                           decoration: TextDecoration.none,
@@ -579,7 +578,7 @@ class _ConfirmDialog extends StatelessWidget {
                         padding: EdgeInsets.symmetric(horizontal: 24.w),
                         child: Text(
                           message,
-                          style: theme.textTheme.bodyMedium?.copyWith(
+                          style: context.textTheme.bodyMedium?.copyWith(
                             fontSize: 14.sp,
                             color: cs.secondary,
                             height: 1.5,
@@ -607,7 +606,7 @@ class _ConfirmDialog extends StatelessWidget {
                                   alignment: Alignment.center,
                                   child: Text(
                                     cancelText,
-                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                    style: context.textTheme.bodyLarge?.copyWith(
                                       fontSize: 15.sp,
                                       color: cs.secondary,
                                       fontWeight: FontWeight.w600,
@@ -639,7 +638,7 @@ class _ConfirmDialog extends StatelessWidget {
                                   alignment: Alignment.center,
                                   child: Text(
                                     confirmText,
-                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                    style: context.textTheme.bodyLarge?.copyWith(
                                       fontSize: 15.sp,
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
@@ -744,8 +743,7 @@ class _InputDialogState extends State<_InputDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final cs = context.colorScheme;
     const gradient = LinearGradient(
       colors: [Color(0xFF60A5FA), Color(0xFFEC4899)],
       begin: Alignment.topLeft,
@@ -828,7 +826,7 @@ class _InputDialogState extends State<_InputDialog> {
                         SizedBox(height: 20.h),
                         Text(
                           widget.title,
-                          style: theme.textTheme.titleLarge?.copyWith(
+                          style: context.textTheme.titleLarge?.copyWith(
                             fontSize: 18.sp,
                             fontWeight: FontWeight.w600,
                             decoration: TextDecoration.none,
@@ -841,7 +839,7 @@ class _InputDialogState extends State<_InputDialog> {
                             padding: EdgeInsets.symmetric(horizontal: 24.w),
                             child: Text(
                               widget.message!,
-                              style: theme.textTheme.bodyMedium?.copyWith(
+                              style: context.textTheme.bodyMedium?.copyWith(
                                 fontSize: 14.sp,
                                 color: cs.secondary,
                                 height: 1.5,
@@ -867,13 +865,13 @@ class _InputDialogState extends State<_InputDialog> {
                               controller: _controller,
                               maxLines: widget.maxLines,
                               keyboardType: widget.keyboardType,
-                              style: theme.textTheme.bodyLarge?.copyWith(
+                              style: context.textTheme.bodyLarge?.copyWith(
                                 fontSize: 15.sp,
                                 decoration: TextDecoration.none,
                               ),
                               decoration: InputDecoration(
                                 hintText: widget.hintText,
-                                hintStyle: theme.textTheme.bodyLarge?.copyWith(
+                                hintStyle: context.textTheme.bodyLarge?.copyWith(
                                   fontSize: 15.sp,
                                   color: cs.secondary.withValues(alpha: 0.5),
                                 ),
@@ -905,7 +903,7 @@ class _InputDialogState extends State<_InputDialog> {
                                     alignment: Alignment.center,
                                     child: Text(
                                       widget.cancelText,
-                                      style: theme.textTheme.bodyLarge
+                                      style: context.textTheme.bodyLarge
                                           ?.copyWith(
                                             fontSize: 15.sp,
                                             color: cs.secondary,
@@ -940,7 +938,7 @@ class _InputDialogState extends State<_InputDialog> {
                                     alignment: Alignment.center,
                                     child: Text(
                                       widget.confirmText,
-                                      style: theme.textTheme.bodyLarge
+                                      style: context.textTheme.bodyLarge
                                           ?.copyWith(
                                             fontSize: 15.sp,
                                             color: Colors.white,

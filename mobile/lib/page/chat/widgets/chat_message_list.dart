@@ -102,8 +102,8 @@ class _ChatMessageListState extends ConsumerState<ChatMessageList> {
       error: (e, _) => Center(
         child: Text(
           '加载失败，请重试',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.error,
+          style: context.textTheme.bodyMedium?.copyWith(
+            color: context.colorScheme.error,
           ),
         ),
       ),
@@ -141,15 +141,13 @@ class _ChatMessageListState extends ConsumerState<ChatMessageList> {
               child: Container(
                 padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
                 decoration: BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.error.withValues(alpha: 0.12),
+                  color: context.colorScheme.error.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12.r),
                 ),
                 child: Text(
                   '回复失败，点击关闭',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.error,
+                  style: context.textTheme.bodySmall?.copyWith(
+                    color: context.colorScheme.error,
                   ),
                 ),
               ),

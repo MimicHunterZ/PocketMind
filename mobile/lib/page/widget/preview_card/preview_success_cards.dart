@@ -1,4 +1,5 @@
 import 'package:any_link_preview/any_link_preview.dart';
+import 'package:pocketmind/util/theme_data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/model/note.dart';
@@ -130,7 +131,7 @@ class _PreviewCardContainer extends StatelessWidget {
       child: Container(
         height: height,
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
+          color: context.theme.cardColor,
           borderRadius: borderRadius,
         ),
         clipBehavior: Clip.antiAlias,
@@ -207,9 +208,8 @@ class _WaterfallContentSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final textTheme = theme.textTheme;
+    final colorScheme = context.colorScheme;
+    final textTheme = context.textTheme;
 
     final titleStyle = textTheme.titleMedium?.copyWith(
       fontSize: isDesktop ? 20.sp : 17.sp,
@@ -270,9 +270,8 @@ class _ClassicListContentSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final textTheme = theme.textTheme;
+    final colorScheme = context.colorScheme;
+    final textTheme = context.textTheme;
 
     return Expanded(
       child: Padding(

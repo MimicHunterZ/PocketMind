@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:pocketmind/page/home/model/category_theme_icon_registry.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 final List<CategoryIconOption> availableCategoryIcons = [
   ...themeCategoryIconOptions.map(
@@ -43,7 +44,7 @@ class _CategoryIconPickerDialogState extends State<CategoryIconPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     final isDesktop = MediaQuery.of(context).size.width > 600;
 
     final dialogWidth = isDesktop ? 320.0 : 300.w;

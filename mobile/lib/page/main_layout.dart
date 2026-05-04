@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:pocketmind/page/widget/desktop/desktop_sidebar.dart';
 import 'package:pocketmind/util/responsive_breakpoints.dart';
 
+import '../util/theme_data.dart';
+
 /// 全局主布局组件
 /// 负责根据平台实现响应式布局：
 /// - 桌面端：固定侧边栏 + 动态内容区
@@ -29,9 +31,7 @@ class MainLayout extends StatelessWidget {
             VerticalDivider(
               width: 1,
               thickness: 1,
-              color: Theme.of(
-                context,
-              ).colorScheme.outlineVariant.withValues(alpha: 0.5),
+              color: context.colorScheme.outlineVariant.withValues(alpha: 0.5),
             ),
 
             // 动态内容区域 (由路由驱动)

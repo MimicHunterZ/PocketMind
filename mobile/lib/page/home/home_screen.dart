@@ -186,7 +186,7 @@ class _EverythingPane extends ConsumerWidget {
           return Center(
             child: Text(
               '你的思绪将汇聚于此',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: context.textTheme.titleMedium,
             ),
           );
         }

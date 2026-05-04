@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:pocketmind/page/widget/category_icon_picker.dart';
 import 'package:pocketmind/page/widget/category_selector.dart';
 import 'package:pocketmind/providers/category_providers.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 class NoteCategorySelector extends ConsumerStatefulWidget {
   final int currentCategoryId;
@@ -83,7 +84,7 @@ class _NoteCategorySelectorState extends ConsumerState<NoteCategorySelector>
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     final categoriesAsync = ref.watch(allCategoriesProvider);
 
     return Container(

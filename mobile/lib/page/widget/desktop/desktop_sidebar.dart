@@ -9,6 +9,7 @@ import 'package:pocketmind/providers/nav_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/page/widget/creative_toast.dart';
 import 'sidebar_item.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 /// 桌面端侧边栏组件
 /// 包含 App 名称、分类列表和设置入口
@@ -20,7 +21,7 @@ class DesktopSidebar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
 
     // 从 provider 获取当前激活的索引
     final activeIndex = ref.watch(activeNavIndexProvider);
@@ -205,8 +206,8 @@ class _SettingsButtonState extends State<_SettingsButton> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = context.colorScheme;
+    final isDark = context.isDark;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),

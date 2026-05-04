@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:pocketmind/page/widget/pm_image.dart';
 import 'package:pocketmind/util/image_prefetcher.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 /// 沉浸式图片展示组件（用于详情页图片区域）。
 ///
@@ -26,7 +27,7 @@ class ImmersiveImage extends StatelessWidget {
   Widget build(BuildContext context) {
     // 空白填充按主题变色：亮色更偏白，暗色更偏黑。
     // 这里用纯黑/白是为了更接近“沉浸式图文预览”的观感。
-    final bg = Theme.of(context).brightness == Brightness.dark
+    final bg = context.isDark
         ? Colors.black
         : Colors.white;
 
@@ -157,7 +158,7 @@ class _ImmersiveImageCarouselState extends State<ImmersiveImageCarousel> {
 
         // 不做兜底高度：尺寸没算完就不展示轮播，避免任何二次重排造成的跳动。
         if (_maxHeightOverWidth == null) {
-          final bg = Theme.of(context).brightness == Brightness.dark
+          final bg = context.isDark
               ? Colors.black
               : Colors.white;
           return SizedBox(
@@ -241,7 +242,7 @@ class _DotsIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // 指示点现在在图片下方（非图片叠层），使用主题色确保可见。
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(count, (i) {

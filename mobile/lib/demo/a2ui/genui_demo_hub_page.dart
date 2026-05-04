@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocketmind/router/route_paths.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 class GenUiDemoHubPage extends StatelessWidget {
   const GenUiDemoHubPage({super.key});
@@ -46,7 +47,6 @@ class _DemoEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Card(
       child: InkWell(
         onTap: onTap,
@@ -61,9 +61,9 @@ class _DemoEntryCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: theme.textTheme.titleMedium),
+                    Text(title, style: context.textTheme.titleMedium),
                     const SizedBox(height: 4),
-                    Text(subtitle, style: theme.textTheme.bodySmall),
+                    Text(subtitle, style: context.textTheme.bodySmall),
                   ],
                 ),
               ),

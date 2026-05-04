@@ -33,7 +33,7 @@ class _SyncStatusCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(syncStateProvider);
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     final appColors = AppColors.of(context);
     final status = _SyncStatusPresentation.fromState(
       state: state,
@@ -50,7 +50,7 @@ class _SyncStatusCard extends ConsumerWidget {
               children: [
                 Icon(status.icon, color: status.color, size: 24.r),
                 SizedBox(width: 8.w),
-                Text('同步状态', style: Theme.of(context).textTheme.titleMedium),
+                Text('同步状态', style: context.textTheme.titleMedium),
               ],
             ),
             SizedBox(height: 12.h),
@@ -59,7 +59,7 @@ class _SyncStatusCard extends ConsumerWidget {
               SizedBox(height: 4.h),
               Text(
                 '${state.pendingCount} 条变更等待同步',
-                style: Theme.of(context).textTheme.bodySmall,
+                style: context.textTheme.bodySmall,
               ),
             ],
             if (state.hasFailed) ...[
@@ -97,7 +97,7 @@ class _SyncActionCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('操作', style: Theme.of(context).textTheme.titleMedium),
+            Text('操作', style: context.textTheme.titleMedium),
             SizedBox(height: 12.h),
             SizedBox(
               width: double.infinity,

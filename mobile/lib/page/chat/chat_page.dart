@@ -209,7 +209,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   void _showSessionMenu(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Theme.of(context).cardColor,
+      backgroundColor: context.theme.cardColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16.r)),
       ),
@@ -257,7 +257,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ChatSheetTile(
                 icon: Icons.delete_outline,
                 label: '删除会话',
-                color: Theme.of(context).colorScheme.error,
+                color: context.colorScheme.error,
                 onTap: () async {
                   Navigator.pop(ctx);
                   _confirmDelete(context);
@@ -410,8 +410,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     });
     final sendState = ref.watch(chatSendProvider(widget.sessionUuid));
     final colors = ChatBubbleColors.of(context);
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final cs = context.colorScheme;
+    final textTheme = context.textTheme;
     final String displayTitle;
     if (sessionAsync.isLoading && !sessionAsync.hasValue) {
       displayTitle = '';
@@ -421,7 +421,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: context.theme.scaffoldBackgroundColor,
       resizeToAvoidBottomInset: true,
       appBar: PMAppBar(
         title: Column(
@@ -481,7 +481,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           if (!widget.canSend)
             Container(
               width: double.infinity,
-              color: Theme.of(context).colorScheme.surfaceContainerHigh,
+              color: context.colorScheme.surfaceContainerHigh,
               padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
               child: Row(
                 children: [

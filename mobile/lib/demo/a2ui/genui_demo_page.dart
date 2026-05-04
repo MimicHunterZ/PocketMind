@@ -7,6 +7,7 @@ import 'package:flutter_streaming_text_markdown/flutter_streaming_text_markdown.
 import 'package:genui/genui.dart';
 import 'package:json_schema_builder/json_schema_builder.dart';
 import 'package:pocketmind/demo/a2ui/a2ui_stream_api_service.dart';
+import 'package:pocketmind/util/theme_data.dart';
 import 'package:uuid/uuid.dart';
 
 class GenUiDemoPage extends ConsumerStatefulWidget {
@@ -93,7 +94,7 @@ class _GenUiDemoPageState extends ConsumerState<GenUiDemoPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
 
     return Scaffold(
       appBar: AppBar(title: const Text('GenUI Demo')),
@@ -106,7 +107,7 @@ class _GenUiDemoPageState extends ConsumerState<GenUiDemoPage> {
               children: [
                 Text(
                   'session: $_sessionUuid',
-                  style: Theme.of(context).textTheme.bodySmall,
+                  style: context.textTheme.bodySmall,
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -154,8 +155,8 @@ class _GenUiDemoPageState extends ConsumerState<GenUiDemoPage> {
               children: [
                 if (_surfaceIds.isEmpty)
                   Text(
-                    '点击“开始流式”后，真实 A2UI 事件会驱动同一 surface 内的文本与组件交错更新。',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    '点击”开始流式”后，真实 A2UI 事件会驱动同一 surface 内的文本与组件交错更新。',
+                    style: context.textTheme.bodyMedium,
                   ),
                 for (final surfaceId in _surfaceIds)
                   Padding(
@@ -180,7 +181,7 @@ class _GenUiDemoPageState extends ConsumerState<GenUiDemoPage> {
                         children: [
                           Text(
                             '交互事件日志',
-                            style: Theme.of(context).textTheme.titleMedium,
+                            style: context.textTheme.titleMedium,
                           ),
                           const SizedBox(height: 8),
                           for (final log in _actionLogs.reversed.take(8))

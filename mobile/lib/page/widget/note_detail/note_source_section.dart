@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/util/url_helper.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 class NoteSourceSection extends StatelessWidget {
   final Note note;
@@ -14,7 +15,7 @@ class NoteSourceSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
 
     final isHttpsUrl = UrlHelper.containsHttpsUrl(note.url);
     if (!isHttpsUrl) return const SizedBox.shrink();

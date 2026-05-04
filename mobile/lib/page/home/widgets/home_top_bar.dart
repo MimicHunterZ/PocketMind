@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocketmind/router/route_paths.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 class HomeTopBar extends StatelessWidget {
   const HomeTopBar({
@@ -31,7 +32,7 @@ class HomeTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
 
     return SafeArea(
       bottom: false,
@@ -147,8 +148,8 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = context.colorScheme;
+    final isDark = context.isDark;
 
     return Container(
       decoration: BoxDecoration(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:any_link_preview/any_link_preview.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 import '../../model/note.dart';
 
@@ -48,7 +49,7 @@ class SourceInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
 
     // 域名 • 日期
     final domain = isLocal ? '本地' : _getDomain(url);

@@ -6,6 +6,7 @@ import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/page/home/model/category_theme_icon_registry.dart';
 import 'package:pocketmind/page/widget/add_category_dialog.dart';
 import 'package:pocketmind/providers/category_providers.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 /// 分类选择器
 class CategorySelector extends ConsumerWidget {
@@ -43,7 +44,7 @@ class CategorySelector extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final categoriesAsync = ref.watch(allCategoriesProvider);
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
 
     return categoriesAsync.when(
       data: (categories) {
@@ -160,7 +161,7 @@ class _CategoryDialog extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
     final isDesktop = MediaQuery.of(context).size.width > 600;
 
     // 响应式尺寸
@@ -272,7 +273,7 @@ class _CategoryItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
 
     // 响应式尺寸
     final hPadding = isDesktop ? 12.0 : 12.w;

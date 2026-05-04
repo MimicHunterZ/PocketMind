@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 class NotePersonalNotesSection extends StatelessWidget {
   final TextEditingController notesController;
@@ -8,7 +9,7 @@ class NotePersonalNotesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = context.colorScheme;
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 24.w),

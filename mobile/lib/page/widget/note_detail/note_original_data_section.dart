@@ -5,6 +5,7 @@ import 'package:pocketmind/page/widget/common/immersive_image.dart';
 import 'package:pocketmind/util/url_helper.dart';
 import 'note_link_content_section.dart';
 import 'note_source_link_card.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 class NoteOriginalDataSection extends StatelessWidget {
   final Note note;
@@ -42,8 +43,8 @@ class NoteOriginalDataSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = context.colorScheme;
+    final textTheme = context.textTheme;
 
     final isLocalImage = UrlHelper.isLocalImagePath(note.url);
     final isHttpsUrl = UrlHelper.containsHttpsUrl(note.url);

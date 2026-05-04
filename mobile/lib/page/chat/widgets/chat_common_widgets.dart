@@ -12,7 +12,7 @@ class ChatTimeDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final textTheme = context.textTheme;
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 12.h),
       child: Center(
@@ -53,8 +53,8 @@ class ChatEmptyHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final cs = context.colorScheme;
+    final textTheme = context.textTheme;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -88,7 +88,7 @@ class ChatBottomSheetHandle extends StatelessWidget {
           width: 36.w,
           height: 4.h,
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.4),
+            color: context.colorScheme.outline.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(2.r),
           ),
         ),
@@ -114,8 +114,8 @@ class ChatSheetTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effective = color ?? Theme.of(context).colorScheme.onSurface;
-    final textTheme = Theme.of(context).textTheme;
+    final effective = color ?? context.colorScheme.onSurface;
+    final textTheme = context.textTheme;
     return ListTile(
       leading: Icon(icon, color: effective, size: 22.sp),
       title: Text(
@@ -136,8 +136,8 @@ class ChatEditModeBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final cs = context.colorScheme;
+    final textTheme = context.textTheme;
     return Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),

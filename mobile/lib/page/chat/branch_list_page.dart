@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:pocketmind/api/models/chat_models.dart';
 import 'package:pocketmind/page/widget/pm_app_bar.dart';
 import 'package:pocketmind/providers/chat_providers.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 /// 分支列表页。
 ///
@@ -18,8 +19,8 @@ class BranchListPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final branchesAsync = ref.watch(chatBranchesProvider(sessionUuid));
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final cs = context.colorScheme;
+    final textTheme = context.textTheme;
     return Scaffold(
       appBar: PMAppBar(title: Text(
           '会话分支',
@@ -149,7 +150,7 @@ class _BranchCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colorScheme;
     final updatedTime = DateTime.fromMillisecondsSinceEpoch(branch.updatedAt);
     final alias = branch.branchAlias;
     // 展示文本时将换行符替换为空格，避免内嵌换行占用行数
@@ -289,7 +290,7 @@ class _BranchAliasTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final cs = context.colorScheme;
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
       decoration: BoxDecoration(

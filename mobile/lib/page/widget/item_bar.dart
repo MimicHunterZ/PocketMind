@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 class ItemBar extends StatelessWidget {
   final String svgPath;
@@ -24,9 +25,9 @@ class ItemBar extends StatelessWidget {
 
     Color textColor() {
       if (isActive) {
-        return Theme.of(context).colorScheme.primary;
+        return context.colorScheme.primary;
       } else {
-        return Theme.of(context).colorScheme.primary.withValues(alpha: 0.8);
+        return context.colorScheme.primary.withValues(alpha: 0.8);
       }
     }
 
@@ -34,7 +35,7 @@ class ItemBar extends StatelessWidget {
     final FontWeight fontWeight = isActive ? FontWeight.w600 : FontWeight.w500;
 
     // 1. 判断当前是否是暗色模式
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = context.isDark;
 
     // 2. 根据模式选择微光的基色
     final Color glossColor = isDark ? Colors.white : Colors.black;
