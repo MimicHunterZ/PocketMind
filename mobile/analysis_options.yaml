@@ -29,6 +29,8 @@ linter:
     unnecessary_this: true  # 避免不必要的 this
 
 analyzer:
+  plugins:
+    - custom_lint  # 启用 pocketmind_lints 自定义 lint 插件
   errors:
     # 将所有 info 和 warning 都视为 error，强制修复
     include_file_not_found: error
@@ -45,3 +47,14 @@ analyzer:
     - "**/*.freezed.dart"
 # Additional information about this file can be found at
 # https://dart.dev/guides/language/analysis-options
+
+# ── custom_lint 规则配置 ────────────────────────────────────────────────────
+# 可在此处按需开启/关闭 pocketmind_lints 中定义的规则
+custom_lint:
+  rules:
+    # 禁止直接调用 Theme.of(context)，必须使用 ThemeContextExt 扩展
+    - no_theme_of_context  # 默认启用；注释掉或写 false 可临时禁用
+    # 禁止硬编码颜色值，必须从主题获取（context.colorScheme、context.appColors 等）
+    - no_hardcoded_colors
+    # 禁止 UI 层（page/）直接导入 api/ 或 data/ 层，必须通过 providers/ 或 service/ 访问
+    - no_cross_layer_import

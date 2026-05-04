@@ -16,7 +16,7 @@ void main() {
     );
 
     final context = tester.element(find.byType(Scaffold));
-    final ext = Theme.of(context).extension<CategoryHomeColors>();
+    final ext = context.theme.extension<CategoryHomeColors>();
 
     expect(ext, isNotNull);
     expect(ext!.cardBackground, isNotNull);

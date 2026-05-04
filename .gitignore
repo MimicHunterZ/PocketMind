@@ -40,6 +40,10 @@ OpenViking/
 # flutter
 .flutter-plugins-dependencies
 devtools_options.yaml
+.dart_tool/
 
 # git worktrees
 .worktrees/
+
+# Claude Code 本地配置
+**/settings.local.json

@@ -96,8 +96,14 @@ flutter pub get
 #### 代码质量
 
 ```bash
-# 代码分析
+# 代码分析（含自定义 lint 规则）
 flutter analyze
+
+# 运行自定义 lint 规则（更快，只检查 custom_lint 规则）
+dart run custom_lint
+
+# 自动修复 custom_lint 检测到的问题
+dart run custom_lint --fix
 
 # 代码格式化
 dart format lib test
@@ -105,6 +111,8 @@ dart format lib test
 # 检查未使用的文件
 flutter pub run dart_code_metrics:metrics check-unused-files lib
 ```
+
+> 自定义 lint 规则详见：[custom-lint-guide.md](custom-lint-guide.md)
 
 ### 开发流程
 

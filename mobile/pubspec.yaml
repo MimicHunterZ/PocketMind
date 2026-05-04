@@ -80,6 +80,12 @@ dev_dependencies:
   build_runner: ^2.4.6
   riverpod_generator: ^3.0.0
   flutter_lints: ^6.0.0
+  # ── 自定义 Lint 规则 ──────────────────────────────────────────────
+  # custom_lint: 运行自定义 lint 插件的宿主框架
+  custom_lint: ^0.8.0
+  # pocketmind_lints: 本项目的 lint 规则集（本地 path 依赖）
+  pocketmind_lints:
+    path: ../packages/pocketmind_lints
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is

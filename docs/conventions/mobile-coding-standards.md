@@ -206,7 +206,95 @@ class NoteCard extends StatelessWidget {
 }
 ```
 
-## 代码风格
+## 主题访问规约
+
+### 使用 BuildContext Extension 访问主题
+
+**严禁在 Widget 中直接调用 `Theme.of(context)`**，必须通过 `ThemeContextExt` 扩展方法访问，定义于 `lib/util/theme_data.dart`。
+
+#### 可用的快捷属性
+
+| 属性 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `context.theme` | `ThemeData` | 完整 ThemeData |
+| `context.colorScheme` | `ColorScheme` | Material 3 颜色方案 |
+| `context.textTheme` | `TextTheme` | 文字样式集 |
+| `context.isDark` | `bool` | 当前是否为暗色模式 |
+| `context.appColors` | `AppColors` | 骨架屏、卡片边框、点睛色等扩展色 |
+| `context.shareColors` | `SharePageThemeColors` | 分享页专属配色 |
+| `context.categoryHomeColors` | `CategoryHomeColors` | 分类首页专属配色 |
+| `context.chatBubbleColors` | `ChatBubbleColors` | 聊天气泡配色 |
+
+> **安全保证**：所有属性均有亮/暗模式 fallback，不会因 ThemeExtension 未注册而崩溃，无需 `!` 断言。
+
+#### 使用示例
+
+```dart
+// ✅ 正确 —— 使用 BuildContext extension
+@override
+Widget build(BuildContext context) {
+  return Container(
+    color: context.colorScheme.surface,
+    child: Text(
+      '标题',
+      style: context.textTheme.titleMedium?.copyWith(
+        color: context.appColors.themeDataColor,
+      ),
+    ),
+  );
+}
+
+// ✅ 正确 —— 多次使用时可用本地变量缓存
+@override
+Widget build(BuildContext context) {
+  final colorScheme = context.colorScheme;
+  final textTheme = context.textTheme;
+  return Column(
+    children: [
+      Text('标题', style: textTheme.titleMedium),
+      Text('副标题', style: textTheme.bodyMedium?.copyWith(
+        color: colorScheme.onSurfaceVariant,
+      )),
+    ],
+  );
+}
+
+// ✅ 正确 —— 判断暗色模式
+Widget build(BuildContext context) {
+  return Icon(
+    Icons.star,
+    color: context.isDark ? Colors.amber : Colors.orange,
+  );
+}
+
+// ❌ 错误 —— 禁止直接使用 Theme.of(context)
+Widget build(BuildContext context) {
+  final theme = Theme.of(context);
+  final colorScheme = Theme.of(context).colorScheme;
+  return Text(
+    '文字',
+    style: Theme.of(context).textTheme.bodyMedium,
+  );
+}
+
+// ❌ 错误 —— 禁止使用断言访问 ThemeExtension
+Widget build(BuildContext context) {
+  final appColors = Theme.of(context).extension<AppColors>()!;
+  return Container(color: appColors.themeDataColor);
+}
+```
+
+#### 使用前提
+
+在文件顶部添加：
+
+```dart
+import 'package:pocketmind/util/theme_data.dart';
+```
+
+---
+
+
 
 ### 导入顺序
 
@@ -430,11 +518,11 @@ git commit -m "doc: 更新 Flutter 架构文档"
 - ❌ `TODO 实现`
 - ❌ 英文提交信息
 
-## 代码审查检查清单
+### 代码审查检查清单
 
 ### UI 层面
 - [ ] 是否使用项目封装的组件
-- [ ] 是否从 `theme_data.dart` 获取设计元素
+- [ ] 是否通过 `context.xxx` 访问主题（禁止直接使用 `Theme.of(context)`）
 - [ ] 是否避免硬编码颜色、字体大小
 - [ ] 是否使用 const 构造函数
 

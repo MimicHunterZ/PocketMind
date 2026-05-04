@@ -1,0 +1,21 @@
+name: pocketmind_lints
+description: >
+  PocketMind 项目自定义 lint 规则集。
+  强制代码规范，例如禁止直接调用 Theme.of(context)，
+  必须通过 ThemeContextExt 扩展方法访问。
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  # custom_lint_builder 是编写 lint 规则的核心 SDK
+  custom_lint_builder: ^0.8.0
+  # analyzer 提供 AST 节点类型（MethodInvocation、ErrorReporter 等）
+  analyzer: ">=8.0.0 <12.0.0"
+
+dev_dependencies:
+  test: ^1.25.0
+  # custom_lint_core 提供 testLint 等测试工具
+  custom_lint_core: ^0.8.0
