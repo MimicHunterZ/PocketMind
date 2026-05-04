@@ -46,3 +46,9 @@ app.*.map.json
 
 # my
 /document
+
+# FVM Version Cache
+.fvm/
+
+# ai
+**/settings.local.json
