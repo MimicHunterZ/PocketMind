@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:pocketmind/model/app_config_state.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';
@@ -14,7 +13,6 @@ class AppConfig extends _$AppConfig {
   static const String _keyLinkPreviewApiKey = 'linkpreview_api_key';
   static const String _metaCacheTime = 'meta_cache_time';
   static const String _keyTitleEnabled = 'title_enabled';
-  static const String _keyEnvironment = 'app_environment';
   static const String _isWaterfallLayout = 'waterfall_layout';
   static const String _keySyncAutoStart = 'sync_auto_start';
   static const String _keyReminderShortcuts = 'reminder_shortcuts';
@@ -40,17 +38,6 @@ class AppConfig extends _$AppConfig {
       }
     }
 
-    // Load environment
-    Environment environment = kReleaseMode
-        ? Environment.production
-        : Environment.development;
-    final envString = prefs.getString(_keyEnvironment);
-    if (envString == 'staging') {
-      environment = Environment.staging;
-    } else if (envString == 'production') {
-      environment = Environment.production;
-    }
-
     return AppConfigState(
       proxyEnabled: prefs.getBool(_keyProxyEnabled) ?? false,
       proxyHost: prefs.getString(_keyProxyHost) ?? '127.0.0.1',
@@ -64,7 +51,6 @@ class AppConfig extends _$AppConfig {
           prefs.getBool(_keyHighPrecisionNotification) ?? false,
       linkPreviewApiKey: prefs.getString(_keyLinkPreviewApiKey) ?? '',
       customDomain: prefs.getString(_keyCustomDomain) ?? '',
-      environment: environment,
     );
   }
 
@@ -130,14 +116,6 @@ class AppConfig extends _$AppConfig {
         .read(sharedPreferencesProvider)
         .setString(_keyCustomDomain, domain);
     state = state.copyWith(customDomain: domain);
-  }
-
-  Future<void> setEnvironment(Environment env) async {
-    final envString = env.toString().split('.').last;
-    await ref
-        .read(sharedPreferencesProvider)
-        .setString(_keyEnvironment, envString);
-    state = state.copyWith(environment: env);
   }
 
   Future<void> addReminderShortcut(String name, String time) async {

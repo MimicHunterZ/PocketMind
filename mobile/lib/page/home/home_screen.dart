@@ -12,6 +12,7 @@ import 'package:pocketmind/page/home/widgets/home_tab_bar.dart';
 import 'package:pocketmind/page/home/widgets/home_top_bar.dart';
 import 'package:pocketmind/page/home/widgets/unified_home_background.dart';
 import 'package:pocketmind/page/widget/add_category_dialog.dart';
+import 'package:pocketmind/page/widget/server_setup_sheet.dart';
 import 'package:pocketmind/providers/app_config_provider.dart';
 import 'package:pocketmind/providers/category_providers.dart';
 import 'package:pocketmind/providers/nav_providers.dart';
@@ -90,10 +91,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SearchLogicMixin {
   Future<void> _handleTabChange(HomeTab tab) async {
     if (tab == HomeTab.ai) {
       if (_isSearchMode) {
-        setState(() {
-          _isSearchMode = false;
-        });
+        setState(() => _isSearchMode = false);
         clearSearch();
+      }
+
+      // 未配置服务器时先弹出引导，配置成功后再跳转
+      final isConfigured = ref.read(
+        appConfigProvider.select((c) => c.isServerConfigured),
+      );
+      if (!isConfigured) {
+        if (!mounted) return;
+        final configured = await showServerSetupSheet(context);
+        if (!configured || !mounted) return;
       }
 
       context.push(RoutePaths.globalAi);

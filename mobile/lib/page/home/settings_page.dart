@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocketmind/providers/app_config_provider.dart';
-import 'package:pocketmind/model/app_config_state.dart';
 import 'package:pocketmind/router/route_paths.dart';
 import 'dart:io';
 import 'package:pocketmind/util/proxy_config.dart';
@@ -35,7 +34,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _isWaterfallLayout = true;
   bool _isLoading = true;
   bool _highPrecisionNotification = false;
-  Environment _currentEnvironment = Environment.development;
 
   @override
   void initState() {
@@ -59,7 +57,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     setState(() {
       _proxyEnabled = config.proxyEnabled;
       _titleEnabled = config.titleEnabled;
-      _currentEnvironment = config.environment;
       _proxyHostController.text = config.proxyHost;
       _proxyPortController.text = config.proxyPort.toString();
       _customDomainController.text = config.customDomain;
@@ -86,9 +83,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     // 保存 布局 显示设置
     await notifier.setWaterFallLayout(_isWaterfallLayout);
-
-    // 保存环境设置
-    await notifier.setEnvironment(_currentEnvironment);
 
     // 保存 Custom Domain
     await notifier.setCustomDomain(_customDomainController.text);
@@ -272,7 +266,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               contentPadding: EdgeInsets.zero,
               title: Text('显示标题字段', style: context.textTheme.bodyLarge),
               subtitle: Text(
-                _titleEnabled ? '笔记卡片和编辑时将显示标题' : '隐藏标题，仅保留内容',
+                _titleEnabled ? '笔记卡片和编辑时将显示标题' : '隐藏用户笔记标题，仅保留内容',
                 style: context.textTheme.bodySmall,
               ),
               value: _titleEnabled,
@@ -470,19 +464,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           children: [
             Text('后端服务地址', style: context.textTheme.bodyLarge),
             SizedBox(height: 8.h),
-            Text('自定义后端 API 地址 (留空则使用默认配置)', style: context.textTheme.bodySmall),
+            Text(
+              '填入你自己部署的服务器地址（必填，AI 功能依赖此配置）',
+              style: context.textTheme.bodySmall,
+            ),
             SizedBox(height: 16.h),
             TextField(
               controller: _customDomainController,
               decoration: InputDecoration(
-                labelText: 'API 域名',
-                hintText: 'https://pocketmind.doublez-area.online',
+                labelText: '服务器地址',
+                hintText: 'https://your-server.com 或 http://192.168.1.100:8080',
                 prefixIcon: const Icon(Icons.cloud),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8.r),
                 ),
               ),
               maxLines: 1,
+              keyboardType: TextInputType.url,
             ),
           ],
         ),
@@ -637,7 +635,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ],
             ),
             SizedBox(height: 12.h),
-            _buildInfoItem('• 代理设置', '启用代理后，国外网站（X/Twitter）的图片才能正常显示'),
+            _buildInfoItem('• 代理设置', '启用代理后，国外网站的图片才能正常抓取'),
             SizedBox(height: 8.h),
             _buildInfoItem(
               '• API Key',

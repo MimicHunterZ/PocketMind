@@ -22,6 +22,7 @@ class GlobalHttpOverrides extends HttpOverrides {
     };
 
     // 处理 HTTPS 证书问题 (有些代理可能会导致证书校验失败)
+    /// todo
     // 警告：在生产环境中盲目返回 true 是不安全的，但个人使用为了方便通常会开启
     if (allowBadCertificates) {
       client.badCertificateCallback =

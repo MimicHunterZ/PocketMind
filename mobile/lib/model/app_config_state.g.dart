@@ -27,9 +27,6 @@ _AppConfigState _$AppConfigStateFromJson(Map<String, dynamic> json) =>
           json['highPrecisionNotification'] as bool? ?? false,
       linkPreviewApiKey: json['linkPreviewApiKey'] as String? ?? '',
       customDomain: json['customDomain'] as String? ?? '',
-      environment:
-          $enumDecodeNullable(_$EnvironmentEnumMap, json['environment']) ??
-          Environment.development,
     );
 
 Map<String, dynamic> _$AppConfigStateToJson(_AppConfigState instance) =>
@@ -45,11 +42,4 @@ Map<String, dynamic> _$AppConfigStateToJson(_AppConfigState instance) =>
       'highPrecisionNotification': instance.highPrecisionNotification,
       'linkPreviewApiKey': instance.linkPreviewApiKey,
       'customDomain': instance.customDomain,
-      'environment': _$EnvironmentEnumMap[instance.environment]!,
     };
-
-const _$EnvironmentEnumMap = {
-  Environment.development: 'development',
-  Environment.staging: 'staging',
-  Environment.production: 'production',
-};
