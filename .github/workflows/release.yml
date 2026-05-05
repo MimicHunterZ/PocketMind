@@ -1,0 +1,150 @@
+name: Release Build
+
+# 当推送 tag（如 v1.0.0）时触发
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  # ─────────────────────────────────────────
+  # Android 构建
+  # ─────────────────────────────────────────
+  build-android:
+    name: Build Android APKs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout 代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 设置 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.8'
+          channel: 'stable'
+          cache: true
+
+      - name: 安装依赖
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: 运行代码生成
+        working-directory: mobile
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+
+      # 将 keystore base64 解码还原为 .jks 文件
+      - name: 还原 Keystore 文件
+        working-directory: mobile/android
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystore.jks
+          cat > key.properties <<EOF
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=keystore.jks
+          EOF
+
+      - name: 构建 Android APKs（按 ABI 拆分）
+        working-directory: mobile
+        run: |
+          flutter build apk --release --split-per-abi
+
+      # 重命名为和截图一致的文件名
+      - name: 整理 APK 文件
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          VERSION="${TAG_NAME#v}"
+          mkdir -p dist/android
+          cp mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk   dist/android/app-arm64-v8a-release.apk
+          cp mobile/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk  dist/android/app-armeabi-v7a-release.apk
+          cp mobile/build/app/outputs/flutter-apk/app-x86_64-release.apk       dist/android/app-x86_64-release.apk
+
+      - name: 上传 Android 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apks
+          path: dist/android/*.apk
+          retention-days: 7
+
+  # ─────────────────────────────────────────
+  # Windows 构建
+  # ─────────────────────────────────────────
+  build-windows:
+    name: Build Windows ZIP
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout 代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.8'
+          channel: 'stable'
+          cache: true
+
+      - name: 安装依赖
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: 运行代码生成
+        working-directory: mobile
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+
+      - name: 构建 Windows
+        working-directory: mobile
+        run: flutter build windows --release
+
+      - name: 打包为 ZIP
+        shell: pwsh
+        run: |
+          $TAG = "${{ github.ref_name }}"
+          $VERSION = $TAG.TrimStart('v')
+          $ZIP_NAME = "pocketmind_windows_${VERSION}.zip"
+          Compress-Archive -Path "mobile\build\windows\x64\runner\Release\*" -DestinationPath "dist\$ZIP_NAME"
+
+      - name: 上传 Windows 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: dist/*.zip
+          retention-days: 7
+
+  # ─────────────────────────────────────────
+  # 上传产物到 GitHub Release（手动创建的 Release）
+  # ─────────────────────────────────────────
+  upload-to-release:
+    name: Upload Assets to Release
+    runs-on: ubuntu-latest
+    needs: [build-android, build-windows]
+
+    steps:
+      - name: 下载所有构建产物
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: 列出产物（调试用）
+        run: find dist -type f
+
+      # 上传到已有的 Release（你手动创建后 CI 自动附加文件）
+      - name: 上传到 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # draft: true 表示上传到草稿 Release，你写完描述后再手动发布
+          # 如果你想让 Release 直接已发布，改为 false
+          draft: false
+          # 不自动生成 release notes，保留你手动填写的内容
+          generate_release_notes: false
+          files: |
+            dist/*.apk
+            dist/*.zip
