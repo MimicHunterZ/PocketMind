@@ -43,13 +43,8 @@ jobs:
       - name: 还原 Keystore 文件
         working-directory: mobile/android
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/keystore.jks
-          cat > key.properties <<EOF
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          storeFile=keystore.jks
-          EOF
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\n' | base64 --decode > app/keystore.jks
+          printf 'storePassword=${{ secrets.KEYSTORE_PASSWORD }}\nkeyPassword=${{ secrets.KEY_PASSWORD }}\nkeyAlias=${{ secrets.KEY_ALIAS }}\nstoreFile=keystore.jks\n' > key.properties
 
       - name: 构建 Android APKs（按 ABI 拆分）
         working-directory: mobile
@@ -109,6 +104,7 @@ jobs:
           $TAG = "${{ github.ref_name }}"
           $VERSION = $TAG.TrimStart('v')
           $ZIP_NAME = "pocketmind_windows_${VERSION}.zip"
+          New-Item -ItemType Directory -Force -Path "dist" | Out-Null
           Compress-Archive -Path "mobile\build\windows\x64\runner\Release\*" -DestinationPath "dist\$ZIP_NAME"
 
       - name: 上传 Windows 产物
@@ -125,6 +121,8 @@ jobs:
     name: Upload Assets to Release
     runs-on: ubuntu-latest
     needs: [build-android, build-windows]
+    permissions:
+      contents: write
 
     steps:
       - name: 下载所有构建产物
