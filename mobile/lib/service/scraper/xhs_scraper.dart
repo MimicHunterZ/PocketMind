@@ -413,22 +413,39 @@ class XhsScraper implements IPlatformScraper {
           }
           
           // 提取图片列表
+          // 优先使用 urlDefault（url 字段小红书已弃用，始终为空字符串）
+          // 降级到 infoList[WB_DFT].url，再降级到 url
           var images = [];
           if (note.imageList && Array.isArray(note.imageList)) {
             note.imageList.forEach(function(img) {
-              if (img.urlDefault) {
-                images.push(img.urlDefault);
-              } else if (img.url) {
-                images.push(img.url);
+              var imgUrl = img.urlDefault || '';
+              if (!imgUrl && img.infoList && Array.isArray(img.infoList)) {
+                // 从 infoList 按优先级查找: WB_DFT（原图）> WB_PRV（预览）
+                var dftInfo = img.infoList.find(function(info) {
+                  return info.imageScene === 'WB_DFT';
+                });
+                if (dftInfo && dftInfo.url) imgUrl = dftInfo.url;
+                if (!imgUrl) {
+                  var prvInfo = img.infoList.find(function(info) {
+                    return info.imageScene === 'WB_PRV';
+                  });
+                  if (prvInfo && prvInfo.url) imgUrl = prvInfo.url;
+                }
               }
+              // 最终降级：旧版 url 字段（通常为空）
+              if (!imgUrl) imgUrl = img.url || '';
+              if (imgUrl) images.push(imgUrl);
             });
           }
-          
+
           // 处理描述中的换行
           var desc = note.desc || '';
-          
+
+          // 视频笔记：type === 'video'，imageList[0] 为封面图，已在上方统一提取
+
           return JSON.stringify({
-            title: note.title || '',
+            // 标题可能为空（部分笔记仅有 desc），返回 null 由上层处理
+            title: note.title || null,
             desc: desc,
             images: images,
             type: note.type || 'normal'
@@ -462,9 +479,13 @@ class XhsScraper implements IPlatformScraper {
       final rawImages = List<String>.from(data['images'] ?? []);
       final images = _normalizeImageUrls(rawImages);
 
+      // title 为 null 或空字符串时保持 null，由上层决定如何显示
+      final title = data['title'] as String?;
+      final desc = data['desc'] as String?;
+
       return ScrapedMetadata(
-        title: data['title'] as String?,
-        description: data['desc'] as String?,
+        title: (title?.isNotEmpty == true) ? title : null,
+        description: (desc?.isNotEmpty == true) ? desc : null,
         images: images,
         rawData: data,
       );
@@ -505,21 +526,29 @@ class XhsScraper implements IPlatformScraper {
             }
           }
           
+          // 规范化 URL 辅助函数：将协议相对地址 //... 补全为 https://...
+          function normalizeUrl(url) {
+            if (!url) return '';
+            if (url.startsWith('//')) return 'https:' + url;
+            return url;
+          }
+
           // 提取所有 OG 图片（支持多图，使用 Set 去重）
+          // 小红书现在可能使用协议相对地址 //picasso-static.xiaohongshu.com/...
           var imageSet = new Set();
           var ogImages = document.querySelectorAll('meta[property="og:image"]');
           ogImages.forEach(function(el) {
-            var content = el.getAttribute('content');
+            var content = normalizeUrl(el.getAttribute('content'));
             if (content && content.startsWith('http')) {
               imageSet.add(content);
             }
           });
-          
+
           // 如果没有 OG 图片，尝试提取页面内的主要图片
           if (imageSet.size === 0) {
             var mainImages = document.querySelectorAll('.note-content img, .swiper-slide img');
             mainImages.forEach(function(img) {
-              var src = img.getAttribute('src') || img.getAttribute('data-src');
+              var src = normalizeUrl(img.getAttribute('src') || img.getAttribute('data-src'));
               if (src && src.startsWith('http')) {
                 imageSet.add(src);
               }
@@ -527,7 +556,8 @@ class XhsScraper implements IPlatformScraper {
           }
           
           return JSON.stringify({
-            title: title,
+            // 标题可能为空，返回 null 由上层处理
+            title: title || null,
             desc: desc,
             images: Array.from(imageSet)
           });
@@ -550,9 +580,12 @@ class XhsScraper implements IPlatformScraper {
       final rawImages = List<String>.from(data['images'] ?? []);
       final images = _normalizeImageUrls(rawImages);
 
+      final ogTitle = data['title'] as String?;
+      final ogDesc = data['desc'] as String?;
+
       return ScrapedMetadata(
-        title: data['title'] as String?,
-        content: data['desc'] as String?,
+        title: (ogTitle?.isNotEmpty == true) ? ogTitle : null,
+        content: (ogDesc?.isNotEmpty == true) ? ogDesc : null,
         images: images,
       );
     } catch (e) {
