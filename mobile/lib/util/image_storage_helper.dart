@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
@@ -23,6 +24,18 @@ class ImageStorageHelper {
 
   // 图片存放的子文件夹名称
   static const String _folderName = 'pocket_images';
+
+  /// 内容寻址命名：根据图片 URL 计算稳定的相对路径,同一 URL 多次调用
+  /// 返回完全相同的字符串。提取为静态方法以便单元测试。
+  ///
+  /// - [url]：原始图片 URL（不应是 data: URI,base64 走另一条路径）。
+  /// - [extensionWithDot]：含点号的小写扩展名（如 `.jpg`、`.webp`）；
+  ///   传入空字符串时退化为 `.jpg`。
+  static String relativePathForUrl(String url, String extensionWithDot) {
+    final ext = extensionWithDot.isEmpty ? '.jpg' : extensionWithDot;
+    final hash = sha256.convert(utf8.encode(url)).toString().substring(0, 32);
+    return '$_folderName/$hash$ext';
+  }
 
   final _imageSavedController = StreamController<String>.broadcast();
 
@@ -62,6 +75,11 @@ class ImageStorageHelper {
   ///
   /// [url] : 图片网络地址 (支持 http/https 或 base64 data uri)
   /// 返回 : 相对路径
+  ///
+  /// **内容寻址命名**：远程图片以 `sha256(url)` 前缀作为文件名，
+  /// 同一 URL 多次调用直接复用磁盘上已有文件，避免重复下载、避免
+  /// 同图占用多份存储；与 `_upsertImageNoteAsset` 的 `(noteUuid, localPath)`
+  /// 主键配合，可让 Isar 行也只保留一条。
   Future<String?> downloadAndSaveImage(String url) async {
     try {
       if (_rootDir == null) await init();
@@ -85,16 +103,36 @@ class ImageStorageHelper {
         return null;
       }
 
-      final String fileName =
-          '${const Uuid().v4()}${extension.isEmpty ? ".jpg" : extension}';
-      // 统一使用正斜杠，确保跨平台数据库兼容性
-      final String relativePath = '$_folderName/$fileName';
-      final String destinationPath = p.join(_rootDir!, _folderName, fileName);
+      // 内容寻址：sha256(url) 前 32 位 hex 作为稳定文件名
+      final initialExt = extension.isEmpty ? '.jpg' : extension;
+      final initialRelativePath = relativePathForUrl(url, initialExt);
+      final initialFileName = p.basename(initialRelativePath);
+      final urlHash = p.basenameWithoutExtension(initialFileName);
+      final initialPath = p.join(_rootDir!, _folderName, initialFileName);
 
-      final response = await HttpClient().dio.download(url, destinationPath);
+      // 同 URL 已经下过 → 直接复用,不再触发 HTTP 请求,不再生成新 NoteAsset 行
+      final initialFile = File(initialPath);
+      if (await initialFile.exists() && await initialFile.length() > 0) {
+        PMlog.d(tag, '图片已存在(内容寻址命中),复用: $initialRelativePath');
+        return initialRelativePath;
+      }
+
+      // 也兼容历史魔数修正后的扩展名（同 hash 不同后缀）
+      for (final ext in const ['.webp', '.png', '.gif', '.jpeg']) {
+        if (ext == initialExt) continue;
+        final altName = '$urlHash$ext';
+        final altPath = p.join(_rootDir!, _folderName, altName);
+        final altFile = File(altPath);
+        if (await altFile.exists() && await altFile.length() > 0) {
+          PMlog.d(tag, '图片已存在(内容寻址命中,扩展名 $ext),复用');
+          return '$_folderName/$altName';
+        }
+      }
+
+      final response = await HttpClient().dio.download(url, initialPath);
 
       // 校验下载结果
-      final file = File(destinationPath);
+      final file = File(initialPath);
       if (!await file.exists() || await file.length() == 0) {
         PMlog.w(tag, '下载的文件为空: $url');
         if (await file.exists()) await file.delete();
@@ -116,21 +154,30 @@ class ImageStorageHelper {
       // 修正扩展名：检测实际格式（防止 CDN URL 无扩展名时默认 .jpg 但实为 WebP 等格式）
       final actualExt = await _detectExtensionFromMagicBytes(file);
       if (actualExt.isNotEmpty &&
-          actualExt != p.extension(fileName).toLowerCase()) {
-        final correctedFileName =
-            p.basenameWithoutExtension(fileName) + actualExt;
+          actualExt != p.extension(initialFileName).toLowerCase()) {
+        final correctedFileName = '$urlHash$actualExt';
         final correctedRelativePath = '$_folderName/$correctedFileName';
         final correctedPath = p.join(_rootDir!, _folderName, correctedFileName);
+
+        // 若魔数修正后的目标文件早已存在（前一次抓取已落盘）→ 删除新下载的副本,直接复用旧的
+        final correctedFile = File(correctedPath);
+        if (await correctedFile.exists() &&
+            await correctedFile.length() > 0) {
+          await file.delete();
+          PMlog.d(tag, '魔数修正后命中已有文件,删除重复副本: $correctedRelativePath');
+          return correctedRelativePath;
+        }
+
         await file.rename(correctedPath);
         PMlog.d(
           tag,
-          '格式修正: ${p.extension(fileName)} → $actualExt, $relativePath -> $correctedRelativePath',
+          '格式修正: ${p.extension(initialFileName)} → $actualExt, $initialRelativePath -> $correctedRelativePath',
         );
         return correctedRelativePath;
       }
 
-      PMlog.d(tag, '图片下载成功: $url -> $relativePath');
-      return relativePath;
+      PMlog.d(tag, '图片下载成功: $url -> $initialRelativePath');
+      return initialRelativePath;
     } catch (e) {
       PMlog.e(tag, '下载图片失败: $url, e:$e');
       return null;
@@ -158,11 +205,17 @@ class ImageStorageHelper {
       }
 
       final bytes = base64Decode(base64Data);
-      final String fileName = '${const Uuid().v4()}$extension';
+      // 内容寻址：以解码后字节的 sha256 为文件名,同图重复保存自动复用
+      final urlHash = sha256.convert(bytes).toString().substring(0, 32);
+      final String fileName = '$urlHash$extension';
       final String relativePath = '$_folderName/$fileName';
       final String destinationPath = p.join(_rootDir!, _folderName, fileName);
 
       final file = File(destinationPath);
+      if (await file.exists() && await file.length() > 0) {
+        PMlog.d(tag, 'Base64 图片已存在(内容寻址命中),复用: $relativePath');
+        return relativePath;
+      }
       await file.writeAsBytes(bytes);
 
       PMlog.d(tag, 'Base64 图片保存成功: $relativePath');

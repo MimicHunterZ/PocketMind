@@ -23,6 +23,7 @@ PocketMind 是一个"第二大脑"生态系统,包含 **Flutter 移动端** 和 
 | 文档 | 说明 |
 | :--- | :--- |
 | [Flutter 架构](docs/architecture/mobile/flutter-architecture.md) | 主题系统/状态管理/网络层/本地存储 |
+| [资源抓取流水线](docs/architecture/mobile/resource-fetch-pipeline.md) | URL 抓取调度/作业表/崩溃恢复/并发安全 |
 
 ---
 

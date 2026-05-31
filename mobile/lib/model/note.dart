@@ -49,9 +49,14 @@ class Note {
   /// 后端返回解析后的 Markdown 正文
   String? previewContent;
 
-  /// 资源抓取状态：SCRAPING / PENDING / CRAWLED / FAILED
+  /// 资源抓取的领域状态，三态：
+  ///   - PENDING : 有 url 但还没抓到内容（已入队或正在 ScrapeAttempt 中）
+  ///   - CRAWLED : 已成功抓取，终态
+  ///   - FAILED  : 抓取彻底失败，终态
   ///
-  /// 注意：失败时仍保持 previewContent 为 null，遵循"失败静默"。
+  /// 注意：执行细节（重试次数、lease 等）已下沉到 ScrapeAttempt 表，
+  /// 本字段仅作为 UI 列表过滤的快速派生视图。所有写入由
+  /// ResourceFetchScheduler 在 finalize 阶段统一完成。
   String? resourceStatus;
 
   /// AI 生成的摘要

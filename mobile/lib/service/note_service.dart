@@ -1,6 +1,4 @@
-﻿import 'dart:convert';
-
-import 'package:pocketmind/model/note.dart';
+﻿import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/data/repositories/isar_note_repository.dart';
 import 'package:pocketmind/sync/local_write_coordinator.dart';
@@ -8,8 +6,6 @@ import 'package:pocketmind/sync/resource_status_state_machine.dart';
 import 'package:pocketmind/sync/sync_engine.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/util/logger_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:workmanager/workmanager.dart';
 
 final String noteServiceTag = 'NoteService';
 
@@ -23,27 +19,23 @@ final String noteServiceTag = 'NoteService';
 /// ## 读路径
 /// 读操作直接委托 [IsarNoteRepository] 的 Watch 流，
 /// UI 层通过 Riverpod StreamProvider 订阅，断网时自动展示历史数据。
+///
+/// ## 抓取调度
+/// 端侧 PENDING 抓取统一收敛到 ResourceFetchScheduler，本类不再维护
+/// 任何 URL 队列或重试计数；执行细节落在 ScrapeAttempt 表。
 class NoteService {
   final IsarNoteRepository _noteRepository;
   final LocalWriteCoordinator _writeCoordinator;
   final SyncEngine? _syncEngine;
-  final SharedPreferences? _prefs;
   final ImageStorageHelper _imageHelper = ImageStorageHelper();
 
   NoteService({
     required IsarNoteRepository noteRepository,
     required LocalWriteCoordinator writeCoordinator,
     SyncEngine? syncEngine,
-    SharedPreferences? prefs,
   }) : _noteRepository = noteRepository,
        _writeCoordinator = writeCoordinator,
-       _syncEngine = syncEngine,
-       _prefs = prefs;
-
-  /// 获取 SharedPreferences 实例（优先用构造注入，降级懒加载）
-  Future<SharedPreferences> _getPrefs() async {
-    return _prefs ?? await SharedPreferences.getInstance();
-  }
+       _syncEngine = syncEngine;
 
   // ─────────────────────────── 写操作 ───────────────────────────
 
@@ -207,10 +199,6 @@ class NoteService {
   Future<List<Note>> findNotesWithUrls(List<String> urls) async =>
       _noteRepository.findByUrls(urls);
 
-  /// 查询指定资源状态的笔记（供后台抓取调度使用）。
-  Future<List<Note>> findNotesByResourceStatus(String status) async =>
-      _noteRepository.findByResourceStatus(status);
-
   /// 后台衍生字段写入统一入口：
   /// - 持久化 Note
   /// - 追加 mutation 进入同步队列
@@ -277,173 +265,7 @@ class NoteService {
     );
   }
 
-  // ─────────────────── 分享 URL 队列管理（Workmanager 流程）───────────────────
-
-  /// 幂等地将 [url] 加入待抓取队列（SharedPreferences [AppConstants.keyNeedCallbackUrl]）。
-  ///
-  /// 返回 true 表示新加入，false 表示已存在。
-  Future<bool> enqueuePendingUrlIfAbsent(String url) async {
-    final prefs = await _getPrefs();
-    final existing = prefs.getStringList(AppConstants.keyNeedCallbackUrl) ?? [];
-    if (existing.contains(url)) {
-      PMlog.d(noteServiceTag, 'URL 已在队列中，跳过: $url');
-      return false;
-    }
-    existing.add(url);
-    await prefs.setStringList(AppConstants.keyNeedCallbackUrl, existing);
-    PMlog.d(noteServiceTag, '已入队: $url（当前队列 ${existing.length} 条）');
-    return true;
-  }
-
-  /// 读取待处理 URL 队列，评估重试资格后向 Workmanager 注册抓取任务。
-  Future<void> processPendingUrls({String? userQuestion}) async {
-    final prefs = await _getPrefs();
-    final pending = prefs.getStringList(AppConstants.keyNeedCallbackUrl) ?? [];
-    if (pending.isEmpty) {
-      PMlog.d(noteServiceTag, 'processPendingUrls: 队列为空，无需调度');
-      return;
-    }
-
-    PMlog.d(noteServiceTag, 'processPendingUrls: 待处理 ${pending.length} 条 URL');
-    final eligibility = await evaluateRetryEligibility(pending);
-
-    // 已达上限的 URL 标记失败
-    if (eligibility.reachedMaxRetryUrls.isNotEmpty) {
-      await markUrlsAsFailedAndStopRetry(eligibility.reachedMaxRetryUrls);
-      PMlog.w(
-        noteServiceTag,
-        '已达最大重试次数，标记失败: ${eligibility.reachedMaxRetryUrls}',
-      );
-    }
-
-    if (eligibility.retryableUrls.isEmpty) {
-      PMlog.d(noteServiceTag, 'processPendingUrls: 无可重试 URL');
-      return;
-    }
-
-    await scheduleScrapeTask(
-      urls: eligibility.retryableUrls,
-      taskUniqueName:
-          '${AppConstants.taskScrapeAndSave}_${DateTime.now().millisecondsSinceEpoch}',
-      userQuestion: userQuestion,
-    );
-  }
-
-  /// 将 [urls] 从待处理队列中移除。
-  Future<void> removePendingUrls(List<String> urls) async {
-    if (urls.isEmpty) return;
-    final prefs = await _getPrefs();
-    final existing = prefs.getStringList(AppConstants.keyNeedCallbackUrl) ?? [];
-    existing.removeWhere(urls.contains);
-    await prefs.setStringList(AppConstants.keyNeedCallbackUrl, existing);
-    PMlog.d(noteServiceTag, '已从队列移除 ${urls.length} 条 URL');
-  }
-
-  /// 将 [urls] 移出队列并停止重试（终态）。
-  Future<void> markUrlsAsFailedAndStopRetry(List<String> urls) async {
-    await removePendingUrls(urls);
-    // 同时清除计数，避免僵尸数据
-    if (urls.isNotEmpty) {
-      final prefs = await _getPrefs();
-      final mapJson =
-          prefs.getString(AppConstants.keyShareUrlRetryCountMap) ?? '{}';
-      final countMap = Map<String, dynamic>.from(jsonDecode(mapJson) as Map);
-      for (final url in urls) {
-        countMap.remove(url);
-      }
-      await prefs.setString(
-        AppConstants.keyShareUrlRetryCountMap,
-        jsonEncode(countMap),
-      );
-    }
-    PMlog.w(noteServiceTag, '标记失败停止重试: $urls');
-  }
-
-  /// 增加 [urls] 的重试计数，返回本次达到最大重试次数的 URL 列表。
-  Future<List<String>> increaseRetryCountForUrls(List<String> urls) async {
-    if (urls.isEmpty) return [];
-    final prefs = await _getPrefs();
-    final mapJson =
-        prefs.getString(AppConstants.keyShareUrlRetryCountMap) ?? '{}';
-    final countMap = Map<String, dynamic>.from(jsonDecode(mapJson) as Map);
-    final maxReached = <String>[];
-    for (final url in urls) {
-      final current = (countMap[url] as num?)?.toInt() ?? 0;
-      final next = current + 1;
-      countMap[url] = next;
-      if (next >= AppConstants.maxShareUrlRetryCount) maxReached.add(url);
-    }
-    await prefs.setString(
-      AppConstants.keyShareUrlRetryCountMap,
-      jsonEncode(countMap),
-    );
-    return maxReached;
-  }
-
-  /// 评估 [urls] 中哪些仍可重试，哪些已达上限。
-  Future<RetryEligibility> evaluateRetryEligibility(List<String> urls) async {
-    if (urls.isEmpty) {
-      return const RetryEligibility(retryableUrls: [], reachedMaxRetryUrls: []);
-    }
-    final prefs = await _getPrefs();
-    final mapJson =
-        prefs.getString(AppConstants.keyShareUrlRetryCountMap) ?? '{}';
-    final countMap = Map<String, dynamic>.from(jsonDecode(mapJson) as Map);
-    final retryable = <String>[];
-    final maxRetried = <String>[];
-    for (final url in urls) {
-      final count = (countMap[url] as num?)?.toInt() ?? 0;
-      if (count >= AppConstants.maxShareUrlRetryCount) {
-        maxRetried.add(url);
-      } else {
-        retryable.add(url);
-      }
-    }
-    return RetryEligibility(
-      retryableUrls: retryable,
-      reachedMaxRetryUrls: maxRetried,
-    );
-  }
-
-  /// 将 [urls] 标记为「抓取中」（从待处理队列移除，由 scrapeAndSave 任务接管）。
-  Future<void> markUrlsAsScraping(List<String> urls) async {
-    await removePendingUrls(urls);
-    PMlog.d(noteServiceTag, '标记为抓取中: $urls');
-  }
-
-  /// 向 Workmanager 注册一次性抓取任务。
-  Future<void> scheduleScrapeTask({
-    required List<String> urls,
-    required String taskUniqueName,
-    String? userQuestion,
-    Duration initialDelay = Duration.zero,
-  }) async {
-    PMlog.d(noteServiceTag, '注册 Workmanager 任务: $taskUniqueName, urls=$urls');
-    await Workmanager().registerOneOffTask(
-      taskUniqueName,
-      AppConstants.taskScrapeAndSave,
-      initialDelay: initialDelay,
-      inputData: {
-        AppConstants.taskInputUrls: urls,
-        if (userQuestion != null)
-          AppConstants.taskInputUserQuestion: userQuestion,
-      },
-      constraints: Constraints(networkType: NetworkType.connected),
-    );
-  }
-
   // ─────────────────────────── 工具方法 ───────────────────────────
 
   bool _isLocalImage(String path) => path.contains('pocket_images/');
-}
-
-/// 重试资格评估结果
-class RetryEligibility {
-  final List<String> retryableUrls;
-  final List<String> reachedMaxRetryUrls;
-
-  const RetryEligibility({
-    required this.retryableUrls,
-    required this.reachedMaxRetryUrls,
-  });
 }

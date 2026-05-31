@@ -8,7 +8,6 @@ import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:pocketmind/service/call_back_dispatcher.dart';
 import 'package:pocketmind/util/logger_service.dart';
 import 'package:workmanager/workmanager.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'dart:convert';
 
@@ -46,19 +45,23 @@ void onBackgroundNotificationResponse(fln.NotificationResponse response) {
 }
 
 /// 处理重试 action
+///
+/// 注册一次后台 [AppConstants.taskRetryUrlsWithPolicy] 任务，
+/// 由 callbackDispatcher 调用 ResourceFetchScheduler.retryNotes() 完成
+/// 状态机复活 + 入队，再 runNow 执行抓取。
 void _handleRetryAction(String payload) async {
   try {
-    final failedUrls = _extractFailedUrls(payload);
-    if (failedUrls.isEmpty) return;
+    final uuids = _extractFailedNoteUuids(payload);
+    if (uuids.isEmpty) return;
 
-    PMlog.d('NotificationService', '触发重试任务（策略校验由后台统一处理）: $failedUrls');
+    PMlog.d('NotificationService', '触发重试任务: $uuids');
 
     Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
 
     await Workmanager().registerOneOffTask(
       'url_scraper_retry_policy_${DateTime.now().millisecondsSinceEpoch}',
       AppConstants.taskRetryUrlsWithPolicy,
-      inputData: {AppConstants.taskInputUrls: failedUrls},
+      inputData: {AppConstants.taskInputNoteUuids: uuids},
       initialDelay: const Duration(seconds: 1),
     );
 
@@ -68,9 +71,9 @@ void _handleRetryAction(String payload) async {
   }
 }
 
-List<String> _extractFailedUrls(String payload) {
+List<String> _extractFailedNoteUuids(String payload) {
   final data = json.decode(payload) as Map<String, dynamic>;
-  return (data['failedUrls'] as List?)
+  return (data['failedNoteUuids'] as List?)
           ?.map((e) => e.toString().trim())
           .where((e) => e.isNotEmpty)
           .toSet()
@@ -79,42 +82,25 @@ List<String> _extractFailedUrls(String payload) {
 }
 
 /// 处理忽略 action（取消重试并标记失败）
+///
+/// 注册一次 [AppConstants.taskMarkDismissedUrlsFailed] 后台任务，
+/// 由 callbackDispatcher 调用 ResourceFetchScheduler.dismissNotes() 把对应
+/// note 推到 FAILED 终态。
 void _handleDismissAction(String payload) async {
   try {
-    final data = json.decode(payload) as Map<String, dynamic>;
-    final failedUrls =
-        (data['failedUrls'] as List?)
-            ?.map((e) => e.toString().trim())
-            .where((e) => e.isNotEmpty)
-            .toSet()
-            .toList() ??
-        [];
-
-    if (failedUrls.isEmpty) return;
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.reload();
-
-    final currentUrls =
-        (prefs.getStringList(AppConstants.keyNeedCallbackUrl) ?? [])
-            .where((url) => url.trim().isNotEmpty)
-            .toSet();
-    currentUrls.removeAll(failedUrls);
-    await prefs.setStringList(
-      AppConstants.keyNeedCallbackUrl,
-      currentUrls.toList(),
-    );
+    final uuids = _extractFailedNoteUuids(payload);
+    if (uuids.isEmpty) return;
 
     Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
 
     await Workmanager().registerOneOffTask(
       'url_scraper_dismiss_${DateTime.now().millisecondsSinceEpoch}',
       AppConstants.taskMarkDismissedUrlsFailed,
-      inputData: {AppConstants.taskInputUrls: failedUrls},
+      inputData: {AppConstants.taskInputNoteUuids: uuids},
       initialDelay: const Duration(seconds: 0),
     );
 
-    PMlog.d('NotificationService', '已忽略并停止重试: $failedUrls');
+    PMlog.d('NotificationService', '已忽略并停止重试: $uuids');
   } catch (e) {
     PMlog.e('NotificationService', '处理忽略 action 失败: $e');
   }
@@ -357,7 +343,8 @@ class NotificationService {
   /// [resultType] 抓取结果类型
   /// [successCount] 成功数量
   /// [failedCount] 失败数量
-  /// [failedUrls] 失败的 URL 列表（用于重试）
+  /// [failedUrls] 失败的 URL 列表（用于在通知 body 中展示给用户）
+  /// [failedNoteUuids] 失败的 noteUuid 列表（重试 / 忽略 action 的目标）
   /// [errorMessage] 错误信息
   /// [contentPreviews] 内容预览列表（显示平台和内容前几个字）
   Future<void> showScrapeResultNotification({
@@ -365,6 +352,7 @@ class NotificationService {
     int successCount = 0,
     int failedCount = 0,
     List<String>? failedUrls,
+    List<String>? failedNoteUuids,
     String? errorMessage,
     List<String>? contentPreviews,
   }) async {
@@ -403,12 +391,13 @@ class NotificationService {
         break;
     }
 
-    // 构建 payload（用于点击通知时处理重试）
+    // 构建 payload（用于点击通知时处理重试 / 忽略 action）
     final payload = json.encode({
       'type': 'scrape_result',
       'resultType': resultType.name,
       'failedUrls': failedUrls ?? [],
-      'canRetry': failedUrls != null && failedUrls.isNotEmpty,
+      'failedNoteUuids': failedNoteUuids ?? [],
+      'canRetry': failedNoteUuids != null && failedNoteUuids.isNotEmpty,
     });
 
     await _showInstantNotification(
@@ -418,11 +407,11 @@ class NotificationService {
       channelId: _scrapeChannelId,
       channelName: _scrapeChannelName,
       payload: payload,
-      // 失败时显示重试 action
+      // 失败时显示重试 action（要有 noteUuids 才能 target）
       showRetryAction:
           resultType != ScrapeResultType.success &&
-          failedUrls != null &&
-          failedUrls.isNotEmpty,
+          failedNoteUuids != null &&
+          failedNoteUuids.isNotEmpty,
     );
   }
 

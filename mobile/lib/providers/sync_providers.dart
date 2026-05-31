@@ -2,12 +2,14 @@
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:pocketmind/api/note_api_service.dart';
 import 'package:pocketmind/api/sync_api_service.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/providers/auth_providers.dart';
 import 'package:pocketmind/providers/http_providers.dart';
 import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/providers/pm_service_providers.dart';
+import 'package:pocketmind/providers/shared_preferences_provider.dart';
 import 'package:pocketmind/data/repositories/isar_category_repository.dart';
 import 'package:pocketmind/sync/local_write_coordinator.dart';
 import 'package:pocketmind/sync/pull_coordinator.dart';
@@ -72,17 +74,39 @@ SyncEngine syncEngine(Ref ref) {
   );
 }
 
-/// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器
+/// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器。
+///
+/// **重要**：本 provider 仅负责**实例化**调度器，不会自动调 `start()`。
+///
+/// 原因：本 provider 在三个 isolate 里都可能被实例化（主 App / 分享 /
+/// Workmanager 后台任务）。`start()` 会立刻 unawaited 发射一发 runNow，
+/// 在后台 isolate 里这会与 dispatcher 的显式 `await runNow()` 形成
+/// "前者占位 → 后者 skip → dispatcher 立即返回 → Android 杀 isolate →
+/// 前者半路被砍"的链条，导致抓取根本跑不完。
+///
+/// 因此：
+///   - 主 App：`main.dart` 显式调用 `scheduler.start()` 一次（订阅
+///     connectivity + 立即扫描一次）；
+///   - Workmanager dispatcher：仅 `await scheduler.runNow(...)`；
+///   - 分享 isolate：不使用本 provider。
 @Riverpod(keepAlive: true)
 ResourceFetchScheduler resourceFetchScheduler(Ref ref) {
+  final isar = ref.watch(isarProvider);
   final noteService = ref.watch(noteServiceProvider);
   final metadataManager = ref.watch(metadataManagerProvider);
+  final noteApi = ref.watch(noteApiServiceProvider);
+  final assetApi = ref.watch(assetApiServiceProvider);
+  final notification = ref.watch(notificationServiceProvider);
+  final prefs = ref.watch(sharedPreferencesProvider);
   final scheduler = ResourceFetchScheduler(
+    isar: isar,
     noteService: noteService,
     metadataManager: metadataManager,
+    noteApiService: noteApi,
+    assetApiService: assetApi,
+    notificationService: notification,
+    prefs: prefs,
   );
-  // 应用启动时即开始监听网络事件
-  scheduler.start();
   ref.onDispose(scheduler.dispose);
   return scheduler;
 }

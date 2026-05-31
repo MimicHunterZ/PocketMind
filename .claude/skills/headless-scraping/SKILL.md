@@ -9,6 +9,16 @@ metadata:
 
 # 无头浏览器内容爬取架构
 
+> **⚠️ 调度链路已重构**（2026-05）。本文档下面"架构概览 / 数据流 / 队列 / 重试"等
+> 章节描述的是**旧实现**（SharedPreferences `needCallBackUrl` 队列 + retry count map），
+> 仅作为历史参考。**新的调度模型请直接看
+> [`docs/architecture/mobile/resource-fetch-pipeline.md`](../../../docs/architecture/mobile/resource-fetch-pipeline.md)**
+> （`Note.resourceStatus` 三态 + `ScrapeAttempt` 作业表 + lease 自愈 + Phase 1/2/3 流水线）。
+>
+> 本文档**仍然适用**的部分：平台爬虫实现（XhsScraper / ZhihuScraper / BilibiliScraper）、
+> Cookie 管理、stealth.js 注入、MethodChannel 协议、Android 前台服务这些底层细节。
+> 它们没被这次重构动到。
+
 PocketMind 使用 HeadlessInAppWebView 实现无头浏览器爬取，用于从小红书等需要登录的平台提取内容。
 
 ## 架构概览（当前实现）

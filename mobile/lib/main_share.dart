@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
+import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/model/note_asset.dart';
 import 'package:pocketmind/model/chat_session.dart';
 import 'package:pocketmind/model/chat_message.dart';
+import 'package:pocketmind/model/scrape_attempt.dart';
 import 'package:pocketmind/page/share/edit_note_page.dart';
 import 'package:pocketmind/page/share/share_success_page.dart';
 import 'package:pocketmind/page/widget/flowing_background.dart';
@@ -73,6 +75,7 @@ Future<void> mainShare() async {
     ChatMessageSchema,
     MutationEntrySchema,
     SyncCheckpointSchema,
+    ScrapeAttemptSchema,
   ], directory: dir.path);
 
   final notificationSvc = NotificationService();
@@ -133,11 +136,9 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
   }
 
   void _rebuildShareServices() {
-    final prefs = ref.read(sharedPreferencesProvider);
     noteService = NoteService(
       noteRepository: IsarNoteRepository(isar),
       writeCoordinator: LocalWriteCoordinator(isar),
-      prefs: prefs,
     );
     categoryService = CategoryService(
       categoryRepository: IsarCategoryRepository(isar),
@@ -160,6 +161,7 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
         ChatMessageSchema,
         MutationEntrySchema,
         SyncCheckpointSchema,
+        ScrapeAttemptSchema,
       ], directory: dir.path);
       _rebuildShareServices();
       PMlog.d(tag, 'Isar 重新打开，分享页服务已重建');
@@ -186,10 +188,20 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
     });
     try {
       final userQuestion = data?['uq'];
-      // 统一入口：分享场景与 App 回前台场景都通过 NoteService.processPendingUrls 调度
-      await noteService.processPendingUrls(userQuestion: userQuestion);
+      // 分享 UI 关闭前注册一次后台抓取任务。
+      // 真正的扫描在 callbackDispatcher → ResourceFetchScheduler.runNow() 中进行,
+      // 因 share 进程会立刻关闭 Isar,无法在此 isolate 完成抓取。
+      await Workmanager().registerOneOffTask(
+        'share_scrape_${DateTime.now().millisecondsSinceEpoch}',
+        AppConstants.taskScrapeAndSave,
+        inputData: <String, dynamic>{
+          if (userQuestion != null && userQuestion.isNotEmpty)
+            AppConstants.taskInputUserQuestion: userQuestion,
+        },
+        constraints: Constraints(networkType: NetworkType.connected),
+      );
     } catch (e) {
-      PMlog.e(tag, 'processPendingUrls 失败，将继续关闭分享页');
+      PMlog.e(tag, '注册后台抓取任务失败,将继续关闭分享页: $e');
     } finally {
       try {
         // 必须关闭，否则主 App 进入时 Isar 锁无法释放导致黑屏
@@ -249,19 +261,14 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
           // 热引擎场景：确保 Isar 已打开
           await _ensureReady();
 
-          // 1. 直接保存数据到数据库
+          // 1. 直接保存数据到数据库（带 url 时 resourceStatus 自动置为 PENDING,
+          //    后续由 ResourceFetchScheduler 在主 App 或 Workmanager 后台 isolate
+          //    中经 CAS 领走作业并完成抓取）。本进程不需要再额外触发任何队列。
           _noteId = await noteService.addNote(
             title: title,
             content: content,
             url: url,
           );
-
-          if (url != null) {
-            final added = await noteService.enqueuePendingUrlIfAbsent(url!);
-            if (added) {
-              PMlog.d(tag, '已保存到备份列表: needCallBackUrl');
-            }
-          }
 
           // 2. 更新 UI 状态以显示 ShareSuccessPage
           setState(() {

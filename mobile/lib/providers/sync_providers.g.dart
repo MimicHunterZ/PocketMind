@@ -300,12 +300,20 @@ final class SyncEngineProvider
 
 String _$syncEngineHash() => r'48a5dfd85082a7b6886eefc94d3d97110e8f5251';
 
-/// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器
+/// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器（前台进程）。
+///
+/// 注入 noteApi / assetApi / notificationService / prefs 后，整个抓取
+/// 流水线（metadata → 图片上传 → AI 提交 → 通知）都在此 Provider 实例
+/// 中完成，不再下沉到 Workmanager 的独立任务函数。
 
 @ProviderFor(resourceFetchScheduler)
 const resourceFetchSchedulerProvider = ResourceFetchSchedulerProvider._();
 
-/// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器
+/// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器（前台进程）。
+///
+/// 注入 noteApi / assetApi / notificationService / prefs 后，整个抓取
+/// 流水线（metadata → 图片上传 → AI 提交 → 通知）都在此 Provider 实例
+/// 中完成，不再下沉到 Workmanager 的独立任务函数。
 
 final class ResourceFetchSchedulerProvider
     extends
@@ -315,7 +323,11 @@ final class ResourceFetchSchedulerProvider
           ResourceFetchScheduler
         >
     with $Provider<ResourceFetchScheduler> {
-  /// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器
+  /// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器（前台进程）。
+  ///
+  /// 注入 noteApi / assetApi / notificationService / prefs 后，整个抓取
+  /// 流水线（metadata → 图片上传 → AI 提交 → 通知）都在此 Provider 实例
+  /// 中完成，不再下沉到 Workmanager 的独立任务函数。
   const ResourceFetchSchedulerProvider._()
     : super(
         from: null,
@@ -351,7 +363,7 @@ final class ResourceFetchSchedulerProvider
 }
 
 String _$resourceFetchSchedulerHash() =>
-    r'568d3c83711a159827b60cc07ee637705042c0a8';
+    r'c3395deb49f6fd9459eb52cd02d0b793f7744453';
 
 /// 自适应轮询 Provider —— 根据应用状态自动调整 Pull 间隔。
 ///

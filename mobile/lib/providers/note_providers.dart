@@ -11,7 +11,6 @@ import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/service/note_service.dart';
 import 'package:pocketmind/providers/sync_providers.dart';
 import 'package:pocketmind/sync/sync_state_provider.dart';
-import 'package:pocketmind/providers/shared_preferences_provider.dart';
 import 'package:pocketmind/service/metadata_manager.dart';
 import 'package:pocketmind/api/link_preview_api_service.dart';
 
@@ -60,12 +59,10 @@ NoteService noteService(Ref ref) {
   final repository = ref.watch(noteRepositoryProvider);
   final writeCoordinator = ref.watch(localWriteCoordinatorProvider);
   final syncEngine = ref.watch(syncEngineProvider);
-  final prefs = ref.watch(sharedPreferencesProvider);
   return NoteService(
     noteRepository: repository,
     writeCoordinator: writeCoordinator,
     syncEngine: syncEngine,
-    prefs: prefs,
   );
 }
 

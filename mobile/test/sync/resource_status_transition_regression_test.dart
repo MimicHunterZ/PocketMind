@@ -16,7 +16,7 @@ void main() {
 
     test('用户强制完成后，后台成功回流 CRAWLED，则升级为 CRAWLED', () {
       final forced = ResourceStatusStateMachine.reduce(
-        current: AppConstants.resourceStatusScraping,
+        current: AppConstants.resourceStatusPending,
         event: ResourceStatusEvent.userForceComplete,
       );
       expect(forced, AppConstants.resourceStatusFailed);

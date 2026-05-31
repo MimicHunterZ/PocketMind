@@ -25,6 +25,7 @@ import 'model/note.dart';
 import 'model/note_asset.dart';
 import 'model/chat_session.dart';
 import 'model/chat_message.dart';
+import 'model/scrape_attempt.dart';
 import 'sync/model/mutation_entry.dart';
 import 'sync/model/sync_checkpoint.dart';
 import 'data/repositories/isar_category_repository.dart';
@@ -68,6 +69,7 @@ Future<void> main() async {
     NoteAssetSchema,
     ChatSessionSchema,
     ChatMessageSchema,
+    ScrapeAttemptSchema,
   ], directory: dir.path);
 
   // 确保初始化默认分类数据
@@ -121,16 +123,22 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     // 确保自适应同步调度器始终激活
     ref.read(adaptiveSyncSchedulerProvider);
 
-    // 激活 PENDING 笔记抓取调度器（分享链路落地后由此接管端侧抓取）
-    ref.read(resourceFetchSchedulerProvider);
+    // 激活 PENDING 笔记抓取调度器，并显式启动主 App 的常驻订阅
+    // （订阅 connectivity 变化 + 启动时立即扫描一次）。
+    // 注意：start() 不能放在 provider 工厂里，否则 Workmanager 后台 isolate
+    // 也会触发，导致后台抓取被 isolate 生命周期提前砍断。详见
+    // sync_providers.dart 上的注释与
+    // docs/architecture/mobile/resource-fetch-pipeline.md。
+    ref.read(resourceFetchSchedulerProvider).start();
 
     // 初始化鉴权
     ref.read(authControllerProvider);
 
-    // 启动时检查是否有待处理的 URL 回调
-    //todo
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(noteServiceProvider).processPendingUrls();
+    // 启动时再触发一轮 PENDING 笔记扫描（处理上次遗留 / 后台分享落地的 URL）；
+    // start() 已经会发一次，这里相当于"用户体验侧"再保险触发，runNow 内部
+    // 会用 in-flight Future 合流，不会重复扫描。
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      ref.read(resourceFetchSchedulerProvider).runNow();
       // 检查并轮询待处理的 AI 分析结果
       ref.read(aiPollingServiceProvider).pollAll();
     });
@@ -146,10 +154,10 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     PMlog.d('MyApp', 'AppLifecycleState changed: $state');
     if (state == AppLifecycleState.resumed) {
-      PMlog.d('MyApp', 'App resumed, checking pending URLs');
-      // 触发 PENDING 笔记扫描（分享后切回主 App 的场景）
+      PMlog.d('MyApp', 'App resumed, 触发 PENDING 扫描');
+      // 单一调度入口：所有 PENDING 笔记由 ResourceFetchScheduler 接管,
+      // CAS 互斥保证不会与后台 Workmanager 任务并发抓取同一 note。
       ref.read(resourceFetchSchedulerProvider).runNow();
-      ref.read(noteServiceProvider).processPendingUrls();
       ref.read(aiPollingServiceProvider).pollAll();
     }
   }

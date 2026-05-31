@@ -58,9 +58,8 @@ class _NoteItemState extends ConsumerState<NoteItem>
     if (!UrlHelper.containsHttpsUrl(note.url)) {
       return false;
     }
-
-    return note.resourceStatus == AppConstants.resourceStatusScraping ||
-        note.resourceStatus == AppConstants.resourceStatusPending;
+    // 三态领域模型下 PENDING 同时覆盖"未开始"和"正在抓"两种执行情况
+    return note.resourceStatus == AppConstants.resourceStatusPending;
   }
 
   Future<void> _forceCompletePreview() async {

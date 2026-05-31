@@ -52,3 +52,7 @@ app.*.map.json
 
 # ai
 **/settings.local.json
+# Isar Core 测试时下载的桌面 native lib，每个开发机自动下载
+libisar.dylib
+libisar*.so
+libisar*.dll

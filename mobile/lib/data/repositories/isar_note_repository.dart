@@ -226,21 +226,6 @@ class IsarNoteRepository {
     }
   }
 
-  /// 查找等待抓取资源的笔记
-  ///
-  /// 条件：URL 不为空，且 previewContent 为空，且未删除
-  Future<List<Note>> findPendingResources() async {
-    return await _isar.notes
-        .filter()
-        .urlIsNotNull()
-        .urlIsNotEmpty()
-        .previewContentIsNull()
-        .not()
-        .resourceStatusEqualTo('FAILED')
-        .isDeletedEqualTo(false)
-        .findAll();
-  }
-
   /// 查询指定 resourceStatus 的笔记列表（用于 ResourceFetchScheduler 扫描）
   Future<List<Note>> findByResourceStatus(String status) async {
     return _isar.notes
