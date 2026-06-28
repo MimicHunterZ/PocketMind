@@ -37,7 +37,7 @@ public class PruningToolCallAdvisor extends ToolCallAdvisor {
                                  int keepRecentToolResponses,
                                  TrustedModelContextWindowResolver contextWindowResolver,
                                  String modelName) {
-        super(toolCallingManager, Ordered.HIGHEST_PRECEDENCE + 300);
+        super(toolCallingManager, DEFAULT_TOOL_EXECUTION_ELIGIBILITY_CHECKER, Ordered.HIGHEST_PRECEDENCE + 300, true);
         this.startRatio = startRatio;
         this.keepRecentToolResponses = Math.max(0, keepRecentToolResponses);
         this.contextWindowResolver = contextWindowResolver;

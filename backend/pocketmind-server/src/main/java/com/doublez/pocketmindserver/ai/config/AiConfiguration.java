@@ -5,8 +5,8 @@ import com.doublez.pocketmindserver.ai.context.PersistingToolCallAdvisor;
 import com.doublez.pocketmindserver.ai.context.ToolResultContextEngineeringProperties;
 import com.doublez.pocketmindserver.ai.context.TrustedModelContextWindowResolver;
 import com.doublez.pocketmindserver.ai.observability.AiObservabilityProperties;
-import com.doublez.pocketmindserver.ai.observability.langfuse.LangfuseChatObservationAdvisor;
 import com.doublez.pocketmindserver.ai.observability.langfuse.AiLangfuseHttpBodyCaptureInterceptor;
+import com.doublez.pocketmindserver.ai.observability.langfuse.LangfuseChatObservationAdvisor;
 import com.doublez.pocketmindserver.ai.observability.tool.ObservedToolCallback;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
 import com.doublez.pocketmind.common.web.ApiCode;
@@ -23,20 +23,16 @@ import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingOptions;
 import org.springframework.ai.document.MetadataMode;
 import org.springframework.ai.model.tool.ToolCallingManager;
-import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
-import org.springframework.core.retry.RetryTemplate;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.client.BufferingClientHttpRequestFactory;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.web.client.RestClient;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.util.StringUtils;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -151,9 +147,8 @@ public class AiConfiguration {
     public OpenAiChatModel primaryChatModel(AiProvidersProperties providers,
                                             AiHttpClientProperties httpClientProperties,
                                             AiObservabilityProperties observabilityProperties,
-                                            ObservationRegistry observationRegistry,
-                                            RetryTemplate retryTemplate) {
-        return buildChatModel(providers.resolveConfig(AiClientId.CHAT_PRIMARY), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
+                                            ObservationRegistry observationRegistry) {
+        return buildChatModel(providers.resolveConfig(AiClientId.CHAT_PRIMARY), httpClientProperties, observabilityProperties, observationRegistry);
     }
 
     @Bean(AiBeanNames.CHAT_SECONDARY_MODEL)
@@ -161,9 +156,8 @@ public class AiConfiguration {
     public OpenAiChatModel secondaryChatModel(AiProvidersProperties providers,
                                               AiHttpClientProperties httpClientProperties,
                                               AiObservabilityProperties observabilityProperties,
-                                              ObservationRegistry observationRegistry,
-                                              RetryTemplate retryTemplate) {
-        return buildChatModel(providers.resolveConfig(AiClientId.CHAT_SECONDARY), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
+                                              ObservationRegistry observationRegistry) {
+        return buildChatModel(providers.resolveConfig(AiClientId.CHAT_SECONDARY), httpClientProperties, observabilityProperties, observationRegistry);
     }
 
     @Bean(AiBeanNames.CHAT_FALLBACK_MODEL)
@@ -171,18 +165,16 @@ public class AiConfiguration {
     public OpenAiChatModel fallbackChatModel(AiProvidersProperties providers,
                                              AiHttpClientProperties httpClientProperties,
                                              AiObservabilityProperties observabilityProperties,
-                                             ObservationRegistry observationRegistry,
-                                             RetryTemplate retryTemplate) {
-        return buildChatModel(providers.resolveConfig(AiClientId.CHAT_FALLBACK), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
+                                             ObservationRegistry observationRegistry) {
+        return buildChatModel(providers.resolveConfig(AiClientId.CHAT_FALLBACK), httpClientProperties, observabilityProperties, observationRegistry);
     }
 
     @Bean(AiBeanNames.VISION_PRIMARY_MODEL)
     public OpenAiChatModel visionChatModel(AiProvidersProperties providers,
                                            AiHttpClientProperties httpClientProperties,
                                            AiObservabilityProperties observabilityProperties,
-                                           ObservationRegistry observationRegistry,
-                                           RetryTemplate retryTemplate) {
-        return buildChatModel(providers.resolveConfig(AiClientId.VISION_PRIMARY), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
+                                           ObservationRegistry observationRegistry) {
+        return buildChatModel(providers.resolveConfig(AiClientId.VISION_PRIMARY), httpClientProperties, observabilityProperties, observationRegistry);
     }
 
     // region Vision failover chain (optional)
@@ -192,9 +184,8 @@ public class AiConfiguration {
     public OpenAiChatModel visionSecondaryChatModel(AiProvidersProperties providers,
                                                     AiHttpClientProperties httpClientProperties,
                                                     AiObservabilityProperties observabilityProperties,
-                                                    ObservationRegistry observationRegistry,
-                                                    RetryTemplate retryTemplate) {
-        return buildChatModel(providers.resolveConfig(AiClientId.VISION_SECONDARY), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
+                                                    ObservationRegistry observationRegistry) {
+        return buildChatModel(providers.resolveConfig(AiClientId.VISION_SECONDARY), httpClientProperties, observabilityProperties, observationRegistry);
     }
 
     @Bean(AiBeanNames.VISION_FALLBACK_MODEL)
@@ -202,9 +193,8 @@ public class AiConfiguration {
     public OpenAiChatModel visionFallbackChatModel(AiProvidersProperties providers,
                                                    AiHttpClientProperties httpClientProperties,
                                                    AiObservabilityProperties observabilityProperties,
-                                                   ObservationRegistry observationRegistry,
-                                                   RetryTemplate retryTemplate) {
-        return buildChatModel(providers.resolveConfig(AiClientId.VISION_FALLBACK), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
+                                                   ObservationRegistry observationRegistry) {
+        return buildChatModel(providers.resolveConfig(AiClientId.VISION_FALLBACK), httpClientProperties, observabilityProperties, observationRegistry);
     }
 
     @Bean(AiBeanNames.IMAGE_MODEL)
@@ -212,9 +202,8 @@ public class AiConfiguration {
     public OpenAiChatModel imageChatModel(AiProvidersProperties providers,
                                           AiHttpClientProperties httpClientProperties,
                                           AiObservabilityProperties observabilityProperties,
-                                          ObservationRegistry observationRegistry,
-                                          RetryTemplate retryTemplate) {
-        return buildChatModel(providers.resolveConfig(AiClientId.IMAGE), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
+                                          ObservationRegistry observationRegistry) {
+        return buildChatModel(providers.resolveConfig(AiClientId.IMAGE), httpClientProperties, observabilityProperties, observationRegistry);
     }
 
     @Bean(AiBeanNames.AUDIO_MODEL)
@@ -222,53 +211,42 @@ public class AiConfiguration {
     public OpenAiChatModel audioChatModel(AiProvidersProperties providers,
                                           AiHttpClientProperties httpClientProperties,
                                           AiObservabilityProperties observabilityProperties,
-                                          ObservationRegistry observationRegistry,
-                                          RetryTemplate retryTemplate) {
-        return buildChatModel(providers.resolveConfig(AiClientId.AUDIO), httpClientProperties, observabilityProperties, observationRegistry, retryTemplate);
+                                          ObservationRegistry observationRegistry) {
+        return buildChatModel(providers.resolveConfig(AiClientId.AUDIO), httpClientProperties, observabilityProperties, observationRegistry);
     }
 
     private OpenAiChatModel buildChatModel(AiProvidersProperties.ProviderConfig config,
                                            AiHttpClientProperties httpClientProperties,
                                            AiObservabilityProperties observabilityProperties,
-                                           ObservationRegistry observationRegistry,
-                                           RetryTemplate retryTemplate) {
+                                           ObservationRegistry observationRegistry) {
         Objects.requireNonNull(config, "config");
 
-        // 使用阻塞 requestFactory 显式控制超时，避免 Reactor Netty 默认超时导致 ReadTimeout。
-        SimpleClientHttpRequestFactory baseFactory = new SimpleClientHttpRequestFactory();
-        baseFactory.setConnectTimeout(httpClientProperties.connectTimeoutMs());
-        baseFactory.setReadTimeout(httpClientProperties.readTimeoutMs());
-        RestClient.Builder restClientBuilder = RestClient.builder()
-            .requestFactory(new BufferingClientHttpRequestFactory(baseFactory));
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+                .model(config.model())
+                .baseUrl(config.baseUrl())
+                .apiKey(config.apiKey())
+                .timeout(Duration.ofMillis(httpClientProperties.readTimeoutMs()))
+                .build();
 
-        // Langfuse HTTP body 捕获（主项目独立开关，不影响 demo）。
+        OpenAiChatModel.Builder modelBuilder = OpenAiChatModel.builder()
+                .options(options)
+                .toolCallingManager(ToolCallingManager.builder().build())
+                .observationRegistry(observationRegistry)
+                .httpClientBuilderCustomizer(httpBuilder ->
+                        httpBuilder.timeout(Duration.ofMillis(httpClientProperties.readTimeoutMs())));
+
         if (observabilityProperties != null
             && observabilityProperties.langfuse() != null
             && observabilityProperties.langfuse().enabled()
             && observabilityProperties.langfuse().httpBodyCaptureEnabled()) {
-            restClientBuilder.requestInterceptor(new AiLangfuseHttpBodyCaptureInterceptor(
-                observabilityProperties.langfuse().logFullPayload(),
-                observabilityProperties.langfuse().maxPayloadLength()
-            ));
+            modelBuilder.httpClientBuilderCustomizer(httpBuilder -> httpBuilder.interceptor(
+                    new AiLangfuseHttpBodyCaptureInterceptor(
+                            observabilityProperties.langfuse().logFullPayload(),
+                            observabilityProperties.langfuse().maxPayloadLength()
+                    )));
         }
 
-        OpenAiApi api = OpenAiApi.builder()
-                .baseUrl(config.baseUrl())
-                .apiKey(config.apiKey())
-                .restClientBuilder(restClientBuilder)
-                .build();
-
-        OpenAiChatOptions options = OpenAiChatOptions.builder()
-                .model(config.model())
-                .build();
-
-        return new OpenAiChatModel(
-                api,
-                options,
-                ToolCallingManager.builder().build(),
-                retryTemplate,
-                observationRegistry
-        );
+        return modelBuilder.build();
     }
 
     // region ChatClient（多角色）
@@ -280,33 +258,26 @@ public class AiConfiguration {
     public OpenAiEmbeddingModel embeddingModel(AiProvidersProperties providers,
                                                EmbeddingProperties embeddingProperties,
                                                AiHttpClientProperties httpClientProperties,
-                                               ObservationRegistry observationRegistry,
-                                               RetryTemplate retryTemplate) {
+                                               ObservationRegistry observationRegistry) {
         AiProvidersProperties.ProviderConfig providerCfg = providers.configs().get(embeddingProperties.provider());
         Objects.requireNonNull(providerCfg,
                 "embedding.provider='" + embeddingProperties.provider() + "' 在 providers.configs 中不存在");
 
-        SimpleClientHttpRequestFactory baseFactory = new SimpleClientHttpRequestFactory();
-        baseFactory.setConnectTimeout(httpClientProperties.connectTimeoutMs());
-        baseFactory.setReadTimeout(httpClientProperties.readTimeoutMs());
-
-        OpenAiApi api = OpenAiApi.builder()
+        OpenAiEmbeddingOptions options = OpenAiEmbeddingOptions.builder()
+                .model(embeddingProperties.model())
+                .dimensions(embeddingProperties.dimensions())
                 .baseUrl(providerCfg.baseUrl())
                 .apiKey(providerCfg.apiKey())
-                .restClientBuilder(RestClient.builder()
-                        .requestFactory(new BufferingClientHttpRequestFactory(baseFactory)))
+                .timeout(Duration.ofMillis(httpClientProperties.readTimeoutMs()))
                 .build();
 
-        return new OpenAiEmbeddingModel(
-                api,
-                MetadataMode.EMBED,
-                OpenAiEmbeddingOptions.builder()
-                        .model(embeddingProperties.model())
-                        .dimensions(embeddingProperties.dimensions())
-                        .build(),
-                retryTemplate,
-                observationRegistry
-        );
+        return OpenAiEmbeddingModel.builder()
+                .metadataMode(MetadataMode.EMBED)
+                .options(options)
+                .observationRegistry(observationRegistry)
+                .httpClientBuilderCustomizer(builder ->
+                        builder.timeout(Duration.ofMillis(httpClientProperties.readTimeoutMs())))
+                .build();
     }
 
     // endregion
@@ -609,4 +580,3 @@ public class AiConfiguration {
     }
 
 }
-

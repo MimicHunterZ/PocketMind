@@ -18,8 +18,8 @@ import org.springframework.ai.chat.client.advisor.StructuredOutputValidationAdvi
 import org.springframework.ai.chat.client.advisor.api.BaseAdvisor;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.converter.BeanOutputConverter;
+import org.springframework.ai.openai.OpenAiChatModel.ResponseFormat;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.Resource;
@@ -185,7 +185,10 @@ public class AiAnalysePollingService {
             var outputConverter = new BeanOutputConverter<>(AiAnalysePollingResult.class);
             String jsonSchema = outputConverter.getJsonSchema();
             OpenAiChatOptions options = OpenAiChatOptions.builder()
-                .responseFormat(new ResponseFormat(ResponseFormat.Type.JSON_OBJECT, jsonSchema))
+                .responseFormat(ResponseFormat.builder()
+                        .type(ResponseFormat.Type.JSON_OBJECT)
+                        .jsonSchema(jsonSchema)
+                        .build())
                 .build();
             prompt = PromptBuilder.build(systemTemplate, pollingPrompt, variables, options);
         } catch (Exception e) {
@@ -298,5 +301,4 @@ public class AiAnalysePollingService {
     }
 
 }
-
 

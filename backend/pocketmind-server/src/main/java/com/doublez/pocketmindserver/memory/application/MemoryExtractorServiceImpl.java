@@ -14,8 +14,8 @@ import com.doublez.pocketmindserver.shared.util.PromptBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.converter.BeanOutputConverter;
+import org.springframework.ai.openai.OpenAiChatModel.ResponseFormat;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -168,9 +168,10 @@ public class MemoryExtractorServiceImpl implements MemoryExtractorService {
                 new BeanOutputConverter<>(MemoryExtractionResult.class);
 
         OpenAiChatOptions options = OpenAiChatOptions.builder()
-                .responseFormat(new ResponseFormat(
-                        ResponseFormat.Type.JSON_OBJECT,
-                        outputConverter.getJsonSchema()))
+                .responseFormat(ResponseFormat.builder()
+                        .type(ResponseFormat.Type.JSON_OBJECT)
+                        .jsonSchema(outputConverter.getJsonSchema())
+                        .build())
                 .build();
 
         try {

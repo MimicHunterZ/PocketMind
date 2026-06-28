@@ -12,7 +12,6 @@ import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,11 +20,6 @@ import org.springframework.context.annotation.Configuration;
 
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.core.Ordered;
-import org.springframework.core.retry.RetryTemplate;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.http.client.BufferingClientHttpRequestFactory;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -87,43 +81,33 @@ public class SkillDemoConfiguration {
 
     /**
      * demo 专用模型：只影响 /demo/skill/*
-     * 1) 通过 RestClient interceptor 捕获 DeepSeek HTTP 的 request/response body，写入 Langfuse 便于排查。
-     * 2) 使用 BufferingClientHttpRequestFactory 缓存 response body，避免“读取一次后下游解析失败”。
+     * 通过 Spring AI 2.0 的 OkHttp interceptor 捕获 DeepSeek HTTP 的 request/response body，写入 Langfuse 便于排查。
      *
-     * 注意：BufferingClientHttpRequestFactory 会把响应体完整读入内存；如果未来启用流式输出，建议将
-     * pocketmind.demo.http.buffering-enabled 设为 false，以免破坏流式效果或放大内存占用。
+     * 注意：body 捕获会把非流式响应体完整读入内存；如果未来启用流式输出，建议将
+     * pocketmind.demo.http.buffering-enabled 设为 false，以免放大内存占用。
      */
     @Bean("skillDemoOpenAiChatModel")
     public OpenAiChatModel skillDemoOpenAiChatModel(AiProvidersProperties providers,
-                                                    ObservationRegistry observationRegistry,
-                                                    RetryTemplate retryTemplate) {
+                                                    ObservationRegistry observationRegistry) {
         AiProvidersProperties.ProviderConfig providerConfig = providers.resolveConfig(AiClientId.CHAT_PRIMARY);
 
-        SimpleClientHttpRequestFactory baseFactory = new SimpleClientHttpRequestFactory();
-        RestClient.Builder restClientBuilder = RestClient.builder()
-            .requestFactory(bufferingEnabled ? new BufferingClientHttpRequestFactory(baseFactory) : baseFactory)
-                .requestInterceptor(new LangfuseHttpBodyCaptureInterceptor());
-
-        WebClient.Builder webClientBuilder = WebClient.builder();
-
-        OpenAiApi api = OpenAiApi.builder()
-            .baseUrl(providerConfig.baseUrl())
-            .apiKey(providerConfig.apiKey())
-                .restClientBuilder(restClientBuilder)
-                .webClientBuilder(webClientBuilder)
-                .build();
-
         OpenAiChatOptions options = OpenAiChatOptions.builder()
-            .model(providerConfig.model())
+                .model(providerConfig.model())
+                .baseUrl(providerConfig.baseUrl())
+                .apiKey(providerConfig.apiKey())
                 .build();
 
-        return new OpenAiChatModel(
-                api,
-                options,
-                org.springframework.ai.model.tool.ToolCallingManager.builder().build(),
-                retryTemplate,
-                observationRegistry
-        );
+        OpenAiChatModel.Builder modelBuilder = OpenAiChatModel.builder()
+                .options(options)
+                .toolCallingManager(org.springframework.ai.model.tool.ToolCallingManager.builder().build())
+                .observationRegistry(observationRegistry);
+
+        if (bufferingEnabled) {
+            modelBuilder.httpClientBuilderCustomizer(httpBuilder ->
+                    httpBuilder.interceptor(new LangfuseHttpBodyCaptureInterceptor()));
+        }
+
+        return modelBuilder.build();
     }
 
     @Bean("skillBaselineChatClient")

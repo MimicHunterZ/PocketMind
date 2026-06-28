@@ -46,7 +46,7 @@ public class PersistingToolCallAdvisor extends ToolCallAdvisor {
     public PersistingToolCallAdvisor(ToolCallingManager toolCallingManager,
                                      ChatMessageRepository chatMessageRepository,
                                      ObjectMapper objectMapper) {
-        super(toolCallingManager, Ordered.HIGHEST_PRECEDENCE + 300);
+        super(toolCallingManager, DEFAULT_TOOL_EXECUTION_ELIGIBILITY_CHECKER, Ordered.HIGHEST_PRECEDENCE + 300, true);
         this.chatMessageRepository = chatMessageRepository;
         this.objectMapper = objectMapper;
     }

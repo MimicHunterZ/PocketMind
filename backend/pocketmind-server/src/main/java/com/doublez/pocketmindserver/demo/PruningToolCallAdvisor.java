@@ -56,7 +56,7 @@ public class PruningToolCallAdvisor extends ToolCallAdvisor {
                                  String modelName) {
         // ToolCallAdvisor 对 advisor order 有断言：必须介于 HIGHEST_PRECEDENCE 和 LOWEST_PRECEDENCE 之间。
         // 这里用和默认 builder 接近的值，确保其能作为 recursive advisor 正常工作。
-        super(toolCallingManager, Ordered.HIGHEST_PRECEDENCE + 300);
+        super(toolCallingManager, DEFAULT_TOOL_EXECUTION_ELIGIBILITY_CHECKER, Ordered.HIGHEST_PRECEDENCE + 300, true);
         this.startRatio = startRatio;
         this.keepRecentToolResponses = Math.max(0, keepRecentToolResponses);
         this.contextWindowResolver = contextWindowResolver;
