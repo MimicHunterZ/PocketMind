@@ -1,12 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_streaming_text_markdown/flutter_streaming_text_markdown.dart';
 import 'package:genui/genui.dart';
-import 'package:json_schema_builder/json_schema_builder.dart';
 import 'package:pocketmind/demo/a2ui/a2ui_stream_api_service.dart';
+import 'package:pocketmind/demo/a2ui/streaming_markdown_catalog_item.dart';
 import 'package:pocketmind/util/theme_data.dart';
 import 'package:uuid/uuid.dart';
 
@@ -18,30 +18,29 @@ class GenUiDemoPage extends ConsumerStatefulWidget {
 }
 
 class _GenUiDemoPageState extends ConsumerState<GenUiDemoPage> {
-  final TextEditingController _queryController = TextEditingController(
-    text: '今天天气是晴天，有什么计划可以做？',
-  );
   final Uuid _uuid = const Uuid();
 
   late final SurfaceController _surfaceController;
   late final A2uiTransportAdapter _transportAdapter;
 
   final List<String> _surfaceIds = [];
-  final List<_ActionLog> _actionLogs = [];
+  final List<String> _logs = [];
 
   CancelToken? _cancelToken;
   StreamSubscription<A2uiSseEvent>? _streamSubscription;
   StreamSubscription<ChatMessage>? _onSubmitSubscription;
 
-  String _sessionUuid = const Uuid().v4();
   String _requestId = '';
   bool _isStreaming = false;
+  double _frameDelayMs = 320;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _surfaceController = SurfaceController(catalogs: [_buildCatalog()]);
+    _surfaceController = SurfaceController(
+      catalogs: [buildAppCatalog()],
+    );
     _transportAdapter = A2uiTransportAdapter();
 
     _transportAdapter.incomingMessages.listen(_surfaceController.handleMessage);
@@ -65,17 +64,10 @@ class _GenUiDemoPageState extends ConsumerState<GenUiDemoPage> {
     });
 
     _onSubmitSubscription = _surfaceController.onSubmit.listen((message) {
-      if (!mounted) {
-        return;
-      }
       for (final part in message.parts) {
         final interaction = part.asUiInteractionPart;
         if (interaction != null) {
-          setState(() {
-            _actionLogs.add(
-              _ActionLog(name: 'ui_action', context: interaction.interaction),
-            );
-          });
+          _handleInteraction(interaction.interaction);
         }
       }
     });
@@ -86,7 +78,6 @@ class _GenUiDemoPageState extends ConsumerState<GenUiDemoPage> {
     _cancelToken?.cancel();
     _streamSubscription?.cancel();
     _onSubmitSubscription?.cancel();
-    _queryController.dispose();
     _surfaceController.dispose();
     _transportAdapter.dispose();
     super.dispose();
@@ -94,311 +85,106 @@ class _GenUiDemoPageState extends ConsumerState<GenUiDemoPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = context.colorScheme;
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('GenUI Demo')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'session: $_sessionUuid',
-                  style: context.textTheme.bodySmall,
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _queryController,
-                  minLines: 2,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: '问题',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    FilledButton.icon(
-                      onPressed: _isStreaming ? null : _startStream,
-                      icon: const Icon(Icons.play_arrow),
-                      label: const Text('开始流式'),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton.icon(
-                      onPressed: _isStreaming ? _stopStream : null,
-                      icon: const Icon(Icons.stop_circle_outlined),
-                      label: const Text('停止'),
-                    ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: _isStreaming ? null : _newSession,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('新会话'),
-                    ),
-                  ],
-                ),
-                if (_error != null) ...[
-                  const SizedBox(height: 8),
-                  Text(_error!, style: TextStyle(color: colorScheme.error)),
-                ],
-              ],
-            ),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('GenUI Demo'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'UI 展示'),
+              Tab(text: '日志'),
+            ],
           ),
-          const Divider(height: 1),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (_surfaceIds.isEmpty)
-                  Text(
-                    '点击”开始流式”后，真实 A2UI 事件会驱动同一 surface 内的文本与组件交错更新。',
-                    style: context.textTheme.bodyMedium,
-                  ),
-                for (final surfaceId in _surfaceIds)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Surface(
-                          surfaceContext: _surfaceController.contextFor(
-                            surfaceId,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                if (_actionLogs.isNotEmpty)
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '交互事件日志',
-                            style: context.textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 8),
-                          for (final log in _actionLogs.reversed.take(8))
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 6),
-                              child: Text('• ${log.name}  ${log.context}'),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
+        ),
+        body: TabBarView(
+          children: [_buildUiTab(context), _buildLogTab(context)],
+        ),
       ),
     );
   }
 
-  Catalog _buildCatalog() {
-    final streamMarkdownMessage = CatalogItem(
-      name: 'StreamingMarkdownMessage',
-      dataSchema: S.object(
-        properties: {
-          'path': S.string(description: 'Markdown 数据模型路径'),
-          'isLoading': S.boolean(description: '是否加载中'),
-        },
-        required: ['path'],
-      ),
-      widgetBuilder: (itemContext) {
-        final data = itemContext.data as Map<String, Object?>;
-        final path = data['path'] as String;
-        final isLoading = (data['isLoading'] as bool?) ?? false;
-        return BoundString(
-          dataContext: itemContext.dataContext,
-          value: {'path': path},
-          builder: (context, value) {
-            return StreamingTextMarkdown.chatGPT(
-              text: value ?? '',
-              markdownEnabled: true,
-              animationsEnabled: false,
-              isLoading: isLoading,
-              padding: EdgeInsets.zero,
-            );
-          },
-        );
-      },
-    );
+  Widget _buildUiTab(BuildContext context) {
+    final colorScheme = context.colorScheme;
 
-    final sourceReferenceCard = CatalogItem(
-      name: 'SourceReferenceCard',
-      dataSchema: S.object(
-        properties: {
-          'title': S.string(),
-          'author': S.string(),
-          'timestamp': S.string(),
-          'url': S.string(),
-        },
-        required: ['title'],
-      ),
-      widgetBuilder: (itemContext) {
-        final data = itemContext.data as Map<String, Object?>;
-        final title = (data['title'] as String?) ?? '来源';
-        final author = (data['author'] as String?) ?? '';
-        final timestamp = (data['timestamp'] as String?) ?? '';
-        final url = (data['url'] as String?) ?? '';
-        return ListTile(
-          leading: const Icon(Icons.link_outlined),
-          title: Text(title),
-          subtitle: Text('$author  $timestamp\n$url'),
-          isThreeLine: true,
-        );
-      },
-    );
-
-    final taskChecklist = CatalogItem(
-      name: 'TaskChecklist',
-      dataSchema: S.object(
-        properties: {
-          'title': S.string(),
-          'items': S.list(
-            items: S.object(
-              properties: {
-                'taskId': S.string(),
-                'description': S.string(),
-                'priority': S.string(),
-                'status': S.string(),
-              },
-              required: ['taskId', 'description'],
-            ),
-          ),
-        },
-      ),
-      widgetBuilder: (itemContext) {
-        final data = itemContext.data as Map<String, Object?>;
-        final title = (data['title'] as String?) ?? '任务清单';
-        final items = (data['items'] as List?) ?? const [];
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            for (final raw in items)
-              if (raw is Map)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        '${raw['status']}' == 'DONE'
-                            ? Icons.check_circle
-                            : Icons.radio_button_unchecked,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '[${raw['taskId']}] ${raw['description']} (${raw['priority']})',
-                        ),
-                      ),
-                    ],
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Row(
+            children: [
+              FilledButton.icon(
+                onPressed: _isStreaming ? _stopStream : _startStream,
+                icon: Icon(_isStreaming ? Icons.stop : Icons.play_arrow),
+                label: Text(_isStreaming ? '停止流式' : '开始流式'),
+              ),
+              const SizedBox(width: 12),
+              Text('${_frameDelayMs.round()}ms'),
+              SizedBox(
+                width: 160,
+                child: Slider(
+                  min: 80,
+                  max: 1000,
+                  divisions: 23,
+                  value: _frameDelayMs,
+                  label: '${_frameDelayMs.round()}ms',
+                  onChanged: _isStreaming
+                      ? null
+                      : (value) => setState(() => _frameDelayMs = value),
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _error!,
+                    style: TextStyle(color: colorScheme.error),
                   ),
                 ),
-          ],
-        );
-      },
-    );
-
-    final actionButtonGroup = CatalogItem(
-      name: 'ActionButtonGroup',
-      dataSchema: S.object(
-        properties: {
-          'title': S.string(),
-          'actions': S.list(
-            items: S.object(
-              properties: {
-                'id': S.string(),
-                'label': S.string(),
-                'payload': S.string(),
-              },
-              required: ['id', 'label'],
-            ),
-          ),
-        },
-      ),
-      widgetBuilder: (itemContext) {
-        final data = itemContext.data as Map<String, Object?>;
-        final title = (data['title'] as String?) ?? '操作';
-        final actions = (data['actions'] as List?) ?? const [];
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final raw in actions)
-                  if (raw is Map)
-                    FilledButton(
-                      onPressed: () {
-                        final actionId = '${raw['id'] ?? ''}';
-                        final payload = '${raw['payload'] ?? ''}';
-                        if (mounted) {
-                          setState(() {
-                            _actionLogs.add(
-                              _ActionLog(
-                                name: actionId.isEmpty ? 'action' : actionId,
-                                context: payload,
-                              ),
-                            );
-                          });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                '已触发操作: ${raw['label'] ?? actionId}',
-                              ),
-                              duration: const Duration(seconds: 2),
-                            ),
-                          );
-                        }
-                        itemContext.dispatchEvent(
-                          UserActionEvent(
-                            name: actionId,
-                            sourceComponentId: itemContext.id,
-                            context: {'payload': payload},
-                          ),
-                        );
-                      },
-                      child: Text('${raw['label'] ?? 'Action'}'),
-                    ),
               ],
-            ),
-          ],
-        );
-      },
-    );
-
-    return BasicCatalogItems.asCatalog().copyWith(
-      newItems: [
-        streamMarkdownMessage,
-        sourceReferenceCard,
-        taskChecklist,
-        actionButtonGroup,
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              if (_surfaceIds.isEmpty)
+                Text(
+                  '点击开始流式，查看 AI 如何流式讲解 Java 类加载机制，并通过选择卡片引导深入。',
+                  style: context.textTheme.bodyMedium,
+                ),
+              for (final surfaceId in _surfaceIds)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Surface(
+                    surfaceContext: _surfaceController.contextFor(surfaceId),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  Future<void> _startStream() async {
-    final query = _queryController.text.trim();
-    if (query.isEmpty) {
-      setState(() => _error = '请输入问题');
-      return;
+  Widget _buildLogTab(BuildContext context) {
+    if (_logs.isEmpty) {
+      return Center(child: Text('暂无日志', style: context.textTheme.bodyMedium));
     }
 
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: _logs.length,
+      separatorBuilder: (_, _) => const Divider(height: 16),
+      itemBuilder: (context, index) {
+        return SelectableText(_logs[index]);
+      },
+    );
+  }
+
+  Future<void> _startStream() async {
     _cancelToken?.cancel();
     await _streamSubscription?.cancel();
 
@@ -409,48 +195,158 @@ class _GenUiDemoPageState extends ConsumerState<GenUiDemoPage> {
       _isStreaming = true;
       _error = null;
       _surfaceIds.clear();
-      _actionLogs.clear();
+      _logs.clear();
     });
 
+    _log('stream start requestId=$_requestId');
+
     final api = ref.read(a2uiStreamApiServiceProvider);
-    _streamSubscription = api
-        .stream(query: query, requestId: _requestId, cancelToken: _cancelToken)
-        .listen((event) {
-          if (!mounted) {
-            return;
-          }
-          switch (event) {
-            case A2uiDeltaEvent(:final data):
-              _transportAdapter.addChunk(data);
-            case A2uiDoneEvent():
-              setState(() => _isStreaming = false);
-            case A2uiErrorEvent(:final message):
-              setState(() {
-                _isStreaming = false;
-                _error = message;
-              });
-          }
-        });
+    _consume(
+      api.mockStream(
+        requestId: _requestId,
+        cancelToken: _cancelToken,
+        delay: Duration(milliseconds: _frameDelayMs.round()),
+      ),
+    );
+  }
+
+  /// 消费一条 A2UI 事件流(首轮或交互后的续推共用)。
+  void _consume(Stream<A2uiSseEvent> stream) {
+    _streamSubscription = stream.listen((event) {
+      if (!mounted) {
+        return;
+      }
+      switch (event) {
+        case A2uiDeltaEvent(:final data):
+          _transportAdapter.addChunk(data);
+          _log(_describeFrame(data));
+        case A2uiDoneEvent():
+          setState(() => _isStreaming = false);
+          _log('stream done requestId=$_requestId');
+        case A2uiErrorEvent(:final message):
+          setState(() {
+            _isStreaming = false;
+            _error = message;
+          });
+          _log('stream error $message');
+      }
+    });
   }
 
   void _stopStream() {
     _cancelToken?.cancel();
     setState(() => _isStreaming = false);
+    _log('stream stopped requestId=$_requestId');
   }
 
-  void _newSession() {
-    setState(() {
-      _sessionUuid = _uuid.v4();
-      _error = null;
-      _surfaceIds.clear();
-      _actionLogs.clear();
+  void _handleInteraction(String rawInteraction) {
+    try {
+      final decoded = jsonDecode(rawInteraction) as Map<String, dynamic>;
+      final action = decoded['action'] as Map<String, dynamic>;
+      final name = action['name'] as String? ?? 'unknown_action';
+      final context = action['context'] as Map<String, dynamic>? ?? {};
+      _log('action $name context=${jsonEncode(context)}');
+      _respondToAction(name, context);
+    } catch (e) {
+      _log('action parse failed $e');
+    }
+  }
+
+  Future<void> _respondToAction(
+    String actionName,
+    Map<String, dynamic> context,
+  ) async {
+    final surfaceId = _surfaceIds.isEmpty ? null : _surfaceIds.last;
+    if (surfaceId == null) {
+      return;
+    }
+
+    final api = ref.read(a2uiStreamApiServiceProvider);
+
+    switch (actionName) {
+      case 'deep_dive':
+        // 用户选择深入方向 → 后端据选择续推第二段流式讲解。
+        // mutuallyExclusive 的 ChoicePicker 把选中值写成数组(如 ["热修复原理"]),
+        // 因此 topic 可能是 List 或 String,这里统一取首个非空值。
+        final topic = _firstNonEmpty(context['topic']);
+        if (topic == null) {
+          _emitDataModel(surfaceId, '/status', '请先选择一个方向');
+          return;
+        }
+        await _streamSubscription?.cancel();
+        _cancelToken = CancelToken();
+        setState(() => _isStreaming = true);
+        _log('agent continue topic=$topic');
+        _consume(
+          api.continueWithTopic(
+            surfaceId: surfaceId,
+            topic: topic,
+            cancelToken: _cancelToken,
+            delay: Duration(milliseconds: _frameDelayMs.round()),
+          ),
+        );
+      case 'mark_done':
+        _emitDataModel(surfaceId, '/status', '✅ 已完成讲解');
+        _log('marked done');
+      default:
+        _log('unhandled action $actionName');
+    }
+  }
+
+  /// 从 event context 的值中取出首个非空字符串。
+  ///
+  /// 兼容两种形态:标量字符串,或 mutuallyExclusive ChoicePicker 写入的单元素数组。
+  String? _firstNonEmpty(Object? raw) {
+    if (raw is String) {
+      final v = raw.trim();
+      return v.isEmpty ? null : v;
+    }
+    if (raw is List) {
+      for (final e in raw) {
+        if (e is String && e.trim().isNotEmpty) {
+          return e.trim();
+        }
+      }
+    }
+    return null;
+  }
+
+  /// 直接向数据模型写一帧(用于本地即时反馈,如状态文字)。
+  void _emitDataModel(String surfaceId, String path, Object? value) {
+    final data = jsonEncode({
+      'version': 'v0.9',
+      'updateDataModel': {'surfaceId': surfaceId, 'path': path, 'value': value},
     });
+    _transportAdapter.addChunk(data);
+    _log(_describeFrame(data));
   }
-}
 
-class _ActionLog {
-  const _ActionLog({required this.name, required this.context});
+  String _describeFrame(String data) {
+    try {
+      final payload = jsonDecode(data) as Map<String, dynamic>;
+      if (payload.containsKey('createSurface')) {
+        final create = payload['createSurface'] as Map<String, dynamic>;
+        return 'a2ui createSurface ${create['surfaceId']}';
+      }
+      if (payload.containsKey('updateComponents')) {
+        final update = payload['updateComponents'] as Map<String, dynamic>;
+        final components = update['components'] as List<dynamic>;
+        return 'a2ui updateComponents count=${components.length}';
+      }
+      if (payload.containsKey('updateDataModel')) {
+        final update = payload['updateDataModel'] as Map<String, dynamic>;
+        return 'a2ui updateDataModel path=${update['path']}';
+      }
+    } catch (_) {
+      return 'a2ui invalid frame';
+    }
+    return 'a2ui frame';
+  }
 
-  final String name;
-  final String context;
+  void _log(String message) {
+    if (!mounted) {
+      return;
+    }
+    setState(() => _logs.insert(0, message));
+  }
 }
