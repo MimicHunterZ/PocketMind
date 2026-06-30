@@ -1,26 +1,19 @@
 # PocketMind iOS 接手清单
 
-> **最新进展（2026-06-30）**：主 App 已经成功用 release 模式装到真机（zhe的iPhone / iOS 18.7.9）并能运行。
-> 系统分享（ShareExtension）暂时从构建里摘出，留待后续单独攻关——详见下方「本次实战记录」。
+> **最新进展（2026-06-30）**：主 App 与 ShareExtension 已一起编译通过并装到真机（zhe的iPhone / iOS 18.7.9）。
+> 系统分享的 Flutter 引擎链接、构建循环等坑已全部打通，剩真机端到端功能验证（Safari 分享 → 弹 Flutter UI → 写入笔记）。
 > 关于 macOS：已经跑通了，不用再做任何事。
 
 ---
 
 ## 当前状态
 
-### ✅ 主 App 已上真机（2026-06-30）
+### ✅ 主 App + ShareExtension 已编译并安装到真机（2026-06-30）
 
-- 编译、签名、安装全链路打通，桌面可直接点开（release 模式）。
+- 主 App 与系统分享 Extension 一起编译、签名、安装全链路打通。
 - 本次踩的所有坑和对应解法，集中记在文末「本次实战记录」，**遇到问题先翻那一节**。
 - ⚠️ 免费 Apple 证书 7 天过期，过期后重跑一次安装即可续期（见第五步）。
-
-### 🟡 系统分享（ShareExtension）暂缓
-
-为先让主 App 跑起来，已临时把 ShareExtension 从主 App 构建里摘出（两处改动，完全可逆）：
-- `ios/Podfile`：注释掉了 `target 'ShareExtension'` 块。
-- `ios/Runner.xcodeproj/project.pbxproj`：移除了 Runner 对 ShareExtension 的「依赖」与「Embed Foundation Extensions」两处**引用**（target 定义本身保留，没删）。
-- 恢复方法和卡点分析见文末「本次实战记录 · ShareExtension 为什么暂缓」。
-- 摘出前的 pbxproj 备份在 `/tmp/project.pbxproj.with-shareext`（重启会丢，需要长期保留请另存）。
+- ⏳ 待办：真机端到端验证分享流程（见第三步「测分享」），以及若要上架需做的合规化（见实战记录）。
 
 ### ✅ 已完成（Claude 写好的）
 
@@ -30,13 +23,14 @@
 - `lib/main_share.dart` —— iOS 平台守卫（Workmanager / flutter_uri_to_file / SystemNavigator.pop）
 - `pubspec.yaml` —— 移除未使用的 `share_handler`
 
-**iOS 原生侧（代码就位但还没集成）**：
+**iOS 原生侧（已集成进构建）**：
 - `ios/Runner/AppDelegate.swift` —— 注册 storage / logger MethodChannel
 - `ios/Runner/Runner.entitlements`（文件已就位）—— App Group capability
 - `ios/Runner/Info.plist` —— 各类 Usage Description + ATS
-- `ios/ShareExtension/ShareViewController.swift` —— Extension 完整实现（启 FlutterEngine + 解析 NSItemProvider + MethodChannel）
+- `ios/ShareExtension/ShareViewController.swift` —— Extension 完整实现（启 FlutterEngine + 解析 NSItemProvider + MethodChannel）；已改为**只手动注册 isar / shared_preferences / flutter_local_notifications 三个插件**，不再用全量 GeneratedPluginRegistrant
 - `ios/ShareExtension/Info.plist` —— NSExtensionActivationRule
 - `ios/ShareExtension/ShareExtension.entitlements`（文件已就位）—— App Group capability
+
 
 **Xcode 工程已配置**：
 - Runner 与 ShareExtension 的 iOS Deployment Target 均已统一为 15.0
@@ -260,9 +254,9 @@ git diff mobile/ios/Runner.xcodeproj/project.pbxproj
 
 ---
 
-## 本次实战记录（2026-06-30，主 App 上真机）
+## 本次实战记录（2026-06-30）
 
-按发生顺序记录这次从「pod install 报错」到「主 App 跑上 iPhone」踩过的坑，方便复现/排查。
+按发生顺序记录这次从「pod install 报错」到「主 App + ShareExtension 一起装上 iPhone」踩过的坑，方便复现/排查。
 
 | # | 现象 | 根因 | 解法 |
 |---|---|---|---|
@@ -270,32 +264,44 @@ git diff mobile/ios/Runner.xcodeproj/project.pbxproj
 | 2 | `pod install` 报 objectVersion 70 | `xcodeproj` gem 兼容表缺 70 | 给 brew gem 的 `constants.rb` 补 `70`/`71` 两行（见第一步） |
 | 3 | 3 条 `CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER` warning | Xcode 新建 Extension 自带的设置与 Pods 注入冲突 | 删掉 ShareExtension 三个 config 里这条设置 |
 | 4 | 编译报 `'sharedApplication' is unavailable (App Extension)` | Extension 复用了主 App 全部插件，`permission_handler` 用了 Extension 禁用的 API | Podfile `post_install` 加 `APPLICATION_EXTENSION_API_ONLY = NO` |
-| 5 | Extension 编译报 `Unable to resolve module 'Flutter'` | ShareExtension 的 base config 没接上 Flutter 引擎模块路径（只引用了 Pods 的 xcconfig，缺 `Generated.xcconfig` 链） | **暂未解决**，先把 ShareExtension 摘出（见下） |
-| 6 | 真机安装报 `0xe8008014 invalid signature` | 拿了 `--no-codesign` 的未签名产物去装 | clean 后走带签名的 `flutter run --release` |
-| 7 | 安装报 `maximum number of installed apps` | 免费证书一台设备最多 3 个 App | 删掉一个不用的腾名额 |
-| 8 | debug 版桌面打不开（黑屏提示只能从工具启动） | iOS 14+ 对 debug 版 Flutter 的限制 | 改用 `--release` 安装 |
+| 5 | Extension 编译报 `Unable to resolve module 'Flutter'` | ShareExtension target 的搜索路径里没有 Flutter 引擎（主 App 是靠 Run Script 把 Flutter.framework 拷进 BUILT_PRODUCTS_DIR，Extension 没这阶段） | Podfile `post_install` 给 `Pods-ShareExtension.*.xcconfig` 追加指向 **extension_safe 引擎** 的 `FRAMEWORK_SEARCH_PATHS[sdk=*]` + `OTHER_LDFLAGS = -framework Flutter` |
+| 6 | Extension 编译报 `Unable to resolve module 'FlutterPluginRegistrant'` | 该模块在本工程根本不存在；Runner 是靠 bridging header `#import "GeneratedPluginRegistrant.h"` 用的，不是 import 模块 | 改 `ShareViewController.swift`：删掉 `import FlutterPluginRegistrant` 与全量 `GeneratedPluginRegistrant.register`，改成只 `import` + 手动注册 isar / shared_preferences / flutter_local_notifications 三个插件 |
+| 7 | 编译报 `Sandbox: bash deny file-write-create .../resources-to-copy-ShareExtension.txt` | Xcode 26 新建 Extension 默认 `ENABLE_USER_SCRIPT_SANDBOXING = YES`，挡住 CocoaPods 的 Copy Resources 脚本 | pbxproj 里 ShareExtension 三个 config 改成 `NO`（与 Runner 一致） |
+| 8 | 编译报 `Cycle inside Runner; building could produce unreliable results` | Embed Extension 的 appex 拷贝排在 CP 脚本之后，与 Thin Binary（其 input 含 Runner.app/Info.plist）+ Info.plist 处理形成依赖环 | 两步双保险：① 移除 Thin Binary 阶段的 `${TARGET_BUILD_DIR}/${INFOPLIST_PATH}` input；② 把 `Embed Foundation Extensions` 阶段移到 `Embed Frameworks` 之后、`Thin Binary` 之前（用 `xcodeproj` gem 改） |
+| 9 | 真机安装报 `0xe8008014 invalid signature`（`objective_c.framework`） | 反复 `--no-codesign` build 在 `build/` 留下 adhoc 签名脏产物，被 `flutter run` 复用 | `flutter clean` + `pod install` 后走纯净 `flutter run --release` |
+| 10 | 安装报 `maximum number of installed apps` | 免费证书一台设备最多 3 个 App | 删掉一个不用的腾名额 |
+| 11 | debug 版桌面打不开（黑屏提示只能从工具启动） | iOS 14+ 对 debug 版 Flutter 的限制 | 改用 `--release` 安装 |
 
-### ShareExtension 为什么暂缓、以及怎么恢复
+### ShareExtension 嵌 Flutter 引擎：最终怎么通的
 
-卡点是上表 #5：`ShareViewController.swift` 要 `import Flutter` 在分享进程里启一个 FlutterEngine，但 Xcode 新建的 ShareExtension target 的 build config 只引用了 `Pods-ShareExtension.*.xcconfig`，**没有接上 Flutter 引擎 framework 的模块路径**（主 App 的 Runner 是靠 base config 链里 `#include "Generated.xcconfig"` 拿到的）。
+核心三处改动（都在 `ios/Podfile` 的 `post_install` 和 `ShareViewController.swift` / pbxproj）：
 
-**好消息**：这条路是官方支持的，不是死胡同。Flutter 引擎目录里就带了专门给 Extension 用的版本：
-```
-~/fvm/versions/3.41.8/bin/cache/artifacts/engine/ios/extension_safe/   # 给 App Extension 的引擎
-~/fvm/versions/3.41.8/bin/cache/artifacts/engine/ios/Flutter.xcframework # 给主 App 的引擎
-```
-后续攻关方向：让 ShareExtension target 正确链接 `extension_safe` 引擎 + 接上模块搜索路径（可能需要在 Podfile 用 `depends_on_flutter` 或手工配 `FRAMEWORK_SEARCH_PATHS` / `OTHER_LDFLAGS`），并注意 120MB 内存上限。
+1. **引擎链接**（解决 #5）：`post_install` 里遍历 `Pods-ShareExtension` 聚合 target，向它的三个 xcconfig 追加：
+   ```
+   FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]      = $(inherited) "<flutter_root>/bin/cache/artifacts/engine/ios/extension_safe/Flutter.xcframework/ios-arm64"
+   FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*] = $(inherited) "<flutter_root>/.../extension_safe/Flutter.xcframework/ios-arm64_x86_64-simulator"
+   OTHER_LDFLAGS = $(inherited) -framework Flutter
+   ```
+   用 **extension_safe** 引擎（不是普通 `ios/Flutter.xcframework`）——它用 `APPLICATION_EXTENSION_API_ONLY=YES` 编译、不引用扩展禁用 API。运行时 Extension 通过 `@executable_path/../../Frameworks` rpath 加载宿主 App 里那份 `Flutter.framework`，所以 appex 本身只有 364K、不带引擎。
+2. **插件精简注册**（解决 #6）：Extension 只手动注册 isar / shared_preferences / flutter_local_notifications，不用全量 GeneratedPluginRegistrant。这样既省内存又避开扩展禁用 API。
+3. **构建顺序 / 沙盒**（解决 #7、#8）：关掉 ShareExtension 的脚本沙盒；调整 Runner 的 build phase 顺序断开依赖环。
 
-**恢复 ShareExtension 进构建的两步**（当前是摘出状态）：
-1. `ios/Podfile`：取消 `target 'ShareExtension'` 块的注释。
-2. `ios/Runner.xcodeproj/project.pbxproj`：恢复 Runner 对 ShareExtension 的两处引用——
-   - `dependencies` 列表里的 `PBXTargetDependency`（id `2728815B...`）
-   - `Embed Foundation Extensions` 阶段里的 `ShareExtension.appex`（id `2728815C...`）
-   - 最省事的办法：从备份 `/tmp/project.pbxproj.with-shareext` 取回这两行（target 定义一直都在，只是引用被删了）。
-3. 重跑 `pod install` + 解决 #5 的 Flutter 模块链接问题，才能真正编译过。
+> ⚠️ 这些 pbxproj 改动（#7 沙盒、#8 顺序）写在 `Runner.xcodeproj/project.pbxproj`，`pod install` / `flutter build` 不会重写它们，所以一次改动持久有效。但若有人重跑 `flutter create` 或在 Xcode 里重建 Extension target，需要重新做。Podfile 的 `post_install` 注入是每次 `pod install` 自动重放的，无需手动。
+
+### 待办：上架 App Store 的合规化（当前是侧载折中）
+
+当前为求快速跑通，用了 `APPLICATION_EXTENSION_API_ONLY = NO`（#4）。这能侧载 / AltStore 安装，但 App Store 审核会因 .appex 引用扩展禁用 API 被拒。要上架需：
+- 确认 Extension 真的只链接 extension_safe 引擎与那 3 个安全插件；
+- 把 `APPLICATION_EXTENSION_API_ONLY` 调回 `YES`，逐个解决暴露出来的禁用 API 链接错误。
+（个人侧载用不影响，可暂时不管。）
 
 ### 本机环境备忘
 - Xcode：26.4.1（Build 17E202）
 - Flutter：3.41.8（经 fvm 管理，`~/fvm/versions/3.41.8`）
 - `pod`：来自 Homebrew（`/opt/homebrew/bin/pod`，1.16.2，已手工补 xcodeproj gem）
-- 真机：zhe的iPhone / iOS 18.7.9，Team `F2GPBS33F5`，Bundle `com.doublez.pocketmind`
+- 真机：zhe的iPhone / iOS 18.7.9，Team `F2GPBS33F5`，Bundle `com.doublez.pocketmind`（Extension：`com.doublez.pocketmind.ShareExtension`）
+- 改 pbxproj 用的 `xcodeproj` gem 跑法（brew ruby 需指定 RUBYLIB）：
+  ```bash
+  XCPROJ_LIB=$(ls -d /opt/homebrew/Cellar/cocoapods/*/libexec/gems/xcodeproj-*/lib | head -1)
+  # 连同 nanaimo/claide/colored2/atomos 的 lib 一起拼进 RUBYLIB,再 /opt/homebrew/opt/ruby/bin/ruby 跑
+  ```

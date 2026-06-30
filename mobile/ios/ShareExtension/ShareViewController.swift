@@ -18,8 +18,14 @@
 
 import UIKit
 import Flutter
-import FlutterPluginRegistrant
 import UniformTypeIdentifiers
+// Share Extension 只手动注册分享流程真正用到的插件,而不是全量 GeneratedPluginRegistrant。
+// 原因:全量注册会拉入 permission_handler / url_launcher / webview 等引用了
+// [UIApplication sharedApplication] 等「扩展禁用 API」的插件,既增加内存(120MB 上限)
+// 又妨碍上架审核。main_share.dart 运行时只需要本地存储与通知三件套。
+import isar_community_flutter_libs
+import shared_preferences_foundation
+import flutter_local_notifications
 
 class ShareViewController: UIViewController {
 
@@ -67,8 +73,14 @@ class ShareViewController: UIViewController {
             return
         }
 
-        // 注册 Flutter 插件 (path_provider / shared_preferences / isar / dio 等都靠这一步生效)
-        GeneratedPluginRegistrant.register(with: engine)
+        // 只注册分享流程必需的插件(isar 本地库 / shared_preferences / 通知)。
+        // workmanager、抓取、权限等都不在 Extension 内执行,留给主 App。
+        IsarFlutterLibsPlugin.register(
+            with: engine.registrar(forPlugin: "IsarFlutterLibsPlugin")!)
+        SharedPreferencesPlugin.register(
+            with: engine.registrar(forPlugin: "SharedPreferencesPlugin")!)
+        FlutterLocalNotificationsPlugin.register(
+            with: engine.registrar(forPlugin: "FlutterLocalNotificationsPlugin")!)
 
         // 用 engine 的 binaryMessenger 安装 channels
         let messenger = engine.binaryMessenger

@@ -41,14 +41,10 @@ end
 
 # ShareExtension target 复用主 App 的 Flutter pods,这样 GeneratedPluginRegistrant
 # 能在 Extension 进程内注册 path_provider / shared_preferences / isar 等插件。
-#
-# 【暂时停用】先只把主 App 装上手机,系统分享(ShareExtension)留到后续单独攻关。
-# 恢复方法:取消下面这个 target 块的注释,并恢复 Runner 工程里对 ShareExtension 的
-# 依赖与 Embed Foundation Extensions 引用(见 /tmp/project.pbxproj.with-shareext 备份)。
-# target 'ShareExtension' do
-#   use_frameworks!
-#   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-# end
+target 'ShareExtension' do
+  use_frameworks!
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
@@ -58,7 +54,33 @@ post_install do |installer|
       # 用到 [UIApplication sharedApplication] —— 该 API 在 App Extension 默认编译模式下被禁用,
       # 会导致编译报 "'sharedApplication' is unavailable: not available on iOS (App Extension)"。
       # 关掉 Extension-only API 限制即可正常编译(sideload / AltStore 安装不受影响)。
+      # 注:这是侧载路线的折中;若要上架 App Store,需改用 extension_safe 引擎 +
+      # 在 Extension 内只手动注册需要的插件,再把此项调回 YES。
       config.build_settings['APPLICATION_EXTENSION_API_ONLY'] = 'NO'
+    end
+  end
+
+  # ShareExtension 的 app target 编译期需要能 `import Flutter` / `import FlutterPluginRegistrant`。
+  # 主 App(Runner)靠 xcode_backend.sh 的 Run Script 把 Flutter.framework 拷进 BUILT_PRODUCTS_DIR,
+  # 而 Extension target 没有这个阶段,搜索路径里也没有引擎,因此 import 报
+  # "Unable to resolve module dependency: 'Flutter'"。
+  # 这里给 Pods-ShareExtension 的 xcconfig 追加指向 extension_safe 引擎 xcframework 的搜索路径
+  # 与弱链接,使 Extension 编译期能解析 Flutter 模块(运行时仍从宿主 App 的 Frameworks/ 加载同一份引擎)。
+  engine_xcframework = File.join(
+    flutter_root, 'bin', 'cache', 'artifacts', 'engine', 'ios', 'extension_safe', 'Flutter.xcframework'
+  )
+  installer.aggregate_targets.each do |agg|
+    next unless agg.name == 'Pods-ShareExtension'
+    agg.user_build_configurations.each_key do |config_name|
+      xcconfig_path = agg.xcconfig_path(config_name)
+      next unless File.exist?(xcconfig_path)
+      File.open(xcconfig_path, 'a') do |f|
+        f.puts ''
+        f.puts '// PocketMind: 让 ShareExtension 编译期能 import Flutter(指向 extension_safe 引擎)'
+        f.puts %(FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*] = $(inherited) "#{engine_xcframework}/ios-arm64")
+        f.puts %(FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*] = $(inherited) "#{engine_xcframework}/ios-arm64_x86_64-simulator")
+        f.puts 'OTHER_LDFLAGS = $(inherited) -framework Flutter'
+      end
     end
   end
 end
