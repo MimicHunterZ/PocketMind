@@ -1,0 +1,64 @@
+# Uncomment this line to define a global platform for your project
+platform :ios, '15.0'
+
+# CocoaPods 国内镜像源（解决 cdn.cocoapods.org 连接问题）
+source 'https://mirrors.tuna.tsinghua.edu.cn/git/CocoaPods/Specs.git'
+
+# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  use_frameworks!
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
+end
+
+# ShareExtension target 复用主 App 的 Flutter pods,这样 GeneratedPluginRegistrant
+# 能在 Extension 进程内注册 path_provider / shared_preferences / isar 等插件。
+#
+# 【暂时停用】先只把主 App 装上手机,系统分享(ShareExtension)留到后续单独攻关。
+# 恢复方法:取消下面这个 target 块的注释,并恢复 Runner 工程里对 ShareExtension 的
+# 依赖与 Embed Foundation Extensions 引用(见 /tmp/project.pbxproj.with-shareext 备份)。
+# target 'ShareExtension' do
+#   use_frameworks!
+#   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+# end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      # ShareExtension 复用了主 App 的全部 Flutter 插件,其中 permission_handler 等
+      # 用到 [UIApplication sharedApplication] —— 该 API 在 App Extension 默认编译模式下被禁用,
+      # 会导致编译报 "'sharedApplication' is unavailable: not available on iOS (App Extension)"。
+      # 关掉 Extension-only API 限制即可正常编译(sideload / AltStore 安装不受影响)。
+      config.build_settings['APPLICATION_EXTENSION_API_ONLY'] = 'NO'
+    end
+  end
+end

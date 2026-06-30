@@ -29,13 +29,16 @@ import 'package:pocketmind/data/repositories/isar_note_repository.dart'
 import 'package:pocketmind/service/notification_service.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/util/proxy_config.dart';
+import 'package:pocketmind/util/storage_paths.dart';
 import 'package:pocketmind/util/theme_data.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pocketmind/util/url_helper.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 import 'util/logger_service.dart';
+// flutter_uri_to_file 仅 Android 上有原生实现（解析 content:// URI）。
+// iOS 上 Share Extension 通过 NSItemProvider.loadFileRepresentation 直接拿到
+// 本地文件路径,因此 toFile() 调用必须用 Platform.isAndroid 守卫。
 import 'package:flutter_uri_to_file/flutter_uri_to_file.dart';
 
 late Isar isar;
@@ -64,7 +67,7 @@ Future<void> mainShare() async {
     );
   }
 
-  final dir = await getApplicationDocumentsDirectory();
+  final dirPath = await getSharedContainerPath();
 
   // 2. 打开 Isar 实例,和主示例相同，要不然存的地方就不一样了
   isar = await Isar.open([
@@ -76,15 +79,18 @@ Future<void> mainShare() async {
     MutationEntrySchema,
     SyncCheckpointSchema,
     ScrapeAttemptSchema,
-  ], directory: dir.path);
+  ], directory: dirPath);
 
   final notificationSvc = NotificationService();
   await notificationSvc.init();
 
   await ImageStorageHelper().init();
 
-  //开启后台进程
-  await Workmanager().initialize(callbackDispatcher);
+  // 仅 Android 在分享 isolate 里也初始化 Workmanager,以便分享后能注册后台抓取任务。
+  // iOS Share Extension 不需要也无法使用 Workmanager（系统不允许 Extension 注册 BGTask）。
+  if (Platform.isAndroid) {
+    await Workmanager().initialize(callbackDispatcher);
+  }
 
   // 4. 运行一个 只 包含分享 UI 的应用
   runApp(
@@ -152,7 +158,7 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
   Future<void> _ensureReady() async {
     if (!isar.isOpen) {
       PMlog.d(tag, '检测到 Isar 已关闭，正在重新打开...');
-      final dir = await getApplicationDocumentsDirectory();
+      final dirPath = await getSharedContainerPath();
       isar = await Isar.open([
         NoteSchema,
         CategorySchema,
@@ -162,7 +168,7 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
         MutationEntrySchema,
         SyncCheckpointSchema,
         ScrapeAttemptSchema,
-      ], directory: dir.path);
+      ], directory: dirPath);
       _rebuildShareServices();
       PMlog.d(tag, 'Isar 重新打开，分享页服务已重建');
     }
@@ -191,15 +197,20 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
       // 分享 UI 关闭前注册一次后台抓取任务。
       // 真正的扫描在 callbackDispatcher → ResourceFetchScheduler.runNow() 中进行,
       // 因 share 进程会立刻关闭 Isar,无法在此 isolate 完成抓取。
-      await Workmanager().registerOneOffTask(
-        'share_scrape_${DateTime.now().millisecondsSinceEpoch}',
-        AppConstants.taskScrapeAndSave,
-        inputData: <String, dynamic>{
-          if (userQuestion != null && userQuestion.isNotEmpty)
-            AppConstants.taskInputUserQuestion: userQuestion,
-        },
-        constraints: Constraints(networkType: NetworkType.connected),
-      );
+      // ⚠️ iOS 上 Workmanager 不能从 Share Extension 注册 BGTask（系统限制）,
+      // 改为留 PENDING：主 App 下次启动 / 前台时 ResourceFetchScheduler.runNow()
+      // 会自动续抓（见 main.dart:140-144 / didChangeAppLifecycleState）。
+      if (Platform.isAndroid) {
+        await Workmanager().registerOneOffTask(
+          'share_scrape_${DateTime.now().millisecondsSinceEpoch}',
+          AppConstants.taskScrapeAndSave,
+          inputData: <String, dynamic>{
+            if (userQuestion != null && userQuestion.isNotEmpty)
+              AppConstants.taskInputUserQuestion: userQuestion,
+          },
+          constraints: Constraints(networkType: NetworkType.connected),
+        );
+      }
     } catch (e) {
       PMlog.e(tag, '注册后台抓取任务失败,将继续关闭分享页: $e');
     } finally {
@@ -211,8 +222,18 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
         PMlog.w(tag, 'Isar close fail: $e');
       }
     }
-    // 关闭 ShareActivity
-    SystemNavigator.pop();
+    // 关闭分享 UI:
+    //   Android: SystemNavigator.pop() 走 Flutter 默认路径关掉 ShareActivity
+    //   iOS: 走 MethodChannel 通知 Swift 调 extensionContext.completeRequest
+    if (Platform.isIOS) {
+      try {
+        await _channel.invokeMethod('dismissExtension');
+      } catch (e) {
+        PMlog.e(tag, 'dismissExtension 调用失败: $e');
+      }
+    } else {
+      SystemNavigator.pop();
+    }
   }
 
   // 状态转换：从 success 到 editing
@@ -226,7 +247,10 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
     if (UrlHelper.containsHttpsUrl(content)) {
       return UrlHelper.extractHttpsUrl(content);
     }
-    if (UrlHelper.containsContentUri(content)) {
+    // content:// URI 仅 Android 系统分享会出现；iOS 上 Share Extension 通过
+    // NSItemProvider.loadFileRepresentation 已经把图片落到本地路径,直接走
+    // image/file 路径,不会走到这里。
+    if (Platform.isAndroid && UrlHelper.containsContentUri(content)) {
       String? uri = UrlHelper.extractContentUri(content);
       try {
         File tempFile = await toFile(uri!);

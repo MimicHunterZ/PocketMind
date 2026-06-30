@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar_community/isar.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pocketmind/core/constants.dart';
 import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/model/note.dart';
@@ -17,6 +16,7 @@ import 'package:pocketmind/providers/sync_providers.dart';
 import 'package:pocketmind/service/notification_service.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/util/logger_service.dart';
+import 'package:pocketmind/util/storage_paths.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workmanager/workmanager.dart';
 
@@ -43,7 +43,10 @@ void callbackDispatcher() {
       await notificationService.init();
 
       // 后台 isolate 重新打开 Isar
-      final dir = await getApplicationDocumentsDirectory();
+      // iOS 走 App Group 共享容器；Android / 其他平台保持 ApplicationDocuments。
+      // iOS 上 Workmanager 实际不会触发本 dispatcher,这里调用是为了与主 App / 分享
+      // Extension 看到同一份数据库,任何平台都不出现路径分裂。
+      final dirPath = await getSharedContainerPath();
       final isar = await Isar.open([
         NoteSchema,
         CategorySchema,
@@ -53,7 +56,7 @@ void callbackDispatcher() {
         MutationEntrySchema,
         SyncCheckpointSchema,
         ScrapeAttemptSchema,
-      ], directory: dir.path);
+      ], directory: dirPath);
 
       await ImageStorageHelper().init();
 

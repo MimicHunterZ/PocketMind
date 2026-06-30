@@ -2,10 +2,10 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import 'package:pocketmind/api/http_client.dart';
+import 'package:pocketmind/util/storage_paths.dart';
 import './logger_service.dart';
 
 /// 图片存储服务
@@ -45,8 +45,8 @@ class ImageStorageHelper {
   /// 初始化服务
   Future<void> init() async {
     if (_rootDir != null) return;
-    final dir = await getApplicationDocumentsDirectory();
-    _rootDir = dir.path;
+    // iOS 走 App Group 共享容器，其它平台 fallback 到 ApplicationDocuments
+    _rootDir = await getSharedContainerPath();
 
     // 确保图片目录存在
     final directory = Directory(p.join(_rootDir!, _folderName));

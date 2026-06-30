@@ -12,6 +12,7 @@ import 'package:pocketmind/providers/auth_providers.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/util/proxy_config.dart';
+import 'package:pocketmind/util/storage_paths.dart';
 import 'package:pocketmind/util/theme_data.dart';
 import 'package:pocketmind/util/workmanager_platform_guard.dart';
 import 'package:pocketmind/router/app_router.dart';
@@ -58,8 +59,8 @@ Future<void> main() async {
     );
   }
 
-  // 获取一个可写目录
-  final dir = await getApplicationDocumentsDirectory();
+  // 获取一个可写目录（iOS 走 App Group 共享容器，其它平台保持 ApplicationDocuments）
+  final dirPath = await getSharedContainerPath();
   // 打开 Isar 实例
   isar = await Isar.open([
     NoteSchema,
@@ -70,7 +71,7 @@ Future<void> main() async {
     ChatSessionSchema,
     ChatMessageSchema,
     ScrapeAttemptSchema,
-  ], directory: dir.path);
+  ], directory: dirPath);
 
   // 确保初始化默认分类数据
   final categoryRepository = IsarCategoryRepository(isar);
