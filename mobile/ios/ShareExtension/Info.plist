@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Share Extension 有 ~120MB 内存上限,Impeller 渲染峰值内存更高,
+	     关掉改用 Skia 以降低被 jetsam 杀进程的概率。 -->
+	<key>FLTEnableImpeller</key>
+	<false/>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionAttributes</key>

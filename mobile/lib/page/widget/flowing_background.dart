@@ -5,7 +5,12 @@ import 'package:pocketmind/util/theme_data.dart';
 
 /// 流动背景
 class FlowingBackground extends StatefulWidget {
-  const FlowingBackground({super.key});
+  /// 是否启用顶部的高斯模糊层。
+  /// iOS Share Extension 有 ~120MB 内存硬上限,BackdropFilter 的全屏离屏缓冲
+  /// 是内存大户,分享页需关掉以免被 jetsam 杀进程。其余场景默认保留模糊效果。
+  final bool enableBlur;
+
+  const FlowingBackground({super.key, this.enableBlur = true});
 
   @override
   State<FlowingBackground> createState() => _FlowingBackgroundState();
@@ -74,14 +79,16 @@ class _FlowingBackgroundState extends State<FlowingBackground>
         ),
 
         // 轻度模糊层 - 降低模糊度让底层更清晰
-        BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: 35.0,
-            sigmaY: 35.0,
-            tileMode: TileMode.clamp,
+        // Share Extension 等内存敏感场景通过 enableBlur=false 关掉,避免离屏缓冲超 120MB。
+        if (widget.enableBlur)
+          BackdropFilter(
+            filter: ImageFilter.blur(
+              sigmaX: 35.0,
+              sigmaY: 35.0,
+              tileMode: TileMode.clamp,
+            ),
+            child: Container(color: Colors.transparent),
           ),
-          child: Container(color: Colors.transparent),
-        ),
       ],
     );
   }

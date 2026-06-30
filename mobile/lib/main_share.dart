@@ -343,7 +343,8 @@ class _MyShareAppState extends ConsumerState<MyShareApp>
         ),
 
         // --- 层 1: 流动的渐变背景 ---
-        const FlowingBackground(),
+        // iOS Share Extension 有 120MB 内存上限,关掉 BackdropFilter 高斯模糊省内存。
+        FlowingBackground(enableBlur: !Platform.isIOS),
 
         // --- 层 2: 实际页面内容 ---
         SafeArea(
