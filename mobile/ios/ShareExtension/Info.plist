@@ -10,20 +10,14 @@
 	<dict>
 		<key>NSExtensionAttributes</key>
 		<dict>
-			<!-- 接受文本 / URL / 图片 / 任意文件,与 Android ShareActivity 的 intent-filter 对齐 -->
+			<!-- 与 Android ShareActivity 的 intent-filter (text/* image/* video/* application/*) 对齐,
+			     做到「近乎全收」。
+			     不用 dict 形式 (SupportsText/WebURL/Image...) 是因为 dict 规则要求分享 payload 里
+			     每一个 attachment 都落进声明的桶里才激活;知乎等国内 App 常夹带私有 UTI(富文本/卡片),
+			     只要有一项不命中整条规则就失败,导致 PocketMind 从分享面板消失。
+			     TRUEPREDICATE 对任意分享内容都激活,真正能否取到内容交给 ShareViewController 的兜底解析。 -->
 			<key>NSExtensionActivationRule</key>
-			<dict>
-				<key>NSExtensionActivationSupportsText</key>
-				<true/>
-				<key>NSExtensionActivationSupportsWebURL</key>
-				<true/>
-				<key>NSExtensionActivationSupportsWebPageWithMaxCount</key>
-				<integer>1</integer>
-				<key>NSExtensionActivationSupportsImageWithMaxCount</key>
-				<integer>10</integer>
-				<key>NSExtensionActivationSupportsFileWithMaxCount</key>
-				<integer>10</integer>
-			</dict>
+			<string>TRUEPREDICATE</string>
 		</dict>
 		<key>NSExtensionMainStoryboard</key>
 		<string>MainInterface</string>

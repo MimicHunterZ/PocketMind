@@ -239,8 +239,84 @@ class ShareViewController: UIViewController {
                 next(copy)
             }
         } else {
-            // 类型不识别,跳过
-            next(accumulated)
+            // 前四种标准类型都不命中——知乎/微博等国内 App 常用私有 UTI(富文本/卡片)
+            // 包裹内容,这里走兜底:先试 public.text,再直接尝试该 provider 注册的
+            // 第一个类型,把它当 URL / String / Data 解析,尽量不丢内容。
+            loadFallback(provider: provider, accumulated: accumulated, completion: next)
+        }
+    }
+
+    /// 兜底解析:标准类型未命中时,尽可能从私有 UTI 的 attachment 中抠出文字或 URL。
+    private func loadFallback(
+        provider: NSItemProvider,
+        accumulated: ShareItem,
+        completion: @escaping (ShareItem) -> Void
+    ) {
+        // 1) 先试通用文本类型 public.text(plainText 的父类型,涵盖 RTF/属性文本等)
+        if provider.hasItemConformingToTypeIdentifier(UTType.text.identifier) {
+            provider.loadItem(forTypeIdentifier: UTType.text.identifier, options: nil) { item, _ in
+                var copy = accumulated
+                if let line = ShareViewController.stringify(item) {
+                    copy.contentLines.append(line)
+                    completion(copy)
+                } else {
+                    self.loadFirstRegisteredType(provider: provider, accumulated: accumulated, completion: completion)
+                }
+            }
+            return
+        }
+        // 2) 没有文本类型,直接拿 provider 注册的第一个类型尝试解析
+        loadFirstRegisteredType(provider: provider, accumulated: accumulated, completion: completion)
+    }
+
+    /// 从 provider 注册的类型里挑第一个「文本 / 链接」类型尝试解析。
+    /// 关键:只挑 text/url,绝不去 loadItem 一个图片/视频/任意 data 类型——
+    /// Extension 有 ~120MB 内存硬上限,loadItem 会把整个对象读进内存,知乎卡片附带的
+    /// 缩略图 data 一旦被加载,叠加 Flutter + Isar 峰值就会破 120MB 被 jetsam 杀(暗色遮罩无卡片)。
+    /// 媒体类附件本就该走前面 image/fileURL 的 file 表示分支(零拷贝落盘),这里宁可放弃也不读进内存。
+    private func loadFirstRegisteredType(
+        provider: NSItemProvider,
+        accumulated: ShareItem,
+        completion: @escaping (ShareItem) -> Void
+    ) {
+        let candidate = provider.registeredTypeIdentifiers.first { id in
+            guard let type = UTType(id) else { return false }
+            return type.conforms(to: .text) || type.conforms(to: .url)
+        }
+        guard let typeId = candidate else {
+            // 没有可安全读取的文本/链接类型,放弃这个 attachment(不冒内存风险)
+            completion(accumulated)
+            return
+        }
+        provider.loadItem(forTypeIdentifier: typeId, options: nil) { item, _ in
+            var copy = accumulated
+            if let line = ShareViewController.stringify(item) {
+                copy.contentLines.append(line)
+            }
+            completion(copy)
+        }
+    }
+
+    /// 把 loadItem 返回的任意 item 尽力转成一行可保存的字符串。
+    private static func stringify(_ item: Any?) -> String? {
+        switch item {
+        case let url as URL:
+            return url.absoluteString
+        case let text as String:
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        case let attr as NSAttributedString:
+            let trimmed = attr.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        case let data as Data:
+            // 仅在 text/url 类型上才会走到这里(见 loadFirstRegisteredType 的类型筛选),
+            // 但仍设上限兜底:超 256KB 的「文本」十有八九是被误判的二进制,直接放弃,避免内存峰值。
+            guard data.count <= 256 * 1024,
+                  let text = String(data: data, encoding: .utf8) else { return nil }
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        default:
+            return nil
         }
     }
 
