@@ -8,12 +8,14 @@
 
 ## 当前状态
 
-### ✅ 主 App + ShareExtension 已编译并安装到真机（2026-06-30）
+### ✅ 主 App + ShareExtension 已跑通真机（2026-06-30）
 
 - 主 App 与系统分享 Extension 一起编译、签名、安装全链路打通。
+- **系统分享已可用**：Safari 分享 → 弹出 Flutter 卡片 → 笔记可靠保存，实测通过。
 - 本次踩的所有坑和对应解法，集中记在文末「本次实战记录」，**遇到问题先翻那一节**。
 - ⚠️ 免费 Apple 证书 7 天过期，过期后重跑一次安装即可续期（见第五步）。
-- ⏳ 待办：真机端到端验证分享流程（见第三步「测分享」），以及若要上架需做的合规化（见实战记录）。
+- ⏳ 残留小问题（不阻塞个人侧载）：分享收尾时有一次 `EXC_GUARD`(308) 崩溃日志，发生在 UI 已显示、笔记已保存**之后**的进程关闭阶段（Flutter 引擎退出不干净），功能无影响。上架前需优化 `dismissExtension` 的退出时机。
+- ⏳ 待办：链接抓取（scraper）端到端验证——分享带 URL 的内容后打开主 App，看 `ResourceFetchScheduler` 是否续抓（抓取不在 Extension 内跑）。以及若要上架的合规化（见实战记录）。
 
 ### ✅ 已完成（Claude 写好的）
 
@@ -271,6 +273,26 @@ git diff mobile/ios/Runner.xcodeproj/project.pbxproj
 | 9 | 真机安装报 `0xe8008014 invalid signature`（`objective_c.framework`） | 反复 `--no-codesign` build 在 `build/` 留下 adhoc 签名脏产物，被 `flutter run` 复用 | `flutter clean` + `pod install` 后走纯净 `flutter run --release` |
 | 10 | 安装报 `maximum number of installed apps` | 免费证书一台设备最多 3 个 App | 删掉一个不用的腾名额 |
 | 11 | debug 版桌面打不开（黑屏提示只能从工具启动） | iOS 14+ 对 debug 版 Flutter 的限制 | 改用 `--release` 安装 |
+| 12 | 分享只出暗色遮罩、无卡片、挡住宿主、笔记有时存有时不存 | **Extension 实际内存 ~122MB 超过 120MB 上限被 jetsam 杀**（崩溃报告误报成 `EXC_GUARD`，真因看日志 `memorystatus: killing_specific_process ... NNNNNKB`） | ① 分享页 `FlowingBackground(enableBlur:false)` 去掉全屏高斯模糊；② ShareExtension Info.plist 加 `FLTEnableImpeller=false` 改用 Skia。两招后降到 120MB 以下，卡片正常弹出、笔记可靠保存 |
+
+### 内存超限（120MB）排查与修复
+
+iOS App Extension 有 ~120MB 内存硬上限，超了直接被内核 jetsam 杀进程。本项目首次真机测试就撞上（实测 ~122.7MB）。
+
+- **怎么确诊**（命令行，不用 Xcode）：
+  ```bash
+  # 1. 拉崩溃报告
+  idevicecrashreport -e -k /tmp/crash   # 找 ExcUserFault_ShareExtension-*.ips
+  # 2. 抓实时日志,同时去手机触发分享
+  idevicesyslog | grep -iE 'shareext|memorystatus|jetsam|IsarCore|flutter:'
+  ```
+  看到 `kernel: memorystatus: killing_specific_process pid ... [ShareExtension] ... 125633KB` 就是内存超限。注意崩溃报告里写的 `EXC_GUARD` 是误导，真因在 syslog 的 memorystatus 行。
+- **降内存改动**（提交 `1dc6d33`）：见上表 #12。`FlowingBackground` 加了 `enableBlur` 开关，`main_share.dart` 在 iOS 传 `false`；`BackdropFilter` 的全屏离屏缓冲是最大头。
+- 第三招「分享 isolate 只 `Isar.open` 必需 schema」没用上（前两招已够，且和主 App 同目录 Isar 实例的 schema 兼容有风险）。真不够时可再上。
+
+### 链接抓取（scraper）不在 Extension 内跑
+
+分享带 URL 时，Extension 只把笔记存进 Isar 并标 `resourceStatus = PENDING`，**不抓取**。真正抓取留给主 App：下次启动 / 切前台时 `ResourceFetchScheduler.runNow()` 领作业续抓（iOS Workmanager 不能从 Extension 注册 BGTask）。所以测抓取要：分享链接 → 打开主 App → 观察。
 
 ### ShareExtension 嵌 Flutter 引擎：最终怎么通的
 
