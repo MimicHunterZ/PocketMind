@@ -67,7 +67,7 @@ struct SaveToPocketMindIntent: AppIntent {
     static var title: LocalizedStringResource = "保存到 PocketMind"
 
     static var description = IntentDescription(
-        "把一个链接快速收藏到 PocketMind,可附带备注与分类。链接稍后会在打开 App 时自动抓取内容。"
+        "把一个链接快速收藏到 PocketMind,可附带备注、分类与提醒。链接稍后会在打开 App 时自动抓取内容。"
     )
 
     /// 不拉起主 App,后台静默入队。
@@ -85,14 +85,26 @@ struct SaveToPocketMindIntent: AppIntent {
     @Parameter(title: "分类")
     var category: PocketMindCategoryEntity?
 
-    @Parameter(title: "提醒时间", description: "可选,设置后会在该时间收到本地提醒通知。")
+    @Parameter(title: "需要提醒", default: false)
+    var needsReminder: Bool
+
+    @Parameter(title: "提醒时间", description: "设置后会在该时间收到本地提醒通知。")
     var reminderDate: Date?
 
     static var parameterSummary: some ParameterSummary {
-        Summary("保存 \(\.$url) 到 PocketMind") {
-            \.$category
-            \.$note
-            \.$reminderDate
+        When(\.$needsReminder, .equalTo, true) {
+            Summary("保存 \(\.$url) 到 PocketMind") {
+                \.$category
+                \.$note
+                \.$needsReminder
+                \.$reminderDate
+            }
+        } otherwise: {
+            Summary("保存 \(\.$url) 到 PocketMind") {
+                \.$category
+                \.$note
+                \.$needsReminder
+            }
         }
     }
 
@@ -118,7 +130,7 @@ struct SaveToPocketMindIntent: AppIntent {
 
         // 提醒要在跑指令的这一刻就注册进系统,不能等主 App 下次排空队列——
         // 用户设提醒就是为了不用管它,等打开 App 才注册等于永远迟到。
-        if let reminderDate = reminderDate {
+        if needsReminder, let reminderDate = reminderDate {
             let body = [note?.trimmingCharacters(in: .whitespacesAndNewlines), trimmed]
                 .compactMap { $0 }
                 .first(where: { !$0.isEmpty }) ?? "您有一条笔记提醒。"
