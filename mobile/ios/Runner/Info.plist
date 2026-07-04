@@ -81,10 +81,5 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
-	<!-- BGTaskScheduler 后台抓取兜底任务标识（V1.1 用，先占位） -->
-	<key>BGTaskSchedulerPermittedIdentifiers</key>
-	<array>
-		<string>com.doublez.pocketmind.fetch</string>
-	</array>
 </dict>
 </plist>
