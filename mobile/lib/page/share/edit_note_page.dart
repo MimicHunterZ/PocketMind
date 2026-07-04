@@ -9,6 +9,7 @@ import 'package:pocketmind/providers/app_config_provider.dart';
 import 'package:pocketmind/providers/infrastructure_providers.dart';
 import 'package:pocketmind/service/category_service.dart';
 import 'package:pocketmind/service/note_service.dart';
+import 'package:pocketmind/util/logger_service.dart';
 import 'package:pocketmind/util/theme_data.dart';
 import 'package:intl/intl.dart';
 
@@ -98,20 +99,25 @@ class EditNotePageState extends ConsumerState<EditNotePage> {
     );
 
     if (_scheduledTime != null) {
-      final notificationService = ref.read(notificationServiceProvider);
-      final config = ref.read(appConfigProvider);
-      await notificationService.requestPermissions();
-      await notificationService.scheduleNotification(
-        id: widget.id,
-        title: _titleEnabled && _titleController.text.isNotEmpty
-            ? _titleController.text
-            : '笔记提醒',
-        body: _contentController.text.isNotEmpty
-            ? _contentController.text
-            : '您有一条笔记提醒。',
-        scheduledDate: _scheduledTime!,
-        highPrecision: config.highPrecisionNotification,
-      );
+      try {
+        final notificationService = ref.read(notificationServiceProvider);
+        final config = ref.read(appConfigProvider);
+        await notificationService.requestPermissions();
+        await notificationService.scheduleNotification(
+          id: widget.id,
+          title: _titleEnabled && _titleController.text.isNotEmpty
+              ? _titleController.text
+              : '笔记提醒',
+          body: _contentController.text.isNotEmpty
+              ? _contentController.text
+              : '您有一条笔记提醒。',
+          scheduledDate: _scheduledTime!,
+          highPrecision: config.highPrecisionNotification,
+        );
+      } catch (e, st) {
+        // 提醒设置失败不应阻塞笔记保存与面板关闭，仅记录日志。
+        PMlog.e('EditNotePage', '设置提醒失败: $e\n$st');
+      }
     }
 
     Map<String, String> result = {'uq': _aiController.text};

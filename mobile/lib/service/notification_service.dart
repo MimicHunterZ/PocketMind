@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show MissingPluginException;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart'
     as fln;
 import 'package:fluttertoast/fluttertoast.dart';
@@ -244,22 +245,27 @@ class NotificationService {
     bool highPrecision = false,
   }) async {
     // 0. 先检测权限检查与请求
-    PermissionStatus status = await Permission.notification.status;
+    try {
+      PermissionStatus status = await Permission.notification.status;
 
-    if (!status.isGranted) {
-      // 如果没有权限，主动请求一次 (iOS会弹窗，Android 13+会弹窗)
-      status = await Permission.notification.request();
-
-      // 如果请求后还是拒绝 (用户点了“不允许”或“不再询问”)
       if (!status.isGranted) {
-        Fluttertoast.showToast(
-          msg: '设置闹钟需要通知权限，请在设置中开启！',
-          toastLength: Toast.LENGTH_LONG,
-        );
-        //打开系统设置页面
-        await openAppSettings();
-        return;
+        // 如果没有权限，主动请求一次 (iOS会弹窗，Android 13+会弹窗)
+        status = await Permission.notification.request();
+
+        // 如果请求后还是拒绝 (用户点了“不允许”或“不再询问”)
+        if (!status.isGranted) {
+          Fluttertoast.showToast(
+            msg: '设置闹钟需要通知权限，请在设置中开启！',
+            toastLength: Toast.LENGTH_LONG,
+          );
+          //打开系统设置页面
+          await openAppSettings();
+          return;
+        }
       }
+    } on MissingPluginException {
+      // ponytail: iOS 分享扩展的 Flutter 引擎未注册 permission_handler（扩展禁止使用其依赖的
+      // UIApplication API），调用方在此之前已通过 flutter_local_notifications 请求过权限，跳过即可。
     }
 
     // 1. 将输入的 DateTime (本地时间) 转换为 tz.local 时区下的 TZDateTime
