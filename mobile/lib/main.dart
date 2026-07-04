@@ -175,6 +175,10 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
         // CAS 互斥保证不会与后台 Workmanager 任务并发抓取同一 note。
         ref.read(resourceFetchSchedulerProvider).runNow();
       });
+      // 分类在应用内是随时可增删的,只在冷启动导出一次会导致快捷指令填写框
+      // 拿到的分类列表过期(比如新建了分类,不重开 App 快捷指令里还是看不到)。
+      // 回前台也导出一次,保持跟数据库同步。
+      QuickSaveBridge.exportCategories(ref.read(categoryServiceProvider));
       ref.read(aiPollingServiceProvider).pollAll();
     }
   }

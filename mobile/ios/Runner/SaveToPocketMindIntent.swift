@@ -85,10 +85,14 @@ struct SaveToPocketMindIntent: AppIntent {
     @Parameter(title: "分类")
     var category: PocketMindCategoryEntity?
 
+    @Parameter(title: "提醒时间", description: "可选,设置后会在该时间收到本地提醒通知。")
+    var reminderDate: Date?
+
     static var parameterSummary: some ParameterSummary {
         Summary("保存 \(\.$url) 到 PocketMind") {
             \.$category
             \.$note
+            \.$reminderDate
         }
     }
 
@@ -111,6 +115,16 @@ struct SaveToPocketMindIntent: AppIntent {
         guard ok else {
             return .result(dialog: "保存失败,请稍后重试")
         }
+
+        // 提醒要在跑指令的这一刻就注册进系统,不能等主 App 下次排空队列——
+        // 用户设提醒就是为了不用管它,等打开 App 才注册等于永远迟到。
+        if let reminderDate = reminderDate {
+            let body = [note?.trimmingCharacters(in: .whitespacesAndNewlines), trimmed]
+                .compactMap { $0 }
+                .first(where: { !$0.isEmpty }) ?? "您有一条笔记提醒。"
+            QuickSaveQueue.scheduleReminder(date: reminderDate, title: "笔记提醒", body: body)
+        }
+
         return .result(dialog: "已保存到 PocketMind")
     }
 }

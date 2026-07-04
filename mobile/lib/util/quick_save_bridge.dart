@@ -17,7 +17,7 @@ import 'package:pocketmind/util/url_helper.dart';
 /// (QuickSaveQueue.swift) 只把 `{url, note, categoryId, ts}` 追加写进
 /// App Group 容器里的 [_queueFileName];主 App 启动 / 前台时由本桥接
 /// [drainQuickSaveQueue] 排空 → addNote(PENDING) → ResourceFetchScheduler
-/// 自动续抓。
+/// 自动续抓。提醒时间不走这条队列,由 Swift 侧在跑指令的那一刻直接注册进系统。
 ///
 /// 反向:[exportCategories] 把当前分类列表导出成 [_categoriesFileName],
 /// 供快捷指令填写框的「选分类」展示。
@@ -49,6 +49,8 @@ class QuickSaveBridge {
   }
 
   /// 排空快捷指令队列:逐条 addNote(带 url → 自动置 PENDING),完成后清空队列文件。
+  /// 提醒通知已在快捷指令跑的那一刻由 Swift 侧直接注册进系统(见 QuickSaveQueue.swift
+  /// 的 scheduleReminder),这里不用管提醒,只管落库。
   ///
   /// 失败安全:整体出错时不删队列,留待下次重试;单条解析失败则跳过该条。
   static Future<void> drainQuickSaveQueue(NoteService noteService) async {
