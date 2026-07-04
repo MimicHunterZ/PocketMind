@@ -12,6 +12,7 @@ import 'package:pocketmind/providers/auth_providers.dart';
 import 'package:pocketmind/providers/shared_preferences_provider.dart';
 import 'package:pocketmind/util/image_storage_helper.dart';
 import 'package:pocketmind/util/proxy_config.dart';
+import 'package:pocketmind/util/quick_save_bridge.dart';
 import 'package:pocketmind/util/storage_paths.dart';
 import 'package:pocketmind/util/theme_data.dart';
 import 'package:pocketmind/util/workmanager_platform_guard.dart';
@@ -32,6 +33,7 @@ import 'sync/model/sync_checkpoint.dart';
 import 'data/repositories/isar_category_repository.dart';
 import 'util/logger_service.dart';
 import 'package:pocketmind/providers/note_providers.dart';
+import 'package:pocketmind/providers/category_providers.dart';
 import 'package:pocketmind/providers/pm_service_providers.dart';
 import 'package:pocketmind/providers/sync_providers.dart';
 
@@ -139,10 +141,21 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     // start() 已经会发一次，这里相当于"用户体验侧"再保险触发，runNow 内部
     // 会用 in-flight Future 合流，不会重复扫描。
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // iOS「保存到 PocketMind」快捷指令把 URL 暂存到 App Group 队列,
+      // 这里先排空落库(PENDING),再触发抓取扫描,新存的链接才能被本轮扫到。
+      await _drainQuickSave();
+      // 把当前分类导出给快捷指令填写框「选分类」用。
+      await QuickSaveBridge.exportCategories(ref.read(categoryServiceProvider));
+
       ref.read(resourceFetchSchedulerProvider).runNow();
       // 检查并轮询待处理的 AI 分析结果
       ref.read(aiPollingServiceProvider).pollAll();
     });
+  }
+
+  /// 排空 iOS 快捷指令队列(非 iOS 为 no-op)。
+  Future<void> _drainQuickSave() async {
+    await QuickSaveBridge.drainQuickSaveQueue(ref.read(noteServiceProvider));
   }
 
   @override
@@ -156,9 +169,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     PMlog.d('MyApp', 'AppLifecycleState changed: $state');
     if (state == AppLifecycleState.resumed) {
       PMlog.d('MyApp', 'App resumed, 触发 PENDING 扫描');
-      // 单一调度入口：所有 PENDING 笔记由 ResourceFetchScheduler 接管,
-      // CAS 互斥保证不会与后台 Workmanager 任务并发抓取同一 note。
-      ref.read(resourceFetchSchedulerProvider).runNow();
+      // 先排空 iOS 快捷指令队列(回前台期间可能有新收藏),再走统一扫描入口。
+      _drainQuickSave().whenComplete(() {
+        // 单一调度入口：所有 PENDING 笔记由 ResourceFetchScheduler 接管,
+        // CAS 互斥保证不会与后台 Workmanager 任务并发抓取同一 note。
+        ref.read(resourceFetchSchedulerProvider).runNow();
+      });
       ref.read(aiPollingServiceProvider).pollAll();
     }
   }
