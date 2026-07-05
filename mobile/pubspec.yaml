@@ -100,6 +100,12 @@ dev_dependencies:
 flutter_launcher_icons:
   android: "launcher_icon" # 指定 Android 图标的文件名，通常保持默认
   ios: true                # 启用 iOS 图标生成
+  macos:
+    generate: true
+    image_path: "assets/icon.png"
+  windows:
+    generate: true
+    image_path: "assets/icon.png"
   image_path: "assets/icon.png" # 您刚才放入的图标路径
   remove_alpha_ios: true   # 移除 iOS 图标的透明通道（App Store 要求图标不能有透明区域）
 # For information on the generic Dart part of this file, see the
