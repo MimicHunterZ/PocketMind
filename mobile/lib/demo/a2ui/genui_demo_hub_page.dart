@@ -15,7 +15,7 @@ class GenUiDemoHubPage extends StatelessWidget {
         children: [
           _DemoEntryCard(
             title: 'A2UI Stream Demo',
-            subtitle: '真实 A2UI SSE 流与 Surface 渲染联动',
+            subtitle: 'AG-UI 事件流(mock)驱动 A2UI Surface 渲染',
             icon: Icons.auto_awesome,
             onTap: () => context.push(RoutePaths.genuiDemoA2ui),
           ),
@@ -25,6 +25,13 @@ class GenUiDemoHubPage extends StatelessWidget {
             subtitle: '读取 mock/full.md 模拟 AI 流式回复',
             icon: Icons.article_outlined,
             onTap: () => context.push(RoutePaths.genuiDemoMarkdownSse),
+          ),
+          const SizedBox(height: 12),
+          _DemoEntryCard(
+            title: 'Surface 生命周期交接 spike',
+            subtitle: '验证直播 controller 交接给持久化 controller 会不会闪烁/漏释放',
+            icon: Icons.swap_horiz,
+            onTap: () => context.push(RoutePaths.genuiDemoSurfaceHandoff),
           ),
         ],
       ),

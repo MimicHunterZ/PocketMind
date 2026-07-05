@@ -9,6 +9,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "91.0.0"
+  ag_ui:
+    dependency: "direct main"
+    description:
+      name: ag_ui
+      sha256: f963810252e5c080af0ff779b03949ac8d45362042bf2ec2b7c711737d3e6457
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.3.0"
   analyzer:
     dependency: transitive
     description:

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:ag_ui/ag_ui.dart' show BaseEvent, CustomEvent, RunErrorEvent, RunFinishedEvent, RunStartedEvent;
 import 'package:dio/dio.dart' show CancelToken;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,43 +8,22 @@ final a2uiStreamApiServiceProvider = Provider<A2uiStreamApiService>((ref) {
   return A2uiStreamApiService();
 });
 
-/// A2UI 流式事件契约。
+/// A2UI 用 AG-UI 作为传输层:AG-UI 管 run 生命周期,A2UI JSON 消息作为内容
+/// 包在 [CustomEvent](name: `'a2ui'`)里传输——这是 A2UI 官方文档里
+/// "AG-UI as the pipe, A2UI as the content" 的映射方式。
+/// mock 与真后端共用同一份 `Stream<BaseEvent>` 契约:
+/// - [RunStartedEvent]                       → 开始一次 run
+/// - `CustomEvent(name: 'a2ui', value: json)` → 一条 A2UI v0.9 消息(JSON 字符串)
+/// - [RunFinishedEvent]                      → 本轮结束
+/// - [RunErrorEvent]                         → 出错
 ///
-/// 这是 mock 与真后端共用的唯一抽象:demo 页只消费这个 sealed class,
-/// 不关心数据来自本地 mock 还是网络 SSE。未来接真后端时,只需新增一个
-/// `connectSse()` 方法,用 Dio 以 [ResponseType.stream] 读取 SSE,把每条
-/// `data:` 行包成 [A2uiDeltaEvent],结束行包成 [A2uiDoneEvent] 即可。
+/// 接真后端时,把 `mockStream`/`continueWithTopic` 换成
+/// `AgUiClient(config: ...).runAgent(endpoint, input)` 即可,返回类型不变,
+/// demo 页完全不用改。
 ///
-/// 真后端 SSE 契约(与本 mock 逐字节对齐):
-/// - `event: a2ui`  + `data: {一条标准 A2UI v0.9 JSON 消息}`  → [A2uiDeltaEvent]
-/// - `event: done`  + `data: {"requestId": "..."}`           → [A2uiDoneEvent]
-/// - `event: error` + `data: {"message": "..."}`             → [A2uiErrorEvent]
-///
-/// 其中 [A2uiDeltaEvent.data] 的 JSON 体必须是合法的 A2UI v0.9 消息:
+/// 其中 `CustomEvent.value` 的 JSON 体必须是合法的 A2UI v0.9 消息:
 /// `createSurface` / `updateComponents` / `updateDataModel` / `deleteSurface`
 /// 之一,且顶层带 `"version": "v0.9"`(genui SDK 强校验此版本号)。
-sealed class A2uiSseEvent {
-  const A2uiSseEvent();
-}
-
-final class A2uiDeltaEvent extends A2uiSseEvent {
-  const A2uiDeltaEvent(this.data);
-
-  final String data;
-}
-
-final class A2uiDoneEvent extends A2uiSseEvent {
-  const A2uiDoneEvent({this.messageUuid, this.requestId});
-
-  final String? messageUuid;
-  final String? requestId;
-}
-
-final class A2uiErrorEvent extends A2uiSseEvent {
-  const A2uiErrorEvent(this.message);
-
-  final String message;
-}
 
 class A2uiStreamApiService {
   /// 会话状态:按 surfaceId 保存当前根组件的 children 顺序。
@@ -62,13 +42,14 @@ class A2uiStreamApiService {
   /// 流式 md 的实现:把整段 md 全文按字符切片,逐帧把「累积到当前的全量文本」
   /// 写入同一 path。客户端的 StreamingMarkdown 组件检测到新值是旧值的前缀延长,
   /// 只对新增片段做打字动画。这与真后端「按 token 累积重发」语义一致。
-  Stream<A2uiSseEvent> mockStream({
+  Stream<BaseEvent> mockStream({
     String? requestId,
     CancelToken? cancelToken,
     Duration delay = const Duration(milliseconds: 320),
   }) async* {
     final surfaceId =
         'mock_${requestId ?? DateTime.now().microsecondsSinceEpoch}';
+    final runId = requestId ?? surfaceId;
     final rootChildren = _sessionRootChildren[surfaceId] = <String>[];
 
     bool cancelled() => cancelToken?.isCancelled ?? false;
@@ -82,9 +63,11 @@ class A2uiStreamApiService {
       return !cancelled();
     }
 
-    A2uiDeltaEvent delta(Map<String, Object?> payload) {
-      return A2uiDeltaEvent(jsonEncode(payload));
+    CustomEvent delta(Map<String, Object?> payload) {
+      return CustomEvent(name: 'a2ui', value: jsonEncode(payload));
     }
+
+    yield RunStartedEvent(threadId: surfaceId, runId: runId);
 
     Map<String, Object?> data(String path, Object? value) {
       return {
@@ -152,24 +135,26 @@ class A2uiStreamApiService {
 
     // 第一轮到此结束,后续由用户交互(deep_dive 事件)驱动。
     // demo 页收到 event 后会调用 continueWithTopic() 继续推送第二段。
-    yield A2uiDoneEvent(requestId: requestId);
+    yield RunFinishedEvent(threadId: surfaceId, runId: runId);
   }
 
   /// 用户在 ④ 选择方向并点击「确定」后,由 demo 页调用,推送第二段讲解。
   ///
   /// 这模拟真后端的第二轮响应:客户端把用户选择(event + context)回传后端,
   /// 后端据此生成后续 UI 帧。这里用本地 mock 模拟该轮流式。
-  Stream<A2uiSseEvent> continueWithTopic({
+  Stream<BaseEvent> continueWithTopic({
     required String surfaceId,
     required String topic,
     CancelToken? cancelToken,
     Duration delay = const Duration(milliseconds: 320),
   }) async* {
+    final runId = 'continue_$surfaceId';
     final rootChildren = _sessionRootChildren[surfaceId];
     if (rootChildren == null) {
-      yield const A2uiErrorEvent('会话已失效,请重新开始');
+      yield const RunErrorEvent(message: '会话已失效,请重新开始');
       return;
     }
+    yield RunStartedEvent(threadId: surfaceId, runId: runId);
     bool cancelled() => cancelToken?.isCancelled ?? false;
 
     Future<bool> wait([Duration? d]) async {
@@ -181,8 +166,8 @@ class A2uiStreamApiService {
       return !cancelled();
     }
 
-    A2uiDeltaEvent delta(Map<String, Object?> payload) =>
-        A2uiDeltaEvent(jsonEncode(payload));
+    CustomEvent delta(Map<String, Object?> payload) =>
+        CustomEvent(name: 'a2ui', value: jsonEncode(payload));
 
     Map<String, Object?> data(String path, Object? value) => {
       'version': 'v0.9',
@@ -230,17 +215,17 @@ class A2uiStreamApiService {
     yield delta(components([root(), ..._doneComponents()]));
     if (!await wait()) return;
 
-    yield A2uiDoneEvent();
+    yield RunFinishedEvent(threadId: surfaceId, runId: runId);
   }
 
   /// 把一段 md 全文按字符切片,逐帧把「累积全文」写入 [path]。
   ///
   /// 每帧的值都是前一帧的前缀延长,客户端据此只对新增片段做打字动画。
-  Stream<A2uiSseEvent> _streamMarkdown({
+  Stream<BaseEvent> _streamMarkdown({
     required String fullText,
     required String path,
     required Map<String, Object?> Function(String, Object?) data,
-    required A2uiDeltaEvent Function(Map<String, Object?>) delta,
+    required CustomEvent Function(Map<String, Object?>) delta,
     required bool Function() cancelled,
     Duration tick = const Duration(milliseconds: 36),
     int charsPerTick = 4,

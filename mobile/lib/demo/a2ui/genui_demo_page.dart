@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:ag_ui/ag_ui.dart'
+    show BaseEvent, CustomEvent, RunErrorEvent, RunFinishedEvent;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,7 +29,7 @@ class _GenUiDemoPageState extends ConsumerState<GenUiDemoPage> {
   final List<String> _logs = [];
 
   CancelToken? _cancelToken;
-  StreamSubscription<A2uiSseEvent>? _streamSubscription;
+  StreamSubscription<BaseEvent>? _streamSubscription;
   StreamSubscription<ChatMessage>? _onSubmitSubscription;
 
   String _requestId = '';
@@ -210,25 +212,28 @@ class _GenUiDemoPageState extends ConsumerState<GenUiDemoPage> {
     );
   }
 
-  /// 消费一条 A2UI 事件流(首轮或交互后的续推共用)。
-  void _consume(Stream<A2uiSseEvent> stream) {
+  /// 消费一条 AG-UI 事件流(首轮或交互后的续推共用)。
+  void _consume(Stream<BaseEvent> stream) {
     _streamSubscription = stream.listen((event) {
       if (!mounted) {
         return;
       }
       switch (event) {
-        case A2uiDeltaEvent(:final data):
+        case CustomEvent(:final value):
+          final data = value as String;
           _transportAdapter.addChunk(data);
           _log(_describeFrame(data));
-        case A2uiDoneEvent():
+        case RunFinishedEvent():
           setState(() => _isStreaming = false);
           _log('stream done requestId=$_requestId');
-        case A2uiErrorEvent(:final message):
+        case RunErrorEvent(:final message):
           setState(() {
             _isStreaming = false;
             _error = message;
           });
           _log('stream error $message');
+        case _:
+          break;
       }
     });
   }

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pocketmind/demo/a2ui/genui_demo_hub_page.dart';
 import 'package:pocketmind/demo/a2ui/genui_demo_page.dart';
 import 'package:pocketmind/demo/a2ui/markdown_sse_mock_demo_page.dart';
+import 'package:pocketmind/demo/a2ui/surface_handoff_lifecycle_demo_page.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/page/chat/branch_list_page.dart';
 import 'package:pocketmind/page/chat/chat_page.dart';
@@ -111,6 +112,12 @@ final appRouter = GoRouter(
     GoRoute(
       path: RoutePaths.genuiDemoMarkdownSse,
       builder: (context, state) => const MarkdownSseMockDemoPage(),
+    ),
+
+    // Surface 生命周期交接 spike 页面 - 全屏，不含侧边栏
+    GoRoute(
+      path: RoutePaths.genuiDemoSurfaceHandoff,
+      builder: (context, state) => const SurfaceHandoffLifecycleDemoPage(),
     ),
 
     // 聊天页 - 全屏，不含侧边栏

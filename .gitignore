@@ -37,6 +37,9 @@ build/
 MediaCrawler-main/
 OpenViking/
 
+# 本地拉取的参考仓库(仅供查阅文档,不入库)
+/ag-ui/
+
 # flutter
 .flutter-plugins-dependencies
 devtools_options.yaml

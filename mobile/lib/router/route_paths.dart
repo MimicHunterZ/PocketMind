@@ -27,6 +27,9 @@ class RoutePaths {
   /// Markdown SSE Mock Demo 页面
   static const String genuiDemoMarkdownSse = '/genui-demo/markdown-sse';
 
+  /// Surface 生命周期交接 spike 页面
+  static const String genuiDemoSurfaceHandoff = '/genui-demo/surface-handoff';
+
   /// 平台账号管理
   static const String platformAccounts = '/settings/platform-accounts';
 
