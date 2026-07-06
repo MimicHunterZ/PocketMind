@@ -47,6 +47,13 @@ class GenUiDemoHubPage extends StatelessWidget {
             icon: Icons.podcasts_outlined,
             onTap: () => context.push(RoutePaths.genuiDemoChatStreamingMock),
           ),
+          const SizedBox(height: 12),
+          _DemoEntryCard(
+            title: '聊天卡片锁定 Mock 预览',
+            subtitle: '验证卡片交互三态(本地写值/functionCall/event 往返)+ 提交后锁定',
+            icon: Icons.lock_outline,
+            onTap: () => context.push(RoutePaths.genuiDemoChatCardLock),
+          ),
         ],
       ),
     );

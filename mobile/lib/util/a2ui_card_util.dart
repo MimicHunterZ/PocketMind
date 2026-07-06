@@ -51,3 +51,29 @@ String a2uiSurfaceId(List<A2uiMessage> messages) {
     DeleteSurface m => m.surfaceId,
   };
 }
+
+/// 尝试把一条消息的 [content] 解析成"卡片提交交互"记录:
+/// `{"surfaceId": "...", "dataModel": {...}}`。
+///
+/// 用户提交卡片交互(点击带 `event` 的按钮)后,以一条新 USER 消息落库,
+/// content 是提交那一刻这张卡片完整的 dataModel。卡片是否已锁定,就看
+/// 消息列表里有没有一条能解析成功、且 surfaceId 与该卡片匹配的这类消息。
+/// 解析失败(非 JSON、形状不对)说明只是一条普通文本消息,返回 null。
+({String surfaceId, Map<String, dynamic> dataModel})? tryParseA2uiSubmission(
+  String content,
+) {
+  Object? decoded;
+  try {
+    decoded = jsonDecode(content);
+  } on FormatException {
+    return null;
+  }
+  if (decoded is! Map<String, dynamic>) return null;
+
+  final surfaceId = decoded['surfaceId'];
+  final dataModel = decoded['dataModel'];
+  if (surfaceId is! String || dataModel is! Map<String, dynamic>) {
+    return null;
+  }
+  return (surfaceId: surfaceId, dataModel: dataModel);
+}

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocketmind/demo/a2ui/chat_block_sequence_preview_page.dart';
+import 'package:pocketmind/demo/a2ui/chat_card_lock_preview_page.dart';
 import 'package:pocketmind/demo/a2ui/chat_streaming_mock_preview_page.dart';
 import 'package:pocketmind/demo/a2ui/genui_demo_hub_page.dart';
 import 'package:pocketmind/demo/a2ui/genui_demo_page.dart';
@@ -132,6 +133,12 @@ final appRouter = GoRouter(
     GoRoute(
       path: RoutePaths.genuiDemoChatStreamingMock,
       builder: (context, state) => const ChatStreamingMockPreviewPage(),
+    ),
+
+    // 聊天卡片提交锁定 mock 预览页面 - 全屏，不含侧边栏
+    GoRoute(
+      path: RoutePaths.genuiDemoChatCardLock,
+      builder: (context, state) => const ChatCardLockPreviewPage(),
     ),
 
     // 聊天页 - 全屏，不含侧边栏

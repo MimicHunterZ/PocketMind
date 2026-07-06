@@ -160,6 +160,76 @@ final class ChatServiceProvider
 
 String _$chatServiceHash() => r'0342f93e65e86a99ccb720b3d8a4792dae9d0463';
 
+/// 卡片提交交互后的回调,默认无操作。生产环境暂不接入——把"提交"变成一次
+/// 真实的带 dataModel 的聊天请求是接后端时才做的事;这里先只提供一个可被
+/// debug mock 预览页覆盖的挂点,用来验证"提交后锁定"的完整交互闭环。
+
+@ProviderFor(a2uiCardSubmitHandler)
+const a2uiCardSubmitHandlerProvider = A2uiCardSubmitHandlerProvider._();
+
+/// 卡片提交交互后的回调,默认无操作。生产环境暂不接入——把"提交"变成一次
+/// 真实的带 dataModel 的聊天请求是接后端时才做的事;这里先只提供一个可被
+/// debug mock 预览页覆盖的挂点,用来验证"提交后锁定"的完整交互闭环。
+
+final class A2uiCardSubmitHandlerProvider
+    extends
+        $FunctionalProvider<
+          void Function(String surfaceId, Map<String, dynamic> dataModel)?,
+          void Function(String surfaceId, Map<String, dynamic> dataModel)?,
+          void Function(String surfaceId, Map<String, dynamic> dataModel)?
+        >
+    with
+        $Provider<
+          void Function(String surfaceId, Map<String, dynamic> dataModel)?
+        > {
+  /// 卡片提交交互后的回调,默认无操作。生产环境暂不接入——把"提交"变成一次
+  /// 真实的带 dataModel 的聊天请求是接后端时才做的事;这里先只提供一个可被
+  /// debug mock 预览页覆盖的挂点,用来验证"提交后锁定"的完整交互闭环。
+  const A2uiCardSubmitHandlerProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'a2uiCardSubmitHandlerProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$a2uiCardSubmitHandlerHash();
+
+  @$internal
+  @override
+  $ProviderElement<
+    void Function(String surfaceId, Map<String, dynamic> dataModel)?
+  >
+  $createElement($ProviderPointer pointer) => $ProviderElement(pointer);
+
+  @override
+  void Function(String surfaceId, Map<String, dynamic> dataModel)? create(
+    Ref ref,
+  ) {
+    return a2uiCardSubmitHandler(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(
+    void Function(String surfaceId, Map<String, dynamic> dataModel)? value,
+  ) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride:
+          $SyncValueProvider<
+            void Function(String surfaceId, Map<String, dynamic> dataModel)?
+          >(value),
+    );
+  }
+}
+
+String _$a2uiCardSubmitHandlerHash() =>
+    r'4e125fb99099be5f8d37d0de3eceb9f78a48559d';
+
 /// 聊天会话列表流。
 
 @ProviderFor(chatSessions)

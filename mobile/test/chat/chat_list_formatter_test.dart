@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocketmind/model/chat_message.dart';
 import 'package:pocketmind/page/chat/chat_list/chat_list_formatter.dart';
@@ -11,6 +13,34 @@ ChatMessage _msg(String uuid, String role, {String messageType = 'TEXT'}) {
     ..role = role
     ..messageType = messageType
     ..content = uuid;
+}
+
+const String _standardCatalogId =
+    'https://a2ui.org/specification/v0_9/standard_catalog.json';
+
+ChatMessage _cardMsg(String uuid, String surfaceId) {
+  return ChatMessage()
+    ..uuid = uuid
+    ..sessionUuid = 's-1'
+    ..role = 'TOOL_RESULT'
+    ..messageType = 'TOOL_RESULT'
+    ..content = jsonEncode({
+      'version': 'v0.9',
+      'createSurface': {'surfaceId': surfaceId, 'catalogId': _standardCatalogId},
+    });
+}
+
+ChatMessage _submissionMsg(
+  String uuid,
+  String surfaceId,
+  Map<String, dynamic> dataModel,
+) {
+  return ChatMessage()
+    ..uuid = uuid
+    ..sessionUuid = 's-1'
+    ..role = 'USER'
+    ..messageType = 'TEXT'
+    ..content = jsonEncode({'surfaceId': surfaceId, 'dataModel': dataModel});
 }
 
 List<ChatListMessageItem> _messageItems(List<ChatMessage> messages) {
@@ -72,6 +102,49 @@ void main() {
       final byUuid = {for (final item in items) item.message.uuid: item};
       expect(byUuid['a1']!.isLastOfTurn, isFalse);
       expect(byUuid['card1']!.isLastOfTurn, isTrue);
+    });
+  });
+
+  group('buildChatListItems 卡片提交锁定(D15)', () {
+    test('卡片后面有对应 surfaceId 的提交交互消息 → lockedDataModel 非空', () {
+      final items = _messageItems([
+        _msg('u1', 'USER'),
+        _cardMsg('card1', 'surface-a'),
+        _submissionMsg('sub1', 'surface-a', {
+          'choice': {'topic': 'B'},
+        }),
+      ]);
+      final byUuid = {for (final item in items) item.message.uuid: item};
+      expect(byUuid['card1']!.lockedDataModel, {
+        'choice': {'topic': 'B'},
+      });
+    });
+
+    test('卡片没有对应的提交交互消息 → lockedDataModel 为 null', () {
+      final items = _messageItems([
+        _msg('u1', 'USER'),
+        _cardMsg('card1', 'surface-a'),
+      ]);
+      final byUuid = {for (final item in items) item.message.uuid: item};
+      expect(byUuid['card1']!.lockedDataModel, isNull);
+    });
+
+    test('两张卡片各自 surfaceId 独立:只有匹配的那张锁定', () {
+      final items = _messageItems([
+        _cardMsg('card1', 'surface-a'),
+        _cardMsg('card2', 'surface-b'),
+        _submissionMsg('sub1', 'surface-a', {'x': 1}),
+      ]);
+      final byUuid = {for (final item in items) item.message.uuid: item};
+      expect(byUuid['card1']!.lockedDataModel, {'x': 1});
+      expect(byUuid['card2']!.lockedDataModel, isNull);
+    });
+
+    test('普通文本消息不受影响,lockedDataModel 始终为 null', () {
+      final items = _messageItems([_msg('u1', 'USER'), _msg('a1', 'ASSISTANT')]);
+      final byUuid = {for (final item in items) item.message.uuid: item};
+      expect(byUuid['u1']!.lockedDataModel, isNull);
+      expect(byUuid['a1']!.lockedDataModel, isNull);
     });
   });
 }

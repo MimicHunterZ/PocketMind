@@ -76,4 +76,40 @@ void main() {
       expect(tryParseA2uiCard(content), isNull);
     });
   });
+
+  group('tryParseA2uiSubmission', () {
+    test('合法的提交交互 JSON → 解析出 surfaceId 和 dataModel', () {
+      const content =
+          '{"surfaceId":"s1","dataModel":{"choice":{"topic":"热修复原理"}}}';
+      final submission = tryParseA2uiSubmission(content);
+      expect(submission, isNotNull);
+      expect(submission!.surfaceId, 's1');
+      expect(submission.dataModel, {
+        'choice': {'topic': '热修复原理'},
+      });
+    });
+
+    test('普通文本 content → 判别为假', () {
+      expect(tryParseA2uiSubmission('好的,已经帮你处理完成'), isNull);
+    });
+
+    test('非法 JSON → 判别为假', () {
+      expect(tryParseA2uiSubmission('不是 JSON 的纯文本'), isNull);
+    });
+
+    test('缺少 dataModel 字段 → 判别为假', () {
+      expect(tryParseA2uiSubmission('{"surfaceId":"s1"}'), isNull);
+    });
+
+    test('surfaceId 不是字符串 → 判别为假', () {
+      expect(tryParseA2uiSubmission('{"surfaceId":1,"dataModel":{}}'), isNull);
+    });
+
+    test('dataModel 不是对象 → 判别为假', () {
+      expect(
+        tryParseA2uiSubmission('{"surfaceId":"s1","dataModel":"x"}'),
+        isNull,
+      );
+    });
+  });
 }

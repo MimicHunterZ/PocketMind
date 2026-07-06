@@ -44,6 +44,13 @@ ChatService chatService(Ref ref) {
   );
 }
 
+/// 卡片提交交互后的回调,默认无操作。生产环境暂不接入——把"提交"变成一次
+/// 真实的带 dataModel 的聊天请求是接后端时才做的事;这里先只提供一个可被
+/// debug mock 预览页覆盖的挂点,用来验证"提交后锁定"的完整交互闭环。
+@riverpod
+void Function(String surfaceId, Map<String, dynamic> dataModel)?
+a2uiCardSubmitHandler(Ref ref) => null;
+
 // 流数据 Providers（UI 持久化驱动）
 
 /// 聊天会话列表流。

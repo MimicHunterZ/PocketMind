@@ -24,11 +24,17 @@ class ChatListMessageItem extends ChatListItem {
   /// 操作按钮只应在整轮回复结束后、挂在最后一块上,不应该在中间块上出现。
   final bool isLastOfTurn;
 
+  /// 仅对 A2UI 卡片(TOOL_RESULT)有意义:非 null 表示这张卡片已经有对应的
+  /// "提交交互"消息,应锁定并用这份 dataModel 定格显示;null 表示未提交,
+  /// 保持可交互,或者这条消息本来就不是卡片。
+  final Map<String, dynamic>? lockedDataModel;
+
   const ChatListMessageItem({
     required this.message,
     required this.isLeaf,
     required this.isLastUserMsg,
     required this.isLastOfTurn,
+    this.lockedDataModel,
   });
 }
 

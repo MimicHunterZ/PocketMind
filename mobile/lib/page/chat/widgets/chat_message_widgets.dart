@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -22,6 +23,7 @@ class ChatMessageBubble extends ConsumerWidget {
   final bool isLeaf;
   final bool isLastUserMsg;
   final bool isLastOfTurn;
+  final Map<String, dynamic>? lockedDataModel;
   final void Function(String uuid, String content)? onEditTap;
 
   const ChatMessageBubble({
@@ -32,6 +34,7 @@ class ChatMessageBubble extends ConsumerWidget {
     required this.isLeaf,
     required this.isLastUserMsg,
     required this.isLastOfTurn,
+    this.lockedDataModel,
     this.onEditTap,
   });
 
@@ -46,6 +49,8 @@ class ChatMessageBubble extends ConsumerWidget {
         return A2uiCardMessage(
           key: ValueKey('a2ui-card-${message.uuid}'),
           operations: operations,
+          lockedDataModel: lockedDataModel,
+          onSubmitted: ref.watch(a2uiCardSubmitHandlerProvider),
         );
       }
     }
@@ -460,10 +465,26 @@ Map<String, dynamic>? _tryParseToolData(String content) {
 /// 序列,在 [initState] 里用同步的 `handleMessage` 循环灌入(而不是走异步的
 /// chunk 解析管线),确保首帧渲染即为最终态,不出现空白帧。消息内容落库后
 /// 不再改写,因此不需要处理更新。
+///
+/// [lockedDataModel] 非 null 时表示这张卡片已经提交过一次交互:额外灌入一条
+/// `updateDataModel(path: '/')` 把提交时的完整 dataModel 定格显示,并整体
+/// 包一层 [AbsorbPointer] 拦截触摸——genui 的交互组件(Button/ChoicePicker/
+/// TextField/CheckBox)都没有只读/禁用的 schema 属性,组件本身没法进入只读态,
+/// 只能在外层拦截。未锁定时,[onSubmitted] 会在用户触发一次 `event` 提交后
+/// 收到该 surface 当前的完整 dataModel(通过 [DataModel.getValue] 读根路径
+/// 取整份快照,而不是解析 [SurfaceController.onSubmit] 内部的事件负载)。
 class A2uiCardMessage extends StatefulWidget {
   final List<A2uiMessage> operations;
+  final Map<String, dynamic>? lockedDataModel;
+  final void Function(String surfaceId, Map<String, dynamic> dataModel)?
+  onSubmitted;
 
-  const A2uiCardMessage({super.key, required this.operations});
+  const A2uiCardMessage({
+    super.key,
+    required this.operations,
+    this.lockedDataModel,
+    this.onSubmitted,
+  });
 
   @override
   State<A2uiCardMessage> createState() => _A2uiCardMessageState();
@@ -472,6 +493,7 @@ class A2uiCardMessage extends StatefulWidget {
 class _A2uiCardMessageState extends State<A2uiCardMessage> {
   late final SurfaceController _controller;
   late final String _surfaceId;
+  StreamSubscription<Object?>? _submitSubscription;
 
   @override
   void initState() {
@@ -481,19 +503,39 @@ class _A2uiCardMessageState extends State<A2uiCardMessage> {
       _controller.handleMessage(operation);
     }
     _surfaceId = a2uiSurfaceId(widget.operations);
+
+    final lockedDataModel = widget.lockedDataModel;
+    if (lockedDataModel != null) {
+      _controller.handleMessage(
+        UpdateDataModel(surfaceId: _surfaceId, value: lockedDataModel),
+      );
+    } else if (widget.onSubmitted != null) {
+      _submitSubscription = _controller.onSubmit.listen((_) {
+        final dataModel = _controller.store
+            .getDataModel(_surfaceId)
+            .getValue<Map<String, Object?>>(DataPath.root);
+        widget.onSubmitted!(_surfaceId, Map<String, dynamic>.from(dataModel ?? {}));
+      });
+    }
   }
 
   @override
   void dispose() {
+    _submitSubscription?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final surface = Padding(
       padding: EdgeInsets.only(bottom: 10.h),
       child: Surface(surfaceContext: _controller.contextFor(_surfaceId)),
+    );
+    if (widget.lockedDataModel == null) return surface;
+    return AbsorbPointer(
+      key: const Key('a2ui-card-lock-barrier'),
+      child: surface,
     );
   }
 }
