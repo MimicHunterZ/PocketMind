@@ -129,7 +129,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const ChatBlockSequencePreviewPage(),
     ),
 
-    // 聊天直播态块序列 mock 预览页面 - 全屏，不含侧边栏
+    // 聊天流式态块序列 mock 预览页面 - 全屏，不含侧边栏
     GoRoute(
       path: RoutePaths.genuiDemoChatStreamingMock,
       builder: (context, state) => const ChatStreamingMockPreviewPage(),

@@ -45,7 +45,7 @@ class ChatListPendingUserItem extends ChatListItem {
   const ChatListPendingUserItem(this.content);
 }
 
-/// 流式回复占位：一轮回复还在直播的块序列（文本+工具进度+A2UI 卡片，
+/// 流式回复占位：一轮回复还在流式的块序列（文本+工具进度+A2UI 卡片，
 /// 按到达顺序追加）。
 class ChatListStreamingItem extends ChatListItem {
   final List<ChatLiveBlock> blocks;

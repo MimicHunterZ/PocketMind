@@ -607,7 +607,7 @@ class GlobalAiSessionController extends _$GlobalAiSessionController {
 
 // 发送状态
 
-/// 直播中的一个块。一轮回复按到达顺序拆成文本/工具调用/A2UI 卡片的块序列，
+/// 流式中的一个块。一轮回复按到达顺序拆成文本/工具调用/A2UI 卡片的块序列，
 /// 每块独立渲染——语义上对应持久化后的 TEXT/TOOL_CALL+TOOL_RESULT/A2UI
 /// 消息，但这里只是过渡态，不落库。
 @freezed

@@ -157,7 +157,7 @@ class ChatPendingUserBubble extends StatelessWidget {
   }
 }
 
-/// 直播态气泡：按块序列渲染这一轮还在流式生成的回复。文本块实时 md 渲染；
+/// 流式态气泡：按块序列渲染这一轮还在流式生成的回复。文本块实时 md 渲染；
 /// 工具调用块只显示"调用中/已完成"的过渡提示，不落库——流式结束后由持久化
 /// 的 TOOL_CALL/TOOL_RESULT 消息取代；A2UI 卡片块用临时 [SurfaceController]
 /// 实时渲染，随分片到达逐步搭建。
@@ -233,7 +233,7 @@ class ChatStreamingBubble extends StatelessWidget {
   }
 }
 
-/// 直播中的工具调用过渡提示，样式对齐持久化后的 [ChatToolCallCard] 折叠态，
+/// 流式中的工具调用过渡提示，样式对齐持久化后的 [ChatToolCallCard] 折叠态，
 /// 但没有展开/结果——结果只在流式结束、消息落库后才存在。
 class _LiveToolCallHint extends StatelessWidget {
   final String toolName;
@@ -292,7 +292,7 @@ class _LiveToolCallHint extends StatelessWidget {
   }
 }
 
-/// 直播中的 A2UI 卡片：每收到一条新分片就通过 [A2uiTransportAdapter.addChunk]
+/// 流式中的 A2UI 卡片：每收到一条新分片就通过 [A2uiTransportAdapter.addChunk]
 /// 追加，卡片随分片到达逐步搭建；不能用同步的 [SurfaceController.handleMessage]，
 /// 因为分片到达时机不确定，需要走异步解析管线。
 class _LiveA2uiCardMessage extends StatefulWidget {

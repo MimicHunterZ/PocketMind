@@ -11,10 +11,10 @@ void main() {
         const MaterialApp(home: SurfaceHandoffLifecycleDemoPage()),
       );
 
-      expect(find.text('状态: 直播中'), findsOneWidget);
+      expect(find.text('状态: 流式中'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
-      // 三条直播消息按 300ms 间隔逐条推送。
+      // 三条流式消息按 300ms 间隔逐条推送。
       await tester.pump(const Duration(milliseconds: 300));
       expect(tester.takeException(), isNull);
       await tester.pump(const Duration(milliseconds: 300));
@@ -22,9 +22,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(tester.takeException(), isNull);
 
-      // 直播态应该已经能看到最终文本(三条消息都到齐了)。
+      // 流式态应该已经能看到最终文本(三条消息都到齐了)。
       expect(find.text('生命周期交接测试'), findsOneWidget);
-      expect(find.text('状态: 直播中'), findsOneWidget);
+      expect(find.text('状态: 流式中'), findsOneWidget);
 
       // 等待触发交接的延时(300ms)。
       await tester.pump(const Duration(milliseconds: 300));
@@ -36,13 +36,13 @@ void main() {
       expect(find.text('生命周期交接测试'), findsOneWidget);
       expect(find.textContaining('已交接'), findsOneWidget);
 
-      // 再 pump 一帧让 addPostFrameCallback 触发直播 controller 的 dispose。
+      // 再 pump 一帧让 addPostFrameCallback 触发流式 controller 的 dispose。
       await tester.pump();
       expect(tester.takeException(), isNull);
-      expect(find.textContaining('直播 controller 已释放: true'), findsOneWidget);
+      expect(find.textContaining('流式 controller 已释放: true'), findsOneWidget);
 
       // dispose 之后再 pump 几次,确认没有任何"used after dispose"之类的异常
-      // 从已释放的直播 controller 里冒出来。
+      // 从已释放的流式 controller 里冒出来。
       await tester.pump(const Duration(milliseconds: 500));
       expect(tester.takeException(), isNull);
       expect(find.text('生命周期交接测试'), findsOneWidget);

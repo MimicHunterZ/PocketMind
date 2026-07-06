@@ -4,7 +4,7 @@
 
 ## Overview
 
-按依赖图从风险最高、最不确定的部分先做,分三个阶段:先用 mock 把客户端渲染管线(块序列渲染 + 直播态)在不依赖后端的情况下验证透,再独立把后端事件管线重做并用 curl 验证透,最后把两边接起来做端到端验收。每阶段结束都有可以独立验证的产出,不要求一次性打通。
+按依赖图从风险最高、最不确定的部分先做,分三个阶段:先用 mock 把客户端渲染管线(块序列渲染 + 流式态)在不依赖后端的情况下验证透,再独立把后端事件管线重做并用 curl 验证透,最后把两边接起来做端到端验收。每阶段结束都有可以独立验证的产出,不要求一次性打通。
 
 **核心模型(spec D3,贯穿全 plan)**:一轮 AI 回复 = 按 `parentUuid` 有序的**块序列**,每块按消息类型各自渲染:
 
@@ -54,28 +54,28 @@
 
 #### Checkpoint 1
 - [ ] 静态块序列(文本 + 工具卡片 + A2UI 卡片)能在真实聊天列表正确渲染、滚动、混排,不涉及流式/后端。
-- [ ] 与用户一起过一遍界面效果,确认没问题再进入直播态改造。
+- [ ] 与用户一起过一遍界面效果,确认没问题再进入流式态改造。
 
-- [x] **Task 1.4(原 Task 1.3a,spike,已完成): 验证"临时直播 controller → 交接给持久化 controller"的生命周期**
-  - 描述:demo 现在的模式是一个 `SurfaceController` 从页面 `initState()` 建一次、用到页面销毁,适合"一整页一个 Surface"。真实聊天是"每条消息各自一个 Surface,消息随时增删、列表滚动",直播时还要经历"临时 controller 实时渲染 → 流式结束 → 交接给这条消息持久化后自己的 controller"这个过程,demo 没验证过这个交接。这个实验在 `mobile/lib/demo/a2ui/` 里独立验证,不碰真实聊天代码。
+- [x] **Task 1.4(原 Task 1.3a,spike,已完成): 验证"临时流式 controller → 交接给持久化 controller"的生命周期**
+  - 描述:demo 现在的模式是一个 `SurfaceController` 从页面 `initState()` 建一次、用到页面销毁,适合"一整页一个 Surface"。真实聊天是"每条消息各自一个 Surface,消息随时增删、列表滚动",流式时还要经历"临时 controller 实时渲染 → 流式结束 → 交接给这条消息持久化后自己的 controller"这个过程,demo 没验证过这个交接。这个实验在 `mobile/lib/demo/a2ui/` 里独立验证,不碰真实聊天代码。
   - 依赖:无
   - 文件:`mobile/lib/demo/a2ui/surface_handoff_lifecycle_demo_page.dart`、`mobile/test/demo/a2ui/surface_handoff_lifecycle_demo_page_test.dart`
   - 规模:S
   - **✅ 已完成,结论如下(2026-07-05)**:
 
     **结论 1——交接机制本身可行,但要用"同步灌入"而不是"流式解析"重建最终态。**
-    一开始想当然地用 `A2uiTransportAdapter.addChunk()` 给交接目标(持久化 controller)灌最终 JSON——结果发现 `addChunk` 走的是异步解析管线(`StreamController` + `Transformer`,消息要等 microtask 才真正送达 `SurfaceController`),灌完立刻 `setState` 切换 widget 的话,新 controller 在下一帧渲染时数据可能还没到,存在一瞬间空白/重建的风险。改成用同步的 `A2uiMessage.fromJson()` 把存储的最终 JSON 解析成消息对象,直接循环调用 `SurfaceController.handleMessage()`——这样新 controller 在 `setState` 之前就已完全就位,交接前后是同一帧内的状态,widget 测试验证了这一点(交接那一次 `pump` 之后立刻就能看到同样的文本,没有中间空白帧)。**结论:正式实现里,"用存储的最终 JSON 重建 Surface"(不管是直播交接还是历史消息 Task 1.2 那种一次性渲染)都应该走 `A2uiMessage.fromJson` + `handleMessage` 这条同步路径,`addChunk` 只用于真正需要边解析边喂的场景(比如真的在接收 LLM 流式文本)。**
+    一开始想当然地用 `A2uiTransportAdapter.addChunk()` 给交接目标(持久化 controller)灌最终 JSON——结果发现 `addChunk` 走的是异步解析管线(`StreamController` + `Transformer`,消息要等 microtask 才真正送达 `SurfaceController`),灌完立刻 `setState` 切换 widget 的话,新 controller 在下一帧渲染时数据可能还没到,存在一瞬间空白/重建的风险。改成用同步的 `A2uiMessage.fromJson()` 把存储的最终 JSON 解析成消息对象,直接循环调用 `SurfaceController.handleMessage()`——这样新 controller 在 `setState` 之前就已完全就位,交接前后是同一帧内的状态,widget 测试验证了这一点(交接那一次 `pump` 之后立刻就能看到同样的文本,没有中间空白帧)。**结论:正式实现里,"用存储的最终 JSON 重建 Surface"(不管是流式交接还是历史消息 Task 1.2 那种一次性渲染)都应该走 `A2uiMessage.fromJson` + `handleMessage` 这条同步路径,`addChunk` 只用于真正需要边解析边喂的场景(比如真的在接收 LLM 流式文本)。**
 
     **结论 2——测试跑出了一个真实 bug:重复 dispose 会崩。**
-    第一次跑测试时,在 widget 树卸载阶段(测试收尾)炸了:`A ValueNotifier<SurfaceDefinition?> was used after being disposed`,来自 `SurfaceController.dispose()` 内部的 `SurfaceRegistry.dispose()`。根因是我在 `addPostFrameCallback` 里 dispose 了直播 controller,但没把持有它的字段置空——`State.dispose()`(widget 销毁时)又拿着同一个引用调用了一次 `.dispose()`,触发二次释放。修复方式很简单:dispose 之后立刻把字段设为 `null`。**结论:任何"提前手动 dispose 一个 controller"的地方,都必须紧跟着清空持有它的引用,否则 `State.dispose()` 的收尾逻辑会重复释放同一个对象——这是后续任何"消息级 controller 生命周期管理"代码都要遵守的规则,不是这次特例。**
+    第一次跑测试时,在 widget 树卸载阶段(测试收尾)炸了:`A ValueNotifier<SurfaceDefinition?> was used after being disposed`,来自 `SurfaceController.dispose()` 内部的 `SurfaceRegistry.dispose()`。根因是我在 `addPostFrameCallback` 里 dispose 了流式 controller,但没把持有它的字段置空——`State.dispose()`(widget 销毁时)又拿着同一个引用调用了一次 `.dispose()`,触发二次释放。修复方式很简单:dispose 之后立刻把字段设为 `null`。**结论:任何"提前手动 dispose 一个 controller"的地方,都必须紧跟着清空持有它的引用,否则 `State.dispose()` 的收尾逻辑会重复释放同一个对象——这是后续任何"消息级 controller 生命周期管理"代码都要遵守的规则,不是这次特例。**
 
-    修完这两点后,`flutter test test/demo/a2ui/surface_handoff_lifecycle_demo_page_test.dart` 全程无异常通过:直播三条消息逐条到达 → 交接瞬间文本不变(无空白帧)→ 交接后一帧内旧 controller 正确 dispose → 之后再 pump 多次也没有任何"used after dispose"类异常冒出来。
+    修完这两点后,`flutter test test/demo/a2ui/surface_handoff_lifecycle_demo_page_test.dart` 全程无异常通过:流式三条消息逐条到达 → 交接瞬间文本不变(无空白帧)→ 交接后一帧内旧 controller 正确 dispose → 之后再 pump 多次也没有任何"used after dispose"类异常冒出来。
 
     **副发现(不在本任务范围内,未处理)**:跑 `test/demo/` 全目录时,发现 `test/demo/a2ui/genui_demo_page_test.dart` 里已有一个失败——它断言的文案和 `a2ui_stream_api_service.dart` 现在的实际内容不匹配。确认这是这次 spike 之前就存在的、跟本任务无关的测试文案漂移,不在本任务范围内,记录下来但没有动它。
 
-- [ ] **Task 1.5(原 Task 1.3b): 直播态渲染改造(`ChatStreamingBubble`)+ 接 mock 验证完整流式**
-  - 描述:在 Task 1.4 验证过的交接方案基础上,把 demo 里已经验证过的 `A2uiStreamApiService` 风格 mock 临时接到真实聊天发送流程(仅用于本任务验证,不是最终形态,Task 3.2 会换真实后端)。`ChatStreamingBubble` 改造成驱动块序列直播:文本流实时 md 渲染;工具进度用 `TOOL_CALL_START/END` 事件显示临时提示(过渡态,不落库,D9);卡片流式到达时用临时 `SurfaceController` 实时渲染,流式结束后按 Task 1.4 的同步交接方案落到持久化消息。
-  - 验收:从"发送消息"到"文字/工具提示/卡片一步步流式出现"到"流式结束变成历史消息"全程不崩溃;关闭重开聊天,历史里的文字、工具记录、卡片和刚才直播时的最终态一致。
+- [ ] **Task 1.5(原 Task 1.3b): 流式态渲染改造(`ChatStreamingBubble`)+ 接 mock 验证完整流式**
+  - 描述:在 Task 1.4 验证过的交接方案基础上,把 demo 里已经验证过的 `A2uiStreamApiService` 风格 mock 临时接到真实聊天发送流程(仅用于本任务验证,不是最终形态,Task 3.2 会换真实后端)。`ChatStreamingBubble` 改造成驱动块序列流式:文本流实时 md 渲染;工具进度用 `TOOL_CALL_START/END` 事件显示临时提示(过渡态,不落库,D9);卡片流式到达时用临时 `SurfaceController` 实时渲染,流式结束后按 Task 1.4 的同步交接方案落到持久化消息。
+  - 验收:从"发送消息"到"文字/工具提示/卡片一步步流式出现"到"流式结束变成历史消息"全程不崩溃;关闭重开聊天,历史里的文字、工具记录、卡片和刚才流式时的最终态一致。
   - 验证:手动跑完整发送流程(接 mock);reload 页面人工核对。
   - 依赖:1.4、1.2
   - 规模:M
@@ -91,7 +91,7 @@
   - 文件:`mobile/lib/page/chat/widgets/chat_message_widgets.dart`、`mobile/lib/providers/chat_providers.dart`、必要时 demo 里加 spike 场景
 
 #### Checkpoint 2(人工评审点)
-- [ ] 客户端渲染管线(块序列历史 + 直播 + 交互/锁定)完全用 mock 验证通过。
+- [ ] 客户端渲染管线(块序列历史 + 流式 + 交互/锁定)完全用 mock 验证通过。
 - [ ] **与用户核对后再推进 Phase 2**——这是本计划里最花不确定性的部分,确认没问题才值得往后端投入。
 
 ### Phase 2: 后端事件重设计(与 Phase 1 独立,可并行,但建议 Checkpoint 2 后再投入)
@@ -172,7 +172,7 @@
   - 文件:`mobile/lib/api/chat_api_service.dart`、`mobile/lib/api/models/chat_models.dart`
 
 - [ ] **Task 3.2: `_consumeStreamEvents` 接真实后端,替换 Task 1.5 的临时 mock**
-  - 描述:把 Task 1.5 里"临时接 mock"的代码换成真实解析出的后端事件,驱动块序列直播(文本/工具提示/卡片)。
+  - 描述:把 Task 1.5 里"临时接 mock"的代码换成真实解析出的后端事件,驱动块序列流式(文本/工具提示/卡片)。
   - 验收:端到端——发一条会触发 AI 生成卡片的真实消息,聊天界面里文字、工具记录、卡片按 AI 实际生成顺序混排出现;关闭重开聊天,原样复现,不重新请求后端。
   - 验证:真机/模拟器手动跑完整流程。
   - 依赖:3.1

@@ -186,7 +186,7 @@ final class ChatPausedEvent extends ChatStreamEvent {
   const ChatPausedEvent({this.requestId, this.messageUuid});
 }
 
-/// 工具调用开始（event: tool_call_start）。仅用于直播期间的过渡提示，
+/// 工具调用开始（event: tool_call_start）。仅用于流式期间的过渡提示，
 /// 不落库——工具调用的最终记录以流结束后同步的 TOOL_CALL/TOOL_RESULT
 /// 消息为准。
 final class ChatToolCallStartEvent extends ChatStreamEvent {

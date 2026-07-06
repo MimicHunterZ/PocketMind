@@ -29,7 +29,7 @@ class GenUiDemoHubPage extends StatelessWidget {
           const SizedBox(height: 12),
           _DemoEntryCard(
             title: 'Surface 生命周期交接 spike',
-            subtitle: '验证直播 controller 交接给持久化 controller 会不会闪烁/漏释放',
+            subtitle: '验证流式 controller 交接给持久化 controller 会不会闪烁/漏释放',
             icon: Icons.swap_horiz,
             onTap: () => context.push(RoutePaths.genuiDemoSurfaceHandoff),
           ),
@@ -42,8 +42,8 @@ class GenUiDemoHubPage extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _DemoEntryCard(
-            title: '聊天直播态 Mock 预览',
-            subtitle: '真实发送流程接固定剧本,验证文本/工具进度/A2UI 卡片逐步直播出现',
+            title: '聊天流式态 Mock 预览',
+            subtitle: '真实发送流程接固定剧本,验证文本/工具进度/A2UI 卡片逐步流式出现',
             icon: Icons.podcasts_outlined,
             onTap: () => context.push(RoutePaths.genuiDemoChatStreamingMock),
           ),

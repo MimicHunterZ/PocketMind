@@ -6,7 +6,7 @@ import 'package:genui/genui.dart';
 
 import 'streaming_markdown_catalog_item.dart';
 
-/// PLAN Task 1.3a 的验证 spike:测试"直播中的临时 SurfaceController → 交接给
+/// PLAN Task 1.3a 的验证 spike:测试"流式中的临时 SurfaceController → 交接给
 /// 持久化后的 SurfaceController"这个动作,交接瞬间会不会闪烁、旧 controller
 /// 会不会正确释放。不接 mock 服务、不接真实发送流程,纯手写固定的 A2UI 消息
 /// 序列,和真实聊天代码完全隔离。
@@ -30,7 +30,7 @@ class SurfaceHandoffLifecycleDemoPage extends StatefulWidget {
 
 const String _surfaceId = 'handoff-demo';
 
-/// 固定的最终态消息序列。直播阶段逐条推送这些消息模拟流式生成;交接阶段把
+/// 固定的最终态消息序列。流式阶段逐条推送这些消息模拟流式生成;交接阶段把
 /// 同一份序列同步喂给全新 controller,验证交接前后渲染内容完全一致。
 List<String> fixedHandoffMessages() => [
   '{"version":"v0.9","createSurface":{"surfaceId":"$_surfaceId",'
@@ -70,7 +70,7 @@ class _SurfaceHandoffLifecycleDemoPageState
       Timer(Duration(milliseconds: 300 * (i + 1)), () {
         if (!mounted) return;
         adapter.addChunk(messages[i]);
-        setState(() => _log.add('直播:第${i + 1}条消息已推送(经 addChunk 异步解析)'));
+        setState(() => _log.add('流式:第${i + 1}条消息已推送(经 addChunk 异步解析)'));
         if (i == messages.length - 1) {
           Timer(const Duration(milliseconds: 300), _handOff);
         }
@@ -96,7 +96,7 @@ class _SurfaceHandoffLifecycleDemoPageState
       _log.add('交接:同步灌入完毕,切到持久化 controller');
     });
 
-    // 等这一帧真正提交、旧的 Surface widget 已经卸载之后才 dispose 直播
+    // 等这一帧真正提交、旧的 Surface widget 已经卸载之后才 dispose 流式
     // controller——如果在 setState 的同一步就 dispose,旧 widget 此刻可能还
     // 挂着监听,会出问题。
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -107,7 +107,7 @@ class _SurfaceHandoffLifecycleDemoPageState
       if (!mounted) return;
       setState(() {
         _liveDisposed = true;
-        _log.add('直播 controller 已 dispose(在新帧提交之后)');
+        _log.add('流式 controller 已 dispose(在新帧提交之后)');
       });
     });
   }
@@ -132,8 +132,8 @@ class _SurfaceHandoffLifecycleDemoPageState
           children: [
             Text(
               _handedOff
-                  ? '状态: 已交接,直播 controller 已释放: $_liveDisposed'
-                  : '状态: 直播中',
+                  ? '状态: 已交接,流式 controller 已释放: $_liveDisposed'
+                  : '状态: 流式中',
               key: const Key('handoff-status'),
             ),
             const SizedBox(height: 12),

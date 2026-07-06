@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'package:pocketmind/api/models/chat_models.dart';
 import 'package:pocketmind/model/chat_message.dart';
 
-/// 直播态调试预览用的固定剧本：文本 → 工具调用 → 文本 → A2UI 卡片。
+/// 流式态调试预览用的固定剧本：文本 → 工具调用 → 文本 → A2UI 卡片。
 ///
-/// [buildChatStreamingMockEvents] 逐块吐出 SSE 事件模拟直播过程；
+/// [buildChatStreamingMockEvents] 逐块吐出 SSE 事件模拟流式过程；
 /// [buildChatStreamingMockFinalMessages] 吐出与剧本内容一致的持久化消息，
-/// 流结束后落库，验证"直播最终态"和"历史里的最终态"一致。
+/// 流结束后落库，验证"流式最终态"和"历史里的最终态"一致。
 
 const String _text1 = '好的，我先搜一下相关记忆。';
 const String _text2 = '找到了，给你一张卡片。';
@@ -44,7 +44,7 @@ List<String> _chatStreamingMockA2uiChunks() => [
         {
           'id': 'streamTitle',
           'component': 'Text',
-          'text': '直播搭建的卡片',
+          'text': '流式搭建的卡片',
           'variant': 'h4',
         },
         {'id': 'streamBody', 'component': 'Text', 'text': {'path': '/body'}},
@@ -61,7 +61,7 @@ List<String> _chatStreamingMockA2uiChunks() => [
   }),
 ];
 
-/// 逐块吐出这一轮直播的 SSE 事件：先一段文本，再一次工具调用，再一段文本，
+/// 逐块吐出这一轮流式的 SSE 事件：先一段文本，再一次工具调用，再一段文本，
 /// 最后一张分片到达的 A2UI 卡片，用固定小延时模拟真实网络的逐步到达。
 Stream<ChatStreamEvent> buildChatStreamingMockEvents({
   String? requestId,
