@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pocketmind/demo/a2ui/chat_block_sequence_preview_page.dart';
 import 'package:pocketmind/demo/a2ui/genui_demo_hub_page.dart';
 import 'package:pocketmind/demo/a2ui/genui_demo_page.dart';
 import 'package:pocketmind/demo/a2ui/markdown_sse_mock_demo_page.dart';
@@ -118,6 +119,12 @@ final appRouter = GoRouter(
     GoRoute(
       path: RoutePaths.genuiDemoSurfaceHandoff,
       builder: (context, state) => const SurfaceHandoffLifecycleDemoPage(),
+    ),
+
+    // 聊天块序列 mock 预览页面 - 全屏，不含侧边栏
+    GoRoute(
+      path: RoutePaths.genuiDemoChatBlockSequence,
+      builder: (context, state) => const ChatBlockSequencePreviewPage(),
     ),
 
     // 聊天页 - 全屏，不含侧边栏

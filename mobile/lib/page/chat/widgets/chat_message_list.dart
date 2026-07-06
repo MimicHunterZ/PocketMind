@@ -118,6 +118,7 @@ class _ChatMessageListState extends ConsumerState<ChatMessageList> {
         :final message,
         :final isLeaf,
         :final isLastUserMsg,
+        :final isLastOfTurn,
       ):
         return ChatMessageBubble(
           message: message,
@@ -125,6 +126,7 @@ class _ChatMessageListState extends ConsumerState<ChatMessageList> {
           sessionUuid: widget.sessionUuid,
           isLeaf: isLeaf,
           isLastUserMsg: isLastUserMsg,
+          isLastOfTurn: isLastOfTurn,
           onEditTap: isLastUserMsg ? widget.onStartEdit : null,
         );
       case ChatListPendingUserItem(:final content):

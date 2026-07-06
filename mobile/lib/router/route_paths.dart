@@ -30,6 +30,10 @@ class RoutePaths {
   /// Surface 生命周期交接 spike 页面
   static const String genuiDemoSurfaceHandoff = '/genui-demo/surface-handoff';
 
+  /// 聊天块序列(文本 + 工具卡片 + A2UI 卡片)mock 预览页面
+  static const String genuiDemoChatBlockSequence =
+      '/genui-demo/chat-block-sequence';
+
   /// 平台账号管理
   static const String platformAccounts = '/settings/platform-accounts';
 

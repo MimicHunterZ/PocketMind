@@ -33,6 +33,13 @@ class GenUiDemoHubPage extends StatelessWidget {
             icon: Icons.swap_horiz,
             onTap: () => context.push(RoutePaths.genuiDemoSurfaceHandoff),
           ),
+          const SizedBox(height: 12),
+          _DemoEntryCard(
+            title: '聊天块序列 Mock 预览',
+            subtitle: '真实 ChatPage + 文本/工具卡片/A2UI 卡片混排的固定 mock 数据',
+            icon: Icons.view_agenda_outlined,
+            onTap: () => context.push(RoutePaths.genuiDemoChatBlockSequence),
+          ),
         ],
       ),
     );

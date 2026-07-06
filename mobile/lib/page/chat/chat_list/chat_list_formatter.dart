@@ -25,18 +25,23 @@ List<ChatListItem> buildChatListItems({
     }
   }
 
-  for (final message in messages) {
+  for (var i = 0; i < messages.length; i++) {
+    final message = messages[i];
     final ts = DateTime.fromMillisecondsSinceEpoch(message.updatedAt);
     if (lastTime == null || ts.difference(lastTime).abs().inMinutes >= 5) {
       items.add(ChatListTimeDivider(ts));
     }
     lastTime = ts;
 
+    final isLastOfTurn =
+        i == messages.length - 1 || messages[i + 1].role == 'USER';
+
     items.add(
       ChatListMessageItem(
         message: message,
         isLeaf: !parentUuidSet.contains(message.uuid),
         isLastUserMsg: message.uuid == lastUserMsgUuid,
+        isLastOfTurn: isLastOfTurn,
       ),
     );
   }

@@ -18,10 +18,16 @@ class ChatListMessageItem extends ChatListItem {
   final bool isLeaf;
   final bool isLastUserMsg;
 
+  /// 是否是这一轮 AI 回复(下一条 USER 消息之前的最后一块)的最后一块。
+  /// 一轮回复可能是"文本+工具调用+文本+卡片"的块序列,复制/点赞/分支这些
+  /// 操作按钮只应在整轮回复结束后、挂在最后一块上,不应该在中间块上出现。
+  final bool isLastOfTurn;
+
   const ChatListMessageItem({
     required this.message,
     required this.isLeaf,
     required this.isLastUserMsg,
+    required this.isLastOfTurn,
   });
 }
 

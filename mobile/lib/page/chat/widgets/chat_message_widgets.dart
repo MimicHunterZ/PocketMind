@@ -1,12 +1,17 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_streaming_text_markdown/flutter_streaming_text_markdown.dart';
+import 'package:genui/genui.dart' hide ChatMessage;
+import 'package:pocketmind/demo/a2ui/streaming_markdown_catalog_item.dart';
 import 'package:pocketmind/model/chat_message.dart';
 import 'package:pocketmind/page/chat/widgets/chat_branch_sheet.dart';
 import 'package:pocketmind/page/widget/creative_toast.dart';
 import 'package:pocketmind/providers/chat_providers.dart';
+import 'package:pocketmind/util/a2ui_card_util.dart';
 import 'package:pocketmind/util/theme_data.dart';
 
 /// 单条消息气泡。
@@ -16,6 +21,7 @@ class ChatMessageBubble extends ConsumerWidget {
   final String sessionUuid;
   final bool isLeaf;
   final bool isLastUserMsg;
+  final bool isLastOfTurn;
   final void Function(String uuid, String content)? onEditTap;
 
   const ChatMessageBubble({
@@ -25,6 +31,7 @@ class ChatMessageBubble extends ConsumerWidget {
     required this.sessionUuid,
     required this.isLeaf,
     required this.isLastUserMsg,
+    required this.isLastOfTurn,
     this.onEditTap,
   });
 
@@ -32,6 +39,16 @@ class ChatMessageBubble extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isUser = message.role == 'USER';
     final textTheme = context.textTheme;
+
+    if (message.messageType == 'TOOL_RESULT') {
+      final operations = tryParseA2uiCard(message.content);
+      if (operations != null) {
+        return A2uiCardMessage(
+          key: ValueKey('a2ui-card-${message.uuid}'),
+          operations: operations,
+        );
+      }
+    }
 
     if (message.messageType == 'TOOL_CALL' ||
         message.messageType == 'TOOL_RESULT') {
@@ -72,16 +89,21 @@ class ChatMessageBubble extends ConsumerWidget {
                         ),
                 ),
                 SizedBox(height: 4.h),
-                ChatMessageActionBar(
-                  message: message,
-                  sessionUuid: sessionUuid,
-                  isUser: isUser,
-                  isLeaf: isLeaf,
-                  isLastUserMsg: isLastUserMsg,
-                  onEditStart: isUser && onEditTap != null
-                      ? () => onEditTap!(message.uuid, message.content)
-                      : null,
-                ),
+                // 一轮 AI 回复可能拆成"文本+工具调用+文本+卡片"的块序列
+                // (isLastOfTurn),操作按钮(复制/点赞/分支等)只挂在这轮
+                // 最后一块上,中间的文本块还没说完这轮的话,不显示。
+                // 用户自己发的消息不受这个限制。
+                if (isUser || isLastOfTurn)
+                  ChatMessageActionBar(
+                    message: message,
+                    sessionUuid: sessionUuid,
+                    isUser: isUser,
+                    isLeaf: isLeaf,
+                    isLastUserMsg: isLastUserMsg,
+                    onEditStart: isUser && onEditTap != null
+                        ? () => onEditTap!(message.uuid, message.content)
+                        : null,
+                  ),
               ],
             ),
           ),
@@ -175,17 +197,33 @@ class ChatStreamingBubble extends StatelessWidget {
   }
 }
 
-/// 工具调用消息卡片。
-class ChatToolCallCard extends StatelessWidget {
+/// 工具调用/结果消息卡片。
+///
+/// `TOOL_CALL` 折叠态显示"调用了 {工具名}";`TOOL_RESULT` 折叠态显示
+/// "{工具名} 已完成",点击展开可看完整结果(不显示参数)。数据从
+/// [message] 的 `content` 里解析——落库的原始 JSON 形如
+/// `{"toolCallId":...,"name":...,"arguments"|"result":...}`。
+class ChatToolCallCard extends StatefulWidget {
   final ChatMessage message;
 
   const ChatToolCallCard({super.key, required this.message});
 
   @override
+  State<ChatToolCallCard> createState() => _ChatToolCallCardState();
+}
+
+class _ChatToolCallCardState extends State<ChatToolCallCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
     final textTheme = context.textTheme;
     final cs = context.colorScheme;
-    final isCall = message.messageType == 'TOOL_CALL';
+    final isCall = widget.message.messageType == 'TOOL_CALL';
+    final data = _tryParseToolData(widget.message.content);
+    final toolName = data?['name'] as String? ?? '工具';
+    final result = data?['result'] as String?;
+    final hasResult = !isCall && result != null && result.isNotEmpty;
 
     return Padding(
       padding: EdgeInsets.only(bottom: 8.h, left: 36.w, right: 36.w),
@@ -199,29 +237,112 @@ class ChatToolCallCard extends StatelessWidget {
             width: 0.5,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isCall
-                  ? Icons.engineering_outlined
-                  : Icons.check_circle_outline_rounded,
-              size: 14.sp,
-              color: cs.tertiary,
-            ),
-            SizedBox(width: 6.w),
-            Flexible(
-              child: Text(
-                isCall ? '调用工具中…' : '工具执行完成',
-                style: textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
-                overflow: TextOverflow.ellipsis,
+        child: InkWell(
+          onTap: hasResult
+              ? () => setState(() => _expanded = !_expanded)
+              : null,
+          borderRadius: BorderRadius.circular(10.r),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isCall
+                        ? Icons.engineering_outlined
+                        : Icons.check_circle_outline_rounded,
+                    size: 14.sp,
+                    color: cs.tertiary,
+                  ),
+                  SizedBox(width: 6.w),
+                  Flexible(
+                    child: Text(
+                      isCall ? '调用了 $toolName' : '$toolName 已完成',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (hasResult) ...[
+                    SizedBox(width: 2.w),
+                    Icon(
+                      _expanded ? Icons.expand_less : Icons.expand_more,
+                      size: 16.sp,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ],
+                ],
               ),
-            ),
-          ],
+              if (_expanded && hasResult) ...[
+                SizedBox(height: 6.h),
+                Text(
+                  result,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+Map<String, dynamic>? _tryParseToolData(String content) {
+  try {
+    final decoded = jsonDecode(content);
+    return decoded is Map<String, dynamic> ? decoded : null;
+  } on FormatException {
+    return null;
+  }
+}
+
+/// A2UI 卡片消息(判别为 A2UI 消息的 `TOOL_RESULT`)。
+///
+/// 每条卡片消息拥有独立的 [SurfaceController],随 widget 一起创建/销毁,
+/// 使同屏多条卡片各自独立、互不干扰。[operations] 是该消息落库的完整操作
+/// 序列,在 [initState] 里用同步的 `handleMessage` 循环灌入(而不是走异步的
+/// chunk 解析管线),确保首帧渲染即为最终态,不出现空白帧。消息内容落库后
+/// 不再改写,因此不需要处理更新。
+class A2uiCardMessage extends StatefulWidget {
+  final List<A2uiMessage> operations;
+
+  const A2uiCardMessage({super.key, required this.operations});
+
+  @override
+  State<A2uiCardMessage> createState() => _A2uiCardMessageState();
+}
+
+class _A2uiCardMessageState extends State<A2uiCardMessage> {
+  late final SurfaceController _controller;
+  late final String _surfaceId;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = SurfaceController(catalogs: [buildAppCatalog()]);
+    for (final operation in widget.operations) {
+      _controller.handleMessage(operation);
+    }
+    _surfaceId = a2uiSurfaceId(widget.operations);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 10.h),
+      child: Surface(surfaceContext: _controller.contextFor(_surfaceId)),
     );
   }
 }
