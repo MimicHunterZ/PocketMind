@@ -1,24 +1,22 @@
 package com.doublez.pocketmindserver.ai.context;
 
-import com.doublez.pocketmindserver.chat.application.ChatPersistenceContext;
-import com.doublez.pocketmindserver.chat.application.ChatPersistenceContextHolder;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.jetbrains.annotations.NotNull;
-import org.slf4j.MDC;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;
-import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
+import org.springframework.ai.chat.client.advisor.api.CallAdvisor;
+import org.springframework.ai.chat.client.advisor.api.CallAdvisorChain;
+import org.springframework.ai.chat.client.advisor.api.StreamAdvisor;
+import org.springframework.ai.chat.client.advisor.api.StreamAdvisorChain;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
-import org.springframework.ai.model.tool.ToolCallingManager;
-import org.springframework.ai.model.tool.ToolExecutionResult;
 import org.springframework.core.Ordered;
+import reactor.core.publisher.Flux;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -28,61 +26,91 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * ToolCallAdvisor 的持久化增强：将 tool_calls/tool_results 写入 chat_messages。
- * 仅在 ChatPersistenceContextHolder 存在时生效。
+ * 观察工具调用循环的每一轮请求，把新增的 tool_call/tool_result 落库为 chat_messages。
+ *
+ * 挂在自动注册的 ToolCallingAdvisor（order = HIGHEST_PRECEDENCE + 300）之后，是 Spring AI 2.0
+ * 官方推荐的"循环内观察者"写法：同一个 advisor 同时实现 CallAdvisor/StreamAdvisor，天然覆盖
+ * .call() 和 .stream() 两条路径。旧实现继承 ToolCallAdvisor 覆写
+ * doGetNextInstructionsForToolCall，那个钩子只在阻塞调用路径触发，流式路径永远走不到。
+ *
+ * 调用方必须通过 .advisors(a -> a.param(...)) 挂载 CTX_CONVERSATION_KEY/CTX_USER_ID/CTX_SESSION_UUID，
+ * 否则视为无需落库的场景（比如没有会话上下文的一次性调用），直接放行不做任何事。
+ * 用请求级 context map 而不是 ThreadLocal，是因为 .stream() 的回调可能跑在别的线程上，
+ * ThreadLocal 过不去；context map 随 ChatClientRequest 本身流转，没有这个问题。
  */
 @Slf4j
-public class PersistingToolCallAdvisor extends ToolCallAdvisor {
+public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
+
+    public static final String CTX_CONVERSATION_KEY = "pm.persist.conversationKey";
+    public static final String CTX_USER_ID = "pm.persist.userId";
+    public static final String CTX_SESSION_UUID = "pm.persist.sessionUuid";
+    public static final String CTX_PARENT_UUID = "pm.persist.parentUuid";
+
+    private static final int MAX_TRACKED_CONVERSATIONS = 200;
 
     private final ChatMessageRepository chatMessageRepository;
     private final ObjectMapper objectMapper;
 
     /**
-     * 基于 traceId 记录已持久化的 history 长度，防止重复写入。
+     * conversationKey -> 已落库的 instructions 长度 / 落库链尾 uuid。
      */
     private final ConcurrentMap<String, Integer> persistedSizes = new ConcurrentHashMap<>();
-    private static final int MAX_TRACKED_CONVERSATIONS = 200;
+    private final ConcurrentMap<String, UUID> tailParentUuids = new ConcurrentHashMap<>();
 
-    public PersistingToolCallAdvisor(ToolCallingManager toolCallingManager,
-                                     ChatMessageRepository chatMessageRepository,
-                                     ObjectMapper objectMapper) {
-        super(toolCallingManager, DEFAULT_TOOL_EXECUTION_ELIGIBILITY_CHECKER, Ordered.HIGHEST_PRECEDENCE + 300, true);
+    public PersistingToolCallAdvisor(ChatMessageRepository chatMessageRepository, ObjectMapper objectMapper) {
         this.chatMessageRepository = chatMessageRepository;
         this.objectMapper = objectMapper;
     }
 
     @Override
-    protected @NotNull List<Message> doGetNextInstructionsForToolCall(@NotNull ChatClientRequest chatClientRequest,
-                                                                      @NotNull ChatClientResponse chatClientResponse,
-                                                                      ToolExecutionResult toolExecutionResult) {
-        List<Message> fullHistory = toolExecutionResult.conversationHistory();
-        tryPersistIncremental(fullHistory);
-        return super.doGetNextInstructionsForToolCall(chatClientRequest, chatClientResponse, toolExecutionResult);
+    public String getName() {
+        return "PersistingToolCallAdvisor";
     }
 
-    protected void tryPersistIncremental(List<Message> fullHistory) {
-        ChatPersistenceContext ctx = ChatPersistenceContextHolder.get();
-        if (ctx == null) {
+    @Override
+    public int getOrder() {
+        return Ordered.HIGHEST_PRECEDENCE + 400;
+    }
+
+    @Override
+    public ChatClientResponse adviseCall(ChatClientRequest chatClientRequest, CallAdvisorChain chain) {
+        persistNewMessages(chatClientRequest);
+        return chain.nextCall(chatClientRequest);
+    }
+
+    @Override
+    public Flux<ChatClientResponse> adviseStream(ChatClientRequest chatClientRequest, StreamAdvisorChain chain) {
+        persistNewMessages(chatClientRequest);
+        return chain.nextStream(chatClientRequest);
+    }
+
+    private void persistNewMessages(ChatClientRequest chatClientRequest) {
+        Map<String, Object> ctx = chatClientRequest.context();
+        String conversationKey = (String) ctx.get(CTX_CONVERSATION_KEY);
+        Object rawUserId = ctx.get(CTX_USER_ID);
+        Object rawSessionUuid = ctx.get(CTX_SESSION_UUID);
+        if (conversationKey == null || rawUserId == null || rawSessionUuid == null) {
             return;
         }
-        if (fullHistory == null || fullHistory.isEmpty()) {
+        long userId = (Long) rawUserId;
+        UUID sessionUuid = (UUID) rawSessionUuid;
+
+        List<Message> instructions = chatClientRequest.prompt().getInstructions();
+        int lastSize = persistedSizes.getOrDefault(conversationKey, 0);
+        if (instructions.size() <= lastSize) {
             return;
         }
 
-        String traceId = MDC.get("traceId");
-        String key = (traceId == null || traceId.isBlank())
-                ? (ctx.sessionUuid() == null ? "" : ctx.sessionUuid().toString())
-                : traceId;
-
-        int lastSize = persistedSizes.getOrDefault(key, 0);
-        if (lastSize >= fullHistory.size()) {
-            return;
+        UUID parentUuid = tailParentUuids.get(conversationKey);
+        if (parentUuid == null) {
+            parentUuid = (UUID) ctx.get(CTX_PARENT_UUID);
         }
 
-        // 仅持久化新增片段
-        List<Message> delta = fullHistory.subList(lastSize, fullHistory.size());
-        persistMessages(ctx, delta);
-        persistedSizes.put(key, fullHistory.size());
+        List<Message> delta = instructions.subList(lastSize, instructions.size());
+        parentUuid = persistMessages(userId, sessionUuid, parentUuid, delta);
+
+        persistedSizes.put(conversationKey, instructions.size());
+        tailParentUuids.put(conversationKey, parentUuid);
         evictWhenTooManyConversations();
     }
 
@@ -94,15 +122,11 @@ public class PersistingToolCallAdvisor extends ToolCallAdvisor {
         String anyKey = persistedSizes.keySet().stream().findFirst().orElse(null);
         if (anyKey != null) {
             persistedSizes.remove(anyKey);
+            tailParentUuids.remove(anyKey);
         }
     }
 
-    private void persistMessages(ChatPersistenceContext ctx, List<Message> messages) {
-        UUID parentUuid = ChatPersistenceContextHolder.getParentUuid();
-        if (parentUuid == null) {
-            parentUuid = ctx.parentUuid();
-        }
-
+    private UUID persistMessages(long userId, UUID sessionUuid, UUID parentUuid, List<Message> messages) {
         for (Message message : messages) {
             if (message == null) {
                 continue;
@@ -114,19 +138,10 @@ public class PersistingToolCallAdvisor extends ToolCallAdvisor {
                 }
                 for (AssistantMessage.ToolCall call : assistant.getToolCalls()) {
                     UUID uuid = UUID.randomUUID();
-                    String json = toToolCallJson(call);
                     ChatMessageEntity entity = ChatMessageEntity.createTool(
-                            uuid,
-                            ctx.userId(),
-                            ctx.sessionUuid(),
-                            parentUuid,
-                            "TOOL_CALL",
-                            ChatRole.TOOL_CALL,
-                            json
-                    );
+                            uuid, userId, sessionUuid, parentUuid, "TOOL_CALL", ChatRole.TOOL_CALL, toToolCallJson(call));
                     chatMessageRepository.save(entity);
                     parentUuid = uuid;
-                    ChatPersistenceContextHolder.updateParentUuid(uuid);
                 }
                 continue;
             }
@@ -134,22 +149,14 @@ public class PersistingToolCallAdvisor extends ToolCallAdvisor {
             if (message.getMessageType() == MessageType.TOOL && message instanceof ToolResponseMessage toolResponseMessage) {
                 for (ToolResponseMessage.ToolResponse resp : toolResponseMessage.getResponses()) {
                     UUID uuid = UUID.randomUUID();
-                    String json = toToolResultJson(resp);
                     ChatMessageEntity entity = ChatMessageEntity.createTool(
-                            uuid,
-                            ctx.userId(),
-                            ctx.sessionUuid(),
-                            parentUuid,
-                            "TOOL_RESULT",
-                            ChatRole.TOOL_RESULT,
-                            json
-                    );
+                            uuid, userId, sessionUuid, parentUuid, "TOOL_RESULT", ChatRole.TOOL_RESULT, toToolResultJson(resp));
                     chatMessageRepository.save(entity);
                     parentUuid = uuid;
-                    ChatPersistenceContextHolder.updateParentUuid(uuid);
                 }
             }
         }
+        return parentUuid;
     }
 
     private String toToolCallJson(AssistantMessage.ToolCall call) {
@@ -176,5 +183,13 @@ public class PersistingToolCallAdvisor extends ToolCallAdvisor {
             log.warn("tool payload json serialize failed: {}", e.getMessage());
             return "{}";
         }
+    }
+
+    /**
+     * 取某次会话当前已落库的工具消息链尾 uuid，供阻塞调用方（如 AiAnalysePollingService）
+     * 在 call() 返回后取用，作为紧接着要落库的 assistant 回复的 parentUuid。
+     */
+    public UUID getCurrentParentUuid(String conversationKey) {
+        return tailParentUuids.get(conversationKey);
     }
 }

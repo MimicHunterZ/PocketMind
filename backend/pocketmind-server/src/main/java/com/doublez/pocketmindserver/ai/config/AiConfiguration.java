@@ -1,7 +1,7 @@
 package com.doublez.pocketmindserver.ai.config;
 
-import com.doublez.pocketmindserver.ai.context.PersistingPruningToolCallAdvisor;
 import com.doublez.pocketmindserver.ai.context.PersistingToolCallAdvisor;
+import com.doublez.pocketmindserver.ai.context.PruningToolCallAdvisor;
 import com.doublez.pocketmindserver.ai.context.ToolResultContextEngineeringProperties;
 import com.doublez.pocketmindserver.ai.context.TrustedModelContextWindowResolver;
 import com.doublez.pocketmindserver.ai.observability.AiObservabilityProperties;
@@ -394,11 +394,11 @@ public class AiConfiguration {
             builder.defaultAdvisors(new LangfuseChatObservationAdvisor(aiJsonMapper));
         }
 
-        // 2) 工具调用：默认 tool advisor，以及可选的 tool-result 剪枝。
-        //    注意：只有在存在 tool callback 时才挂载 tool advisor，避免无工具场景引入额外复杂度。
+        // 2) 工具调用：默认 tool advisor（可选剪枝），以及独立的落库观察者 advisor。
+        //    注意：只有在存在 tool callback 时才挂载，避免无工具场景引入额外复杂度。
         if (!selectedToolCallbacks.isEmpty()) {
             ToolCallAdvisor toolCallAdvisor = buildToolCallAdvisor(providers, toolResultContextEngineeringProperties, modelName);
-            builder.defaultAdvisors(toolCallAdvisor);
+            builder.defaultAdvisors(toolCallAdvisor, persistingToolCallAdvisor());
         }
 
         // 3) ChatClient 调试日志。
@@ -461,23 +461,28 @@ public class AiConfiguration {
                     props.defaultWindowTokens(),
                     windowTokens
             );
-                return new PersistingPruningToolCallAdvisor(
+            return new PruningToolCallAdvisor(
                     ToolCallingManager.builder().build(),
                     props.compressStartRatio(),
                     props.keepRecentToolResponses(),
                     resolver,
-                    modelName,
-                    chatMessageRepository,
-                    objectMapper
-                );
+                    modelName
+            );
         }
 
-            // 榛樿 ToolCallAdvisor + 钀藉簱澧炲己
-            return new PersistingToolCallAdvisor(
-                ToolCallingManager.builder().build(),
-                chatMessageRepository,
-                objectMapper
-            );
+        // 默认 ToolCallAdvisor（落库由独立的 persistingToolCallAdvisor() 负责）
+        return ToolCallAdvisor.builder()
+                .toolCallingManager(ToolCallingManager.builder().build())
+                .build();
+    }
+
+    /**
+     * 工具调用循环内的落库观察者：同时支持 .call() 和 .stream()，与 buildToolCallAdvisor()
+     * 返回的工具执行 advisor 相互独立，挂载顺序由各自 order 决定，不需要手动排列。
+     */
+    @Bean
+    public PersistingToolCallAdvisor persistingToolCallAdvisor() {
+        return new PersistingToolCallAdvisor(chatMessageRepository, objectMapper);
     }
 
     private boolean hasExplicitWindowTokensForModel(Map<String, Integer> windowTokens, String modelName) {

@@ -1,6 +1,7 @@
 package com.doublez.pocketmindserver.ai.application.stream;
 
 import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
+import com.doublez.pocketmindserver.ai.context.PersistingToolCallAdvisor;
 import com.doublez.pocketmindserver.ai.tool.skill.TenantSkillToolResolver;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
@@ -97,7 +98,7 @@ public class SseReplyService {
                 .then();
 
         StringBuilder accumulator = new StringBuilder();
-        Flux<String> contentFlux = buildContentFlux(systemText, userId, historyMessages, userPrompt);
+        Flux<String> contentFlux = buildContentFlux(systemText, userId, sessionUuid, userMsgUuid, historyMessages, userPrompt);
 
         Mono<ServerSentEvent<String>> terminalEvent = Mono.fromCallable(() -> {
             if (cancelled.get()) {
@@ -145,6 +146,8 @@ public class SseReplyService {
 
     private Flux<String> buildContentFlux(String systemText,
                                           long userId,
+                                          UUID sessionUuid,
+                                          UUID userMsgUuid,
                                           List<Message> historyMessages,
                                           String userPrompt) {
         TenantSkillToolResolver.ResolvedTenantSkillTool resolvedSkillTool =
@@ -153,7 +156,7 @@ public class SseReplyService {
         // 构建请求级记忆工具
         MemoryToolSet memoryToolSet = memoryToolSetFactory.createForUser(userId);
         ToolCallback[] memoryCallbacks = memoryToolSet.toToolCallbacks();
-        
+
         // 构建请求级资源工具
         ResourceToolSet resourceToolSet = resourceToolSetFactory.createForUser(userId);
         ToolCallback[] resourceCallbacks = resourceToolSet.toToolCallbacks();
@@ -161,7 +164,7 @@ public class SseReplyService {
         List<ToolCallback> allCallbacks = new ArrayList<>();
         allCallbacks.addAll(Arrays.asList(memoryCallbacks));
         allCallbacks.addAll(Arrays.asList(resourceCallbacks));
-        
+
         if (resolvedSkillTool.skillCallback() != null) {
             allCallbacks.addAll(Arrays.asList(resolvedSkillTool.skillCallback()));
         }
@@ -173,7 +176,14 @@ public class SseReplyService {
                             .toolContext(resolvedSkillTool.toolContext())
                             .system(systemText)
                             .messages(historyMessages.toArray(new Message[0]))
-                            .user(userPrompt);
+                            .user(userPrompt)
+                            // 每次实际调用（含 AiFailoverRouter 的重试/降级）都生成新 key，
+                            // 落库观察者据此按会话增量落库 TOOL_CALL/TOOL_RESULT。
+                            .advisors(a -> a
+                                    .param(PersistingToolCallAdvisor.CTX_CONVERSATION_KEY, UUID.randomUUID().toString())
+                                    .param(PersistingToolCallAdvisor.CTX_USER_ID, userId)
+                                    .param(PersistingToolCallAdvisor.CTX_SESSION_UUID, sessionUuid)
+                                    .param(PersistingToolCallAdvisor.CTX_PARENT_UUID, userMsgUuid));
 
                     // 注入所有合并后的工具
                     if (!allCallbacks.isEmpty()) {

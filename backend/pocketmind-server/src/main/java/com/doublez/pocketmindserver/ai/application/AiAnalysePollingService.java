@@ -3,7 +3,7 @@ package com.doublez.pocketmindserver.ai.application;
 import com.doublez.pocketmindserver.ai.api.dto.AiAnalyseAcceptRequest;
 import com.doublez.pocketmindserver.ai.api.dto.AiAnalysePollingResult;
 import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
-import com.doublez.pocketmindserver.chat.application.ChatPersistenceContextHolder;
+import com.doublez.pocketmindserver.ai.context.PersistingToolCallAdvisor;
 import com.doublez.pocketmindserver.note.domain.note.NoteEntity;
 import com.doublez.pocketmindserver.note.domain.note.NoteRepository;
 import com.doublez.pocketmindserver.note.domain.tag.TagRepository;
@@ -14,6 +14,7 @@ import com.doublez.pocketmindserver.shared.util.PromptBuilder;
 import com.doublez.pocketmind.common.web.ApiCode;
 import com.doublez.pocketmind.common.web.BusinessException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.StructuredOutputValidationAdvisor;
 import org.springframework.ai.chat.client.advisor.api.BaseAdvisor;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -28,6 +29,7 @@ import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * AI 分析（轮询模式）应用服务。
@@ -44,6 +46,7 @@ public class AiAnalysePollingService {
     private final TagRepository tagRepository;
     private final TaskExecutor taskExecutor;
     private final NoteResourceSyncService noteResourceSyncService;
+    private final PersistingToolCallAdvisor persistingToolCallAdvisor;
 
     @Value("classpath:prompts/analyse/system_prompt.md")
     private Resource systemTemplate;
@@ -58,7 +61,8 @@ public class AiAnalysePollingService {
                                    AiAnalyseChatSessionService chatSessionService,
                                    TagRepository tagRepository,
                                    @Qualifier("applicationTaskExecutor") TaskExecutor taskExecutor,
-                                   NoteResourceSyncService noteResourceSyncService) {
+                                   NoteResourceSyncService noteResourceSyncService,
+                                   PersistingToolCallAdvisor persistingToolCallAdvisor) {
         this.noteRepository = noteRepository;
         this.crawlerProducer = crawlerProducer;
         this.jinaReaderClient = jinaReaderClient;
@@ -67,6 +71,7 @@ public class AiAnalysePollingService {
         this.tagRepository = tagRepository;
         this.taskExecutor = taskExecutor;
         this.noteResourceSyncService = noteResourceSyncService;
+        this.persistingToolCallAdvisor = persistingToolCallAdvisor;
     }
 
     /**
@@ -217,20 +222,28 @@ public class AiAnalysePollingService {
                     safe(title, note.getSourceUrl()),
                     userQuestion
             );
-            ChatPersistenceContextHolder.set(userId, chatInit.sessionUuid(), chatInit.userMessageUuid());
         }
+        AiAnalyseChatSessionService.ChatInit finalChatInit = chatInit;
+        AtomicReference<String> conversationKeyRef = new AtomicReference<>();
 
         try {
             result = failoverRouter.executeChat(
                     "ai-analyse-polling",
-                    client -> client.prompt(prompt)
-                            .call()
-                            .entity(AiAnalysePollingResult.class)
+                    client -> {
+                        ChatClient.ChatClientRequestSpec spec = client.prompt(prompt);
+                        if (finalChatInit != null) {
+                            String conversationKey = UUID.randomUUID().toString();
+                            conversationKeyRef.set(conversationKey);
+                            spec = spec.advisors(a -> a
+                                    .param(PersistingToolCallAdvisor.CTX_CONVERSATION_KEY, conversationKey)
+                                    .param(PersistingToolCallAdvisor.CTX_USER_ID, userId)
+                                    .param(PersistingToolCallAdvisor.CTX_SESSION_UUID, finalChatInit.sessionUuid())
+                                    .param(PersistingToolCallAdvisor.CTX_PARENT_UUID, finalChatInit.userMessageUuid()));
+                        }
+                        return spec.call().entity(AiAnalysePollingResult.class);
+                    }
             );
         } catch (RuntimeException e) {
-            if (chatInit != null) {
-                ChatPersistenceContextHolder.clear();
-            }
             // todo 失败重试
             log.warn("AI analyse failed, skip write: noteUuid={}, url={}, err={}",
                     noteUuid, note.getSourceUrl(), e.getClass().getSimpleName());
@@ -249,9 +262,8 @@ public class AiAnalysePollingService {
 
         // 落库对话（assistant reply）
         if (chatInit != null) {
-            UUID parentUuid = ChatPersistenceContextHolder.getParentUuid();
+            UUID parentUuid = persistingToolCallAdvisor.getCurrentParentUuid(conversationKeyRef.get());
             chatSessionService.saveAssistantReply(chatInit.sessionUuid(), userId, parentUuid, result.answer());
-            ChatPersistenceContextHolder.clear();
         }
     }
 
