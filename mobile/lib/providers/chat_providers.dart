@@ -600,15 +600,32 @@ class GlobalAiSessionController extends _$GlobalAiSessionController {
 
 // 发送状态
 
+/// 直播中的一个块。一轮回复按到达顺序拆成文本/工具调用/A2UI 卡片的块序列，
+/// 每块独立渲染——语义上对应持久化后的 TEXT/TOOL_CALL+TOOL_RESULT/A2UI
+/// 消息，但这里只是过渡态，不落库。
+@freezed
+sealed class ChatLiveBlock with _$ChatLiveBlock {
+  const factory ChatLiveBlock.text(String content) = ChatLiveTextBlock;
+
+  const factory ChatLiveBlock.toolCall({
+    required String toolCallId,
+    required String toolName,
+    required bool done,
+  }) = ChatLiveToolCallBlock;
+
+  /// [chunks] 是这张卡片已到达的 A2UI 消息 JSON 分片，按到达顺序累积。
+  const factory ChatLiveBlock.a2ui(List<String> chunks) = ChatLiveA2uiBlock;
+}
+
 /// 消息发送状态，描述当前会话的 SSE 流状态。
 @freezed
 sealed class ChatSendState with _$ChatSendState {
   /// 空闲，无发送中的请求。
   const factory ChatSendState.idle() = ChatSendIdle;
 
-  /// 流式接收中，[content] 为目前已累积的助手回复文本（用于实时预览）。
+  /// 流式接收中，[blocks] 为目前已到达的块序列（用于实时预览）。
   const factory ChatSendState.streaming({
-    required String content,
+    required List<ChatLiveBlock> blocks,
     required String pendingUserMessage,
   }) = ChatSendStreaming;
 
@@ -651,7 +668,7 @@ class ChatSend extends _$ChatSend {
     _activeCancelToken = CancelToken();
     _activeRequestId = _newRequestId();
     state = ChatSendState.streaming(
-      content: '',
+      blocks: const [],
       pendingUserMessage: pendingUserMessage,
     );
   }
@@ -698,15 +715,57 @@ class ChatSend extends _$ChatSend {
     required String errorLogLabel,
     Future<void> Function()? onDone,
   }) async {
-    final buffer = StringBuffer();
+    final blocks = <ChatLiveBlock>[];
+
+    void emitBlocks() {
+      state = ChatSendState.streaming(
+        blocks: List.unmodifiable(blocks),
+        pendingUserMessage: pendingUserMessage,
+      );
+    }
+
     await for (final event in stream) {
       switch (event) {
         case ChatDeltaEvent(:final delta):
-          buffer.write(delta);
-          state = ChatSendState.streaming(
-            content: buffer.toString(),
-            pendingUserMessage: pendingUserMessage,
+          final last = blocks.isEmpty ? null : blocks.last;
+          if (last is ChatLiveTextBlock) {
+            blocks[blocks.length - 1] = ChatLiveBlock.text(
+              last.content + delta,
+            );
+          } else {
+            blocks.add(ChatLiveBlock.text(delta));
+          }
+          emitBlocks();
+        case ChatToolCallStartEvent(:final toolCallId, :final toolName):
+          blocks.add(
+            ChatLiveBlock.toolCall(
+              toolCallId: toolCallId,
+              toolName: toolName,
+              done: false,
+            ),
           );
+          emitBlocks();
+        case ChatToolCallEndEvent(:final toolCallId):
+          final index = blocks.indexWhere(
+            (b) => b is ChatLiveToolCallBlock && b.toolCallId == toolCallId,
+          );
+          if (index != -1) {
+            blocks[index] = (blocks[index] as ChatLiveToolCallBlock).copyWith(
+              done: true,
+            );
+            emitBlocks();
+          }
+        case ChatA2uiChunkEvent(:final json):
+          final last = blocks.isEmpty ? null : blocks.last;
+          if (last is ChatLiveA2uiBlock) {
+            blocks[blocks.length - 1] = ChatLiveBlock.a2ui([
+              ...last.chunks,
+              json,
+            ]);
+          } else {
+            blocks.add(ChatLiveBlock.a2ui([json]));
+          }
+          emitBlocks();
         case ChatDoneEvent(:final messageUuid, requestId: final eventRequestId):
           final handled = await _handleTerminalEvent(
             service: service,

@@ -55,7 +55,7 @@ List<ChatListItem> buildChatListItems({
     if (sendState.pendingUserMessage.isNotEmpty) {
       items.add(ChatListPendingUserItem(sendState.pendingUserMessage));
     }
-    items.add(ChatListStreamingItem(sendState.content));
+    items.add(ChatListStreamingItem(sendState.blocks));
   }
 
   if (sendState is ChatSendError) {

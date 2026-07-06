@@ -34,6 +34,10 @@ class RoutePaths {
   static const String genuiDemoChatBlockSequence =
       '/genui-demo/chat-block-sequence';
 
+  /// 聊天直播态块序列 mock 预览页面
+  static const String genuiDemoChatStreamingMock =
+      '/genui-demo/chat-streaming-mock';
+
   /// 平台账号管理
   static const String platformAccounts = '/settings/platform-accounts';
 

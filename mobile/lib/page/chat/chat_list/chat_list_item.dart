@@ -1,4 +1,5 @@
 import 'package:pocketmind/model/chat_message.dart';
+import 'package:pocketmind/providers/chat_providers.dart' show ChatLiveBlock;
 
 /// 聊天列表项基类（仅描述数据，不包含 UI 组件）。
 sealed class ChatListItem {
@@ -38,11 +39,12 @@ class ChatListPendingUserItem extends ChatListItem {
   const ChatListPendingUserItem(this.content);
 }
 
-/// 流式回复占位。
+/// 流式回复占位：一轮回复还在直播的块序列（文本+工具进度+A2UI 卡片，
+/// 按到达顺序追加）。
 class ChatListStreamingItem extends ChatListItem {
-  final String content;
+  final List<ChatLiveBlock> blocks;
 
-  const ChatListStreamingItem(this.content);
+  const ChatListStreamingItem(this.blocks);
 }
 
 /// 列表尾部错误提示。

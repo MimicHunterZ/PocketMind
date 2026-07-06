@@ -131,8 +131,8 @@ class _ChatMessageListState extends ConsumerState<ChatMessageList> {
         );
       case ChatListPendingUserItem(:final content):
         return ChatPendingUserBubble(content: content, colors: widget.colors);
-      case ChatListStreamingItem(:final content):
-        return ChatStreamingBubble(content: content, colors: widget.colors);
+      case ChatListStreamingItem(:final blocks):
+        return ChatStreamingBubble(blocks: blocks, colors: widget.colors);
       case ChatListErrorItem():
         return Padding(
           padding: EdgeInsets.symmetric(vertical: 8.h),

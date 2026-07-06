@@ -186,6 +186,29 @@ final class ChatPausedEvent extends ChatStreamEvent {
   const ChatPausedEvent({this.requestId, this.messageUuid});
 }
 
+/// 工具调用开始（event: tool_call_start）。仅用于直播期间的过渡提示，
+/// 不落库——工具调用的最终记录以流结束后同步的 TOOL_CALL/TOOL_RESULT
+/// 消息为准。
+final class ChatToolCallStartEvent extends ChatStreamEvent {
+  final String toolCallId;
+  final String toolName;
+  const ChatToolCallStartEvent(this.toolCallId, this.toolName);
+}
+
+/// 工具调用结束（event: tool_call_end）。
+final class ChatToolCallEndEvent extends ChatStreamEvent {
+  final String toolCallId;
+  const ChatToolCallEndEvent(this.toolCallId);
+}
+
+/// 一条 A2UI v0.9 消息分片（event: a2ui_chunk），[json] 为
+/// `createSurface`/`updateComponents`/`updateDataModel`/`deleteSurface`
+/// 之一的原始 JSON 字符串。
+final class ChatA2uiChunkEvent extends ChatStreamEvent {
+  final String json;
+  const ChatA2uiChunkEvent(this.json);
+}
+
 /// 错误事件（event: error）
 final class ChatErrorEvent extends ChatStreamEvent {
   final String message;

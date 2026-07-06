@@ -40,6 +40,13 @@ class GenUiDemoHubPage extends StatelessWidget {
             icon: Icons.view_agenda_outlined,
             onTap: () => context.push(RoutePaths.genuiDemoChatBlockSequence),
           ),
+          const SizedBox(height: 12),
+          _DemoEntryCard(
+            title: '聊天直播态 Mock 预览',
+            subtitle: '真实发送流程接固定剧本,验证文本/工具进度/A2UI 卡片逐步直播出现',
+            icon: Icons.podcasts_outlined,
+            onTap: () => context.push(RoutePaths.genuiDemoChatStreamingMock),
+          ),
         ],
       ),
     );
