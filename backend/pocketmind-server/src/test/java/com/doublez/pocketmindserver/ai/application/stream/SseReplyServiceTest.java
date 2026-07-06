@@ -60,6 +60,7 @@ class SseReplyServiceTest {
                 100L,
                 UUID.randomUUID(),
                 UUID.randomUUID(),
+                UUID.randomUUID(),
                 (String) null,
                 "assistant content"
         );

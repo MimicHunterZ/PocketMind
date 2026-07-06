@@ -131,7 +131,7 @@ public class SseReplyService {
         Mono<AgUiEvent> terminalEvent = Mono.<AgUiEvent>fromCallable(() -> {
             if (cancelled.get()) {
                 return handlePausedTerminal(
-                        userId, sessionUuid, assistantMsgUuid, conversationKeyRef.get(), accumulator, effectiveRequestId);
+                        userId, sessionUuid, userMsgUuid, assistantMsgUuid, conversationKeyRef.get(), accumulator, effectiveRequestId);
             }
             return handleDoneTerminal(
                     userId,
@@ -232,6 +232,7 @@ public class SseReplyService {
 
     private AgUiEvent handlePausedTerminal(long userId,
                                            UUID sessionUuid,
+                                           UUID userMsgUuid,
                                            UUID assistantMsgUuid,
                                            String conversationKey,
                                            StringBuilder accumulator,
@@ -239,7 +240,7 @@ public class SseReplyService {
         String partialContent = accumulator.toString();
         UUID pausedMessageUuid = null;
         if (!partialContent.isBlank()) {
-            pausedMessageUuid = persistAssistant(userId, sessionUuid, assistantMsgUuid, conversationKey, partialContent);
+            pausedMessageUuid = persistAssistant(userId, sessionUuid, userMsgUuid, assistantMsgUuid, conversationKey, partialContent);
             log.info("AI 流式回复暂停并保存部分内容: userId={}, sessionUuid={}, assistantMsgUuid={}",
                     userId, sessionUuid, pausedMessageUuid);
         } else {
@@ -259,7 +260,7 @@ public class SseReplyService {
                                          StringBuilder accumulator,
                                          String requestId) {
         String fullContent = accumulator.toString();
-        persistAssistant(userId, sessionUuid, assistantMsgUuid, conversationKey, fullContent);
+        persistAssistant(userId, sessionUuid, userMsgUuid, assistantMsgUuid, conversationKey, fullContent);
 
         log.info("AI 流式回复完成: userId={}, sessionUuid={}, assistantMsgUuid={}",
                 userId, sessionUuid, assistantMsgUuid);
@@ -275,22 +276,24 @@ public class SseReplyService {
     }
 
     /**
-     * 落库这轮的 assistant 回复。parentUuid 优先接在这轮工具调用链的落库尾部
-     * （若这轮没有工具调用，advisor 里查不到 key，退回用户消息作为父节点）。
+     * 落库这轮的 assistant 回复。parentUuid 优先接在这轮工具调用链的落库尾部；
+     * 若这轮没有工具调用（advisor 里查不到链尾），退回用户消息作为父节点。
      */
     private UUID persistAssistant(long userId,
                                   UUID sessionUuid,
+                                  UUID userMsgUuid,
                                   UUID assistantMsgUuid,
                                   String conversationKey,
                                   String content) {
         UUID toolChainTail = conversationKey == null
                 ? null
                 : persistingToolCallAdvisor.getCurrentParentUuid(conversationKey);
+        UUID parentUuid = toolChainTail != null ? toolChainTail : userMsgUuid;
         ChatMessageEntity assistantMsg = ChatMessageEntity.create(
                 assistantMsgUuid,
                 userId,
                 sessionUuid,
-                toolChainTail,
+                parentUuid,
                 ChatRole.ASSISTANT,
                 content,
                 List.of());
