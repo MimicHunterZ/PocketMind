@@ -1,6 +1,8 @@
 package com.doublez.pocketmindserver.ai.application.stream;
 
+import com.doublez.pocketmindserver.agui.AgUiEventEncoder;
 import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
+import com.doublez.pocketmindserver.ai.context.PersistingToolCallAdvisor;
 import com.doublez.pocketmindserver.ai.tool.skill.TenantSkillToolResolver;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
 import com.doublez.pocketmindserver.memory.application.MemoryToolSet;
@@ -43,12 +45,13 @@ class SseReplyServiceTest {
                 aiFailoverRouter,
                 chatMessageRepository,
                 new ChatStreamCancellationManager(),
-                new ChatSseEventFactory(new com.fasterxml.jackson.databind.ObjectMapper()),
+                new ChatSseEventFactory(new AgUiEventEncoder(new com.fasterxml.jackson.databind.ObjectMapper())),
                 tenantSkillToolResolver,
                 chatTranscriptResourceSyncService,
                 memoryToolSetFactory,
                 null,
-                resourceToolSetFactory
+                resourceToolSetFactory,
+                new PersistingToolCallAdvisor(chatMessageRepository, new com.fasterxml.jackson.databind.ObjectMapper())
         );
 
         UUID result = ReflectionTestUtils.invokeMethod(
@@ -57,6 +60,7 @@ class SseReplyServiceTest {
                 100L,
                 UUID.randomUUID(),
                 UUID.randomUUID(),
+                (String) null,
                 "assistant content"
         );
 

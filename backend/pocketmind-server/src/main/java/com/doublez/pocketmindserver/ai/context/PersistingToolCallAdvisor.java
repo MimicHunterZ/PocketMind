@@ -1,5 +1,6 @@
 package com.doublez.pocketmindserver.ai.context;
 
+import com.doublez.pocketmindserver.agui.AgUiEvent;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
@@ -17,6 +18,7 @@ import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.core.Ordered;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Sinks;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,7 +28,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * 观察工具调用循环的每一轮请求，把新增的 tool_call/tool_result 落库为 chat_messages。
+ * 观察工具调用循环的每一轮请求，把新增的 tool_call/tool_result 落库为 chat_messages，
+ * 并（若调用方挂载了事件 sink）实时发出对应的 AG-UI 工具事件供 SSE 转发。
  *
  * 挂在自动注册的 ToolCallingAdvisor（order = HIGHEST_PRECEDENCE + 300）之后，是 Spring AI 2.0
  * 官方推荐的"循环内观察者"写法：同一个 advisor 同时实现 CallAdvisor/StreamAdvisor，天然覆盖
@@ -37,6 +40,10 @@ import java.util.concurrent.ConcurrentMap;
  * 否则视为无需落库的场景（比如没有会话上下文的一次性调用），直接放行不做任何事。
  * 用请求级 context map 而不是 ThreadLocal，是因为 .stream() 的回调可能跑在别的线程上，
  * ThreadLocal 过不去；context map 随 ChatClientRequest 本身流转，没有这个问题。
+ *
+ * 事件粒度上的已知简化：框架托管的工具调用循环只在"整轮工具调用+结果都已产生"之后才把
+ * 增量历史交给这个 advisor，拿不到参数级的中间 chunk，所以 TOOL_CALL_START/END 几乎是背靠背
+ * 发出的，不发 TOOL_CALL_ARGS。需要参数级进度的话，要切到用户托管的手动聚合循环。
  */
 @Slf4j
 public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
@@ -45,6 +52,7 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
     public static final String CTX_USER_ID = "pm.persist.userId";
     public static final String CTX_SESSION_UUID = "pm.persist.sessionUuid";
     public static final String CTX_PARENT_UUID = "pm.persist.parentUuid";
+    public static final String CTX_EVENT_SINK = "pm.persist.eventSink";
 
     private static final int MAX_TRACKED_CONVERSATIONS = 200;
 
@@ -106,8 +114,11 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
             parentUuid = (UUID) ctx.get(CTX_PARENT_UUID);
         }
 
+        @SuppressWarnings("unchecked")
+        Sinks.Many<AgUiEvent> eventSink = (Sinks.Many<AgUiEvent>) ctx.get(CTX_EVENT_SINK);
+
         List<Message> delta = instructions.subList(lastSize, instructions.size());
-        parentUuid = persistMessages(userId, sessionUuid, parentUuid, delta);
+        parentUuid = persistMessages(userId, sessionUuid, parentUuid, delta, eventSink);
 
         persistedSizes.put(conversationKey, instructions.size());
         tailParentUuids.put(conversationKey, parentUuid);
@@ -126,7 +137,8 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
         }
     }
 
-    private UUID persistMessages(long userId, UUID sessionUuid, UUID parentUuid, List<Message> messages) {
+    private UUID persistMessages(long userId, UUID sessionUuid, UUID parentUuid, List<Message> messages,
+                                 Sinks.Many<AgUiEvent> eventSink) {
         for (Message message : messages) {
             if (message == null) {
                 continue;
@@ -142,6 +154,8 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
                             uuid, userId, sessionUuid, parentUuid, "TOOL_CALL", ChatRole.TOOL_CALL, toToolCallJson(call));
                     chatMessageRepository.save(entity);
                     parentUuid = uuid;
+                    emit(eventSink, new AgUiEvent.ToolCallStart(call.id(), call.name()));
+                    emit(eventSink, new AgUiEvent.ToolCallEnd(call.id()));
                 }
                 continue;
             }
@@ -153,10 +167,24 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
                             uuid, userId, sessionUuid, parentUuid, "TOOL_RESULT", ChatRole.TOOL_RESULT, toToolResultJson(resp));
                     chatMessageRepository.save(entity);
                     parentUuid = uuid;
+                    emit(eventSink, new AgUiEvent.ToolCallResult(uuid.toString(), resp.id(), toContentString(resp.responseData())));
                 }
             }
         }
         return parentUuid;
+    }
+
+    private void emit(Sinks.Many<AgUiEvent> eventSink, AgUiEvent event) {
+        if (eventSink != null) {
+            eventSink.tryEmitNext(event);
+        }
+    }
+
+    private String toContentString(Object responseData) {
+        if (responseData instanceof String s) {
+            return s;
+        }
+        return writeJson(responseData);
     }
 
     private String toToolCallJson(AssistantMessage.ToolCall call) {

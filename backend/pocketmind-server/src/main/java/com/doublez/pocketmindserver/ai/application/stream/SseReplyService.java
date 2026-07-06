@@ -1,5 +1,6 @@
 package com.doublez.pocketmindserver.ai.application.stream;
 
+import com.doublez.pocketmindserver.agui.AgUiEvent;
 import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
 import com.doublez.pocketmindserver.ai.context.PersistingToolCallAdvisor;
 import com.doublez.pocketmindserver.ai.tool.skill.TenantSkillToolResolver;
@@ -22,6 +23,7 @@ import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 
 import java.util.ArrayList;
@@ -30,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 聊天 SSE 回复服务。
@@ -49,6 +52,7 @@ public class SseReplyService {
     private final MemoryToolSet.MemoryToolSetFactory memoryToolSetFactory;
     private final SessionCommitService sessionCommitService;
     private final ResourceToolSet.ResourceToolSetFactory resourceToolSetFactory;
+    private final PersistingToolCallAdvisor persistingToolCallAdvisor;
 
     @Value("classpath:prompts/chat/branch_alias_system.md")
     private Resource branchAliasSystemTemplate;
@@ -64,7 +68,8 @@ public class SseReplyService {
                            ChatTranscriptResourceSyncService chatTranscriptResourceSyncService,
                            MemoryToolSet.MemoryToolSetFactory memoryToolSetFactory,
                            SessionCommitService sessionCommitService,
-                           ResourceToolSet.ResourceToolSetFactory resourceToolSetFactory) {
+                           ResourceToolSet.ResourceToolSetFactory resourceToolSetFactory,
+                           PersistingToolCallAdvisor persistingToolCallAdvisor) {
         this.aiFailoverRouter = aiFailoverRouter;
         this.chatMessageRepository = chatMessageRepository;
         this.chatStreamCancellationManager = chatStreamCancellationManager;
@@ -74,6 +79,7 @@ public class SseReplyService {
         this.memoryToolSetFactory = memoryToolSetFactory;
         this.sessionCommitService = sessionCommitService;
         this.resourceToolSetFactory = resourceToolSetFactory;
+        this.persistingToolCallAdvisor = persistingToolCallAdvisor;
     }
 
     public Flux<ServerSentEvent<String>> streamReply(long userId,
@@ -97,17 +103,42 @@ public class SseReplyService {
                 })
                 .then();
 
+        UUID assistantMsgUuid = UUID.randomUUID();
         StringBuilder accumulator = new StringBuilder();
-        Flux<String> contentFlux = buildContentFlux(systemText, userId, sessionUuid, userMsgUuid, historyMessages, userPrompt);
+        Sinks.Many<AgUiEvent> toolEventSink = Sinks.many().multicast().onBackpressureBuffer();
+        AtomicReference<String> conversationKeyRef = new AtomicReference<>();
 
-        Mono<ServerSentEvent<String>> terminalEvent = Mono.fromCallable(() -> {
+        Flux<String> contentFlux = buildContentFlux(
+                systemText, userId, sessionUuid, userMsgUuid, historyMessages, userPrompt,
+                toolEventSink, conversationKeyRef);
+
+        Flux<AgUiEvent> textEvents = contentFlux
+                .doOnNext(accumulator::append)
+                // contentFlux 完成时（正常结束/异常/取消）工具事件不会再有新的一轮，
+                // 主动关闭 sink，否则下面的 merge 会因为 sink 永不 complete 而永远等下去。
+                .doFinally(signal -> toolEventSink.tryEmitComplete())
+                .map(delta -> new AgUiEvent.TextMessageContent(assistantMsgUuid.toString(), delta));
+
+        Flux<AgUiEvent> liveEvents = Flux.merge(textEvents, toolEventSink.asFlux())
+                .takeUntilOther(cancelSignal);
+
+        Flux<AgUiEvent> preamble = Flux.just(
+                new AgUiEvent.RunStarted(sessionUuid.toString(), effectiveRequestId),
+                new AgUiEvent.TextMessageStart(assistantMsgUuid.toString()));
+
+        Mono<AgUiEvent> textEnd = Mono.just(new AgUiEvent.TextMessageEnd(assistantMsgUuid.toString()));
+
+        Mono<AgUiEvent> terminalEvent = Mono.<AgUiEvent>fromCallable(() -> {
             if (cancelled.get()) {
-                return handlePausedTerminal(userId, sessionUuid, userMsgUuid, accumulator, effectiveRequestId);
+                return handlePausedTerminal(
+                        userId, sessionUuid, assistantMsgUuid, conversationKeyRef.get(), accumulator, effectiveRequestId);
             }
             return handleDoneTerminal(
                     userId,
                     sessionUuid,
                     userMsgUuid,
+                    assistantMsgUuid,
+                    conversationKeyRef.get(),
                     userPrompt,
                     historyMessages,
                     isFork,
@@ -116,20 +147,15 @@ public class SseReplyService {
             );
         }).subscribeOn(Schedulers.boundedElastic());
 
-        return contentFlux
-                .takeUntilOther(cancelSignal)
-                .map(delta -> {
-                    accumulator.append(delta);
-                    return chatSseEventFactory.delta(delta);
-                })
-                .concatWith(terminalEvent)
+        return Flux.concat(preamble, liveEvents, textEnd, terminalEvent)
+                .map(chatSseEventFactory::encode)
                 .onErrorResume(e -> {
                     if (cancelled.get()) {
                         return Flux.just(chatSseEventFactory.paused(effectiveRequestId, null));
                     }
                     log.error("AI 流式回复异常: userId={}, sessionUuid={}", userId, sessionUuid, e);
                     // 安全修复：不向前端透传详细异常栈，避免内部凭证/路径泄露，仅返回通用错误提示
-                    return Flux.just(chatSseEventFactory.error(effectiveRequestId, "AI服务异常_ERR_500"));
+                    return Flux.just(chatSseEventFactory.runError("AI服务异常_ERR_500"));
                 })
                 .doFinally(signalType -> chatStreamCancellationManager.cleanup(streamKey));
     }
@@ -149,7 +175,9 @@ public class SseReplyService {
                                           UUID sessionUuid,
                                           UUID userMsgUuid,
                                           List<Message> historyMessages,
-                                          String userPrompt) {
+                                          String userPrompt,
+                                          Sinks.Many<AgUiEvent> toolEventSink,
+                                          AtomicReference<String> conversationKeyRef) {
         TenantSkillToolResolver.ResolvedTenantSkillTool resolvedSkillTool =
                 tenantSkillToolResolver.resolveForUser(userId, "chat-stream");
 
@@ -172,18 +200,22 @@ public class SseReplyService {
         return aiFailoverRouter.executeChatStream(
                 "streamReply",
                 client -> {
+                    // 每次实际调用（含 AiFailoverRouter 的重试/降级）都生成新 key，
+                    // 落库观察者据此按会话增量落库 TOOL_CALL/TOOL_RESULT、实时发工具事件。
+                    String conversationKey = UUID.randomUUID().toString();
+                    conversationKeyRef.set(conversationKey);
+
                     ChatClient.ChatClientRequestSpec requestSpec = client.prompt()
                             .toolContext(resolvedSkillTool.toolContext())
                             .system(systemText)
                             .messages(historyMessages.toArray(new Message[0]))
                             .user(userPrompt)
-                            // 每次实际调用（含 AiFailoverRouter 的重试/降级）都生成新 key，
-                            // 落库观察者据此按会话增量落库 TOOL_CALL/TOOL_RESULT。
                             .advisors(a -> a
-                                    .param(PersistingToolCallAdvisor.CTX_CONVERSATION_KEY, UUID.randomUUID().toString())
+                                    .param(PersistingToolCallAdvisor.CTX_CONVERSATION_KEY, conversationKey)
                                     .param(PersistingToolCallAdvisor.CTX_USER_ID, userId)
                                     .param(PersistingToolCallAdvisor.CTX_SESSION_UUID, sessionUuid)
-                                    .param(PersistingToolCallAdvisor.CTX_PARENT_UUID, userMsgUuid));
+                                    .param(PersistingToolCallAdvisor.CTX_PARENT_UUID, userMsgUuid)
+                                    .param(PersistingToolCallAdvisor.CTX_EVENT_SINK, toolEventSink));
 
                     // 注入所有合并后的工具
                     if (!allCallbacks.isEmpty()) {
@@ -198,33 +230,36 @@ public class SseReplyService {
         );
     }
 
-    private ServerSentEvent<String> handlePausedTerminal(long userId,
-                                                         UUID sessionUuid,
-                                                         UUID userMsgUuid,
-                                                         StringBuilder accumulator,
-                                                         String requestId) {
+    private AgUiEvent handlePausedTerminal(long userId,
+                                           UUID sessionUuid,
+                                           UUID assistantMsgUuid,
+                                           String conversationKey,
+                                           StringBuilder accumulator,
+                                           String requestId) {
         String partialContent = accumulator.toString();
         UUID pausedMessageUuid = null;
         if (!partialContent.isBlank()) {
-            pausedMessageUuid = persistAssistant(userId, sessionUuid, userMsgUuid, partialContent);
+            pausedMessageUuid = persistAssistant(userId, sessionUuid, assistantMsgUuid, conversationKey, partialContent);
             log.info("AI 流式回复暂停并保存部分内容: userId={}, sessionUuid={}, assistantMsgUuid={}",
                     userId, sessionUuid, pausedMessageUuid);
         } else {
             log.info("AI 流式回复暂停（无可保存增量）: userId={}, sessionUuid={}", userId, sessionUuid);
         }
-        return chatSseEventFactory.paused(requestId, pausedMessageUuid);
+        return chatSseEventFactory.pausedEvent(requestId, pausedMessageUuid);
     }
 
-    private ServerSentEvent<String> handleDoneTerminal(long userId,
-                                                       UUID sessionUuid,
-                                                       UUID userMsgUuid,
-                                                       String userPrompt,
-                                                       List<Message> historyMessages,
-                                                       boolean isFork,
-                                                       StringBuilder accumulator,
-                                                       String requestId) {
+    private AgUiEvent handleDoneTerminal(long userId,
+                                         UUID sessionUuid,
+                                         UUID userMsgUuid,
+                                         UUID assistantMsgUuid,
+                                         String conversationKey,
+                                         String userPrompt,
+                                         List<Message> historyMessages,
+                                         boolean isFork,
+                                         StringBuilder accumulator,
+                                         String requestId) {
         String fullContent = accumulator.toString();
-        UUID assistantMsgUuid = persistAssistant(userId, sessionUuid, userMsgUuid, fullContent);
+        persistAssistant(userId, sessionUuid, assistantMsgUuid, conversationKey, fullContent);
 
         log.info("AI 流式回复完成: userId={}, sessionUuid={}, assistantMsgUuid={}",
                 userId, sessionUuid, assistantMsgUuid);
@@ -236,19 +271,26 @@ public class SseReplyService {
         // 异步触发会话提交：生成阶段摘要 + 记忆抽取
         triggerSessionCommitAsync(userId, sessionUuid);
 
-        return chatSseEventFactory.done(requestId, assistantMsgUuid);
+        return new AgUiEvent.RunFinished(sessionUuid.toString(), requestId);
     }
 
+    /**
+     * 落库这轮的 assistant 回复。parentUuid 优先接在这轮工具调用链的落库尾部
+     * （若这轮没有工具调用，advisor 里查不到 key，退回用户消息作为父节点）。
+     */
     private UUID persistAssistant(long userId,
                                   UUID sessionUuid,
-                                  UUID userMsgUuid,
+                                  UUID assistantMsgUuid,
+                                  String conversationKey,
                                   String content) {
-        UUID assistantMsgUuid = UUID.randomUUID();
+        UUID toolChainTail = conversationKey == null
+                ? null
+                : persistingToolCallAdvisor.getCurrentParentUuid(conversationKey);
         ChatMessageEntity assistantMsg = ChatMessageEntity.create(
                 assistantMsgUuid,
                 userId,
                 sessionUuid,
-                userMsgUuid,
+                toolChainTail,
                 ChatRole.ASSISTANT,
                 content,
                 List.of());

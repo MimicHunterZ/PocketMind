@@ -78,7 +78,7 @@ class AiChatServicePauseTest {
         tenantSkillToolResolver = mock(TenantSkillToolResolver.class);
         chatStreamCancellationManager = new ChatStreamCancellationManager();
         objectMapper = new ObjectMapper();
-        chatSseEventFactory = new ChatSseEventFactory(objectMapper);
+        chatSseEventFactory = new ChatSseEventFactory(new com.doublez.pocketmindserver.agui.AgUiEventEncoder(objectMapper));
         var intentAnalyzer = mock(com.doublez.pocketmindserver.ai.application.retrieval.IntentAnalyzer.class);
         var retrievalOrchestrator = mock(com.doublez.pocketmindserver.ai.application.retrieval.RetrievalOrchestrator.class);
         // 全局对话路径需要 IntentAnalyzer 和 RetrievalOrchestrator 返回有效值
@@ -124,7 +124,8 @@ class AiChatServicePauseTest {
                 new com.doublez.pocketmindserver.memory.application.MemoryToolSet.MemoryToolSetFactory(
                         new InMemoryMemoryRecordRepository()),
                 null,  // SessionCommitService — 单元测试不触发会话提交
-                resourceToolSetFactory
+                resourceToolSetFactory,
+                new com.doublez.pocketmindserver.ai.context.PersistingToolCallAdvisor(chatMessageRepository, objectMapper)
         );
 
         when(tenantSkillToolResolver.resolveForUser(anyLong(), anyString()))
@@ -175,15 +176,17 @@ class AiChatServicePauseTest {
                 .subscribe(events::add);
 
         llmSink.tryEmitNext("部分回答");
-        waitUntil(() -> hasEvent(events, "delta"), 2000);
+        waitUntil(() -> hasEvent(events, "TEXT_MESSAGE_CONTENT"), 2000);
 
         aiChatService.stopReply(userId, sessionUuid, requestId);
-        waitUntil(() -> hasEvent(events, "paused"), 2000);
+        waitUntil(() -> hasEvent(events, "CUSTOM"), 2000);
 
-        ServerSentEvent<String> paused = findEvent(events, "paused");
+        ServerSentEvent<String> paused = findEvent(events, "CUSTOM");
         assertNotNull(paused);
         @SuppressWarnings("unchecked")
-        Map<String, Object> payload = objectMapper.readValue(paused.data(), Map.class);
+        Map<String, Object> customEvent = objectMapper.readValue(paused.data(), Map.class);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = (Map<String, Object>) customEvent.get("value");
         assertEquals(requestId, payload.get("requestId"));
         assertTrue(payload.containsKey("messageUuid"));
         assertNotNull(payload.get("messageUuid"));
@@ -223,12 +226,14 @@ class AiChatServicePauseTest {
                 .subscribe(events::add);
 
         aiChatService.stopReply(userId, sessionUuid, requestId);
-        waitUntil(() -> hasEvent(events, "paused"), 2000);
+        waitUntil(() -> hasEvent(events, "CUSTOM"), 2000);
 
-        ServerSentEvent<String> paused = findEvent(events, "paused");
+        ServerSentEvent<String> paused = findEvent(events, "CUSTOM");
         assertNotNull(paused);
         @SuppressWarnings("unchecked")
-        Map<String, Object> payload = objectMapper.readValue(paused.data(), Map.class);
+        Map<String, Object> customEvent = objectMapper.readValue(paused.data(), Map.class);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = (Map<String, Object>) customEvent.get("value");
         assertEquals(requestId, payload.get("requestId"));
         assertFalse(payload.containsKey("messageUuid"));
 

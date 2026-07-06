@@ -1,74 +1,47 @@
 package com.doublez.pocketmindserver.ai.application.stream;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.doublez.pocketmindserver.agui.AgUiEvent;
+import com.doublez.pocketmindserver.agui.AgUiEventEncoder;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 /**
- * 聊天 SSE 事件构造器。
+ * 聊天场景下 AG-UI 事件的构造入口：把会话/消息/工具调用等聊天业务数据，
+ * 转换成 {@link AgUiEvent}，再交给协议层的 {@link AgUiEventEncoder} 编码成 SSE 帧。
  *
- * 统一负责 payload 序列化和标准事件帧构建，避免手写 JSON 与重复样板代码。
+ * 事件"长什么样、怎么序列化"是 {@code agui} 包的知识，这里只负责"聊天场景该发哪个事件"。
  */
 @Component("streamChatSseEventFactory")
 public class ChatSseEventFactory {
 
-    private final ObjectMapper objectMapper;
+    private final AgUiEventEncoder encoder;
 
-    public ChatSseEventFactory(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    public ChatSseEventFactory(AgUiEventEncoder encoder) {
+        this.encoder = encoder;
     }
 
-    public ServerSentEvent<String> delta(String delta) {
-        return ServerSentEvent.<String>builder()
-                .event("delta")
-                .data(delta)
-                .build();
+    public ServerSentEvent<String> encode(AgUiEvent event) {
+        return encoder.encode(event);
     }
 
-    public ServerSentEvent<String> done(String requestId, UUID messageUuid) {
-        return event("done", Map.of(
-                "messageUuid", messageUuid.toString(),
-                "requestId", requestId
-        ));
+    public ServerSentEvent<String> runError(String message) {
+        return encode(new AgUiEvent.RunError(message));
     }
 
+    /** 用户主动打断生成：AG-UI 词汇里没有对应事件，走 CUSTOM。 */
     public ServerSentEvent<String> paused(String requestId, UUID messageUuid) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("requestId", requestId);
-        if (messageUuid != null) {
-            payload.put("messageUuid", messageUuid.toString());
-        }
-        return event("paused", payload);
+        return encode(pausedEvent(requestId, messageUuid));
     }
 
-    public ServerSentEvent<String> error(String message) {
-        return event("error", Map.of("message", message));
+    public AgUiEvent pausedEvent(String requestId, UUID messageUuid) {
+        return new AgUiEvent.Custom("chat.paused", new PausedPayload(requestId,
+                messageUuid == null ? null : messageUuid.toString()));
     }
 
-    public ServerSentEvent<String> error(String requestId, String message) {
-        return event("error", Map.of(
-                "requestId", requestId,
-                "message", message
-        ));
-    }
-
-    public ServerSentEvent<String> event(String eventName, Map<String, Object> payload) {
-        return ServerSentEvent.<String>builder()
-                .event(eventName)
-                .data(toJson(payload))
-                .build();
-    }
-
-    private String toJson(Map<String, Object> payload) {
-        try {
-            return objectMapper.writeValueAsString(payload);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("SSE 负载序列化失败", e);
-        }
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private record PausedPayload(String requestId, String messageUuid) {
     }
 }

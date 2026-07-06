@@ -75,7 +75,7 @@ class AiChatServiceTest {
     @BeforeEach
     void setUp() throws Exception {
         chatStreamCancellationManager = new ChatStreamCancellationManager();
-        chatSseEventFactory = new ChatSseEventFactory(new ObjectMapper());
+        chatSseEventFactory = new ChatSseEventFactory(new com.doublez.pocketmindserver.agui.AgUiEventEncoder(new ObjectMapper()));
         userSettingService = org.mockito.Mockito.mock(UserSettingService.class);
         lenient().when(userSettingService.getActivePersonaPrompt(anyLong())).thenReturn("");
         intentAnalyzer = mock(IntentAnalyzer.class);
@@ -120,7 +120,8 @@ class AiChatServiceTest {
                 new com.doublez.pocketmindserver.memory.application.MemoryToolSet.MemoryToolSetFactory(
                         new InMemoryMemoryRecordRepository()),
                 null,  // SessionCommitService — 单元测试不触发会话提交
-                resourceToolSetFactory
+                resourceToolSetFactory,
+                new com.doublez.pocketmindserver.ai.context.PersistingToolCallAdvisor(chatMessageRepository, new ObjectMapper())
         );
         service = new AiChatService(
                 chatSessionRepository,
