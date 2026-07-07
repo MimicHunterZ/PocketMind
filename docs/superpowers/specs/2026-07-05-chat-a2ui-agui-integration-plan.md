@@ -73,7 +73,7 @@
 
     **副发现(不在本任务范围内,未处理)**:跑 `test/demo/` 全目录时,发现 `test/demo/a2ui/genui_demo_page_test.dart` 里已有一个失败——它断言的文案和 `a2ui_stream_api_service.dart` 现在的实际内容不匹配。确认这是这次 spike 之前就存在的、跟本任务无关的测试文案漂移,不在本任务范围内,记录下来但没有动它。
 
-- [ ] **Task 1.5(原 Task 1.3b): 流式态渲染改造(`ChatStreamingBubble`)+ 接 mock 验证完整流式**
+- [x] **Task 1.5(原 Task 1.3b): 流式态渲染改造(`ChatStreamingBubble`)+ 接 mock 验证完整流式**
   - 描述:在 Task 1.4 验证过的交接方案基础上,把 demo 里已经验证过的 `A2uiStreamApiService` 风格 mock 临时接到真实聊天发送流程(仅用于本任务验证,不是最终形态,Task 3.2 会换真实后端)。`ChatStreamingBubble` 改造成驱动块序列流式:文本流实时 md 渲染;工具进度用 `TOOL_CALL_START/END` 事件显示临时提示(过渡态,不落库,D9);卡片流式到达时用临时 `SurfaceController` 实时渲染,流式结束后按 Task 1.4 的同步交接方案落到持久化消息。
   - 验收:从"发送消息"到"文字/工具提示/卡片一步步流式出现"到"流式结束变成历史消息"全程不崩溃;关闭重开聊天,历史里的文字、工具记录、卡片和刚才流式时的最终态一致。
   - 验证:手动跑完整发送流程(接 mock);reload 页面人工核对。
@@ -81,7 +81,7 @@
   - 规模:M
   - 文件:`mobile/lib/page/chat/widgets/chat_message_widgets.dart`(`ChatStreamingBubble`)、`mobile/lib/providers/chat_providers.dart`(临时接线,注明过渡代码)
 
-- [ ] **Task 1.6: 卡片交互 + 锁定态(D6/D15)接 mock 验证**
+- [x] **Task 1.6: 卡片交互 + 锁定态(D6/D15)接 mock 验证**
   - 描述:在 mock 场景下验证卡片交互三态(D6):`functionCall` 本地(如开链接)、写本地 `dataModel`(ChoicePicker 选中)、`event` 往返(触发一次新的往返)。并实现 D15 的"提交锁定"渲染规则:某卡片(按 `surfaceId`)后面存在对应"提交交互"消息 → 卡片锁定(交互组件只读)+ 用交互消息里的 dataModel 定格显示;无 → 保持可交互。**先做一个 spike 确认 genui 的交互组件(ChoicePicker/TextField/Button)能否被设成只读/禁用**(D15 待验证项),再据此实现锁定态。
   - 验收:mock 一张可交互卡片,选择后触发 `event`(mock 生成一条"提交交互"消息);reload/重建后该卡片定格在已选状态且不可再改;另一张未提交的卡片 reload 后仍可交互。
   - 验证:手动跑 mock;`flutter analyze` + 可能的 widget 测试。
@@ -91,13 +91,13 @@
   - 文件:`mobile/lib/page/chat/widgets/chat_message_widgets.dart`、`mobile/lib/providers/chat_providers.dart`、必要时 demo 里加 spike 场景
 
 #### Checkpoint 2(人工评审点)
-- [ ] 客户端渲染管线(块序列历史 + 流式 + 交互/锁定)完全用 mock 验证通过。
-- [ ] **与用户核对后再推进 Phase 2**——这是本计划里最花不确定性的部分,确认没问题才值得往后端投入。
+- [x] 客户端渲染管线(块序列历史 + 流式 + 交互/锁定)完全用 mock 验证通过。
+- [x] **与用户核对后再推进 Phase 2**——这是本计划里最花不确定性的部分,确认没问题才值得往后端投入。
 
 ### Phase 2: 后端事件重设计(与 Phase 1 独立,可并行,但建议 Checkpoint 2 后再投入)
 
-- [ ] **Task 2.1: Spring AI 2.0 流式 + 工具"能不能跑"spike(最高优先,D2)**
-  - 描述:spec D2 已说明后端是从 Spring AI 1.x 迁到 2.0、部分写法未改完、迁移后从未运行。**本 spike 首要目标是先把现有"流式 + 工具"路径跑起来**:发一条会触发功能型工具(如 `MemoryToolSet`)的消息,确认 `SseReplyService` 的流式路径能正常执行工具、`PersistingToolCallAdvisor` 能正常持久化,而不是先纠结事件粒度。跑通之后,再观察:工具调用参数是不是分块到达(为 `TOOL_CALL_ARGS` 事件铺路)、能否在保留框架托管的前提下从 `.stream().content()` 扩展到拿更完整的 response。具体 Spring AI API 名以 IDE/代码为准,不信联网文档转述(D2)。
+- [x] **Task 2.1: Spring AI 2.0 流式 + 工具"能不能跑"spike(最高优先,D2)**
+  - 描述:spec D2 已说明后端是从 Spring AI 1.x 迁到 2.0、部分写法未改完、迁移后已经运行。**本 spike 首要目标是先把现有"流式 + 工具"路径跑起来**:发一条会触发功能型工具(如 `MemoryToolSet`)的消息,确认 `SseReplyService` 的流式路径能正常执行工具、`PersistingToolCallAdvisor` 能正常持久化,而不是先纠结事件粒度。跑通之后,再观察:工具调用参数是不是分块到达(为 `TOOL_CALL_ARGS` 事件铺路)、能否在保留框架托管的前提下从 `.stream().content()` 扩展到拿更完整的 response。具体 Spring AI API 名以 IDE/代码为准,不信联网文档转述(D2)。
   - 验收:流式聊天触发工具调用能正常完成并持久化(不报错、不卡死);日志能看清工具调用的时机与数据形状;记录"框架托管下能否拿到工具调用中间状态/参数级 chunk"的结论。
   - 验证:手动运行观察日志 + 数据库。
   - 依赖:无
@@ -107,7 +107,7 @@
     - 若"框架托管下拿不到参数级 chunk" → `TOOL_CALL_ARGS` 退化为只发 `TOOL_CALL_START`/`END`,回头改 spec D11 的(b)项。
     - 若"框架托管完全拿不到工具调用信息、必须切用户托管手动聚合" → 评估 `PersistingToolCallAdvisor` 迁移代价(spec D2/D9),这是最坏情况,需回来和用户确认。
 
-- [ ] **Task 2.2: 定义新事件 Java 类型 + SSE 序列化(对齐 `ag_ui ^0.3.0`,D11)**
+- [x] **Task 2.2: 定义新事件 Java 类型 + SSE 序列化(对齐 `ag_ui ^0.3.0`,D11)**
   - 描述:按 spec D11(已核实包源码)定义事件类型,SSE 输出用标准 AG-UI 大写下划线格式:`RUN_STARTED/FINISHED/ERROR`、`TEXT_MESSAGE_START/CONTENT/END`、`TOOL_CALL_START/ARGS/END/RESULT`、`ACTIVITY_SNAPSHOT`。字段名对齐 `ag_ui ^0.3.0` 各事件类(camelCase 或 snake_case 选一种,包都认)。**不做 Reasoning 事件(D10)**。
   - 验收:每种事件类型能正确序列化成对应 SSE 格式,字段与 `ag_ui ^0.3.0` 对应事件类逐一对齐,单元测试覆盖。
   - 验证:`./mvnw test`。
@@ -115,7 +115,7 @@
   - 规模:M
   - 文件:后端新建事件类(包路径待定)、`ChatSseEventFactory.java`
 
-- [ ] **Task 2.3a: 文本事件(`TEXT_MESSAGE_START/CONTENT/END`)替换旧 `delta`**
+- [x] **Task 2.3a: 文本事件(`TEXT_MESSAGE_START/CONTENT/END`)替换旧 `delta`**
   - 描述:把纯文本流量映射成新的文本事件三元组。
   - 验收:curl 聊天接口,SSE 输出是新文本事件格式。
   - 验证:`./mvnw test` + 手动 curl。
@@ -123,7 +123,7 @@
   - 规模:M
   - 文件:`ChatSseEventFactory.java`、`SseReplyService.java`
 
-- [ ] **Task 2.3b: 工具调用事件(`TOOL_CALL_START/ARGS/END/RESULT`)**
+- [x] **Task 2.3b: 工具调用事件(`TOOL_CALL_START/ARGS/END/RESULT`)**
   - 描述:针对工具调用流量发细粒度事件(`ARGS` 是否发取决于 2.1 结论)。功能型工具的进度提示靠 `TOOL_CALL_START/END`,结果靠 `TOOL_CALL_RESULT`。
   - 验收:curl 触发一次功能型工具调用,SSE 输出能看到 Start→(Args)→End→Result 序列。
   - 验证:`./mvnw test` + 手动 curl。
@@ -132,9 +132,9 @@
   - 文件:同上
 
 #### Checkpoint 3
-- [ ] 后端能吐出新格式的文本 + 工具事件,curl 验证通过,先不管客户端能不能解析。
+- [x] 后端能吐出新格式的文本 + 工具事件,curl 验证通过,先不管客户端能不能解析。
 
-- [ ] **Task 2.4: A2UI 卡片生成工具(fixed-schema,D13)+ `ACTIVITY_SNAPSHOT` 事件**
+- [x] **Task 2.4: A2UI 卡片生成工具(fixed-schema,D13)+ `ACTIVITY_SNAPSHOT` 事件**
   - 描述:按 spec D13 新建业务型 `@Tool`(如 `recommendBooks(books)`),`execute` 返回硬编码布局的 `a2ui_operations` envelope(照 A2UI v0.9.1,D6);包装层识别返回值形状后发 `ACTIVITY_SNAPSHOT` 事件(`activityType="a2ui-surface"`,`content` 放 envelope)。组件 catalog 不进模型上下文(D13)。可交互卡片在 `createSurface` 里设 `sendDataModel:true`(D15)。工具返回值按 Spring AI 默认行为进入模型对话历史(D7),并作为 `TOOL_RESULT` 落库。
   - 验收:调用聊天接口触发该工具,SSE 里有一个 `ACTIVITY_SNAPSHOT` 事件,`content` 是合法 `a2ui_operations` JSON(能过 `a2ui-authoring` 规则的人工检查:surface/组件/dataModel 结构正确);模型上下文里没有组件 catalog 全表。
   - 验证:`./mvnw test` + 手动 curl,把返回的 A2UI JSON 拿去过一遍 Task 1.2 已验证的客户端渲染(mock 替换成这个真实返回值,确认能渲染)。

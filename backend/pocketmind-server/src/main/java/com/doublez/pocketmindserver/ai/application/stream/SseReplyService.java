@@ -1,6 +1,7 @@
 package com.doublez.pocketmindserver.ai.application.stream;
 
 import com.doublez.pocketmindserver.agui.AgUiEvent;
+import com.doublez.pocketmindserver.ai.application.tool.A2uiChoiceCardToolSet;
 import com.doublez.pocketmindserver.ai.config.AiFailoverRouter;
 import com.doublez.pocketmindserver.ai.context.PersistingToolCallAdvisor;
 import com.doublez.pocketmindserver.ai.tool.skill.TenantSkillToolResolver;
@@ -52,6 +53,7 @@ public class SseReplyService {
     private final MemoryToolSet.MemoryToolSetFactory memoryToolSetFactory;
     private final SessionCommitService sessionCommitService;
     private final ResourceToolSet.ResourceToolSetFactory resourceToolSetFactory;
+    private final A2uiChoiceCardToolSet.A2uiChoiceCardToolSetFactory a2uiChoiceCardToolSetFactory;
     private final PersistingToolCallAdvisor persistingToolCallAdvisor;
 
     @Value("classpath:prompts/chat/branch_alias_system.md")
@@ -69,6 +71,7 @@ public class SseReplyService {
                            MemoryToolSet.MemoryToolSetFactory memoryToolSetFactory,
                            SessionCommitService sessionCommitService,
                            ResourceToolSet.ResourceToolSetFactory resourceToolSetFactory,
+                           A2uiChoiceCardToolSet.A2uiChoiceCardToolSetFactory a2uiChoiceCardToolSetFactory,
                            PersistingToolCallAdvisor persistingToolCallAdvisor) {
         this.aiFailoverRouter = aiFailoverRouter;
         this.chatMessageRepository = chatMessageRepository;
@@ -79,6 +82,7 @@ public class SseReplyService {
         this.memoryToolSetFactory = memoryToolSetFactory;
         this.sessionCommitService = sessionCommitService;
         this.resourceToolSetFactory = resourceToolSetFactory;
+        this.a2uiChoiceCardToolSetFactory = a2uiChoiceCardToolSetFactory;
         this.persistingToolCallAdvisor = persistingToolCallAdvisor;
     }
 
@@ -189,9 +193,14 @@ public class SseReplyService {
         ResourceToolSet resourceToolSet = resourceToolSetFactory.createForUser(userId);
         ToolCallback[] resourceCallbacks = resourceToolSet.toToolCallbacks();
 
+        // 构建请求级 A2UI 卡片渲染工具
+        A2uiChoiceCardToolSet a2uiChoiceCardToolSet = a2uiChoiceCardToolSetFactory.createForUser(userId);
+        ToolCallback[] a2uiChoiceCardCallbacks = a2uiChoiceCardToolSet.toToolCallbacks();
+
         List<ToolCallback> allCallbacks = new ArrayList<>();
         allCallbacks.addAll(Arrays.asList(memoryCallbacks));
         allCallbacks.addAll(Arrays.asList(resourceCallbacks));
+        allCallbacks.addAll(Arrays.asList(a2uiChoiceCardCallbacks));
 
         if (resolvedSkillTool.skillCallback() != null) {
             allCallbacks.addAll(Arrays.asList(resolvedSkillTool.skillCallback()));

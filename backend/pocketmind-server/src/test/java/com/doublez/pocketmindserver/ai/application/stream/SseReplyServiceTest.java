@@ -51,6 +51,8 @@ class SseReplyServiceTest {
                 memoryToolSetFactory,
                 null,
                 resourceToolSetFactory,
+                new com.doublez.pocketmindserver.ai.application.tool.A2uiChoiceCardToolSet.A2uiChoiceCardToolSetFactory(
+                        new com.fasterxml.jackson.databind.ObjectMapper()),
                 new PersistingToolCallAdvisor(chatMessageRepository, new com.fasterxml.jackson.databind.ObjectMapper())
         );
 

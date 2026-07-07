@@ -23,6 +23,7 @@ import reactor.core.publisher.Sinks;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -55,6 +56,10 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
     public static final String CTX_EVENT_SINK = "pm.persist.eventSink";
 
     private static final int MAX_TRACKED_CONVERSATIONS = 200;
+
+    /** A2UI 消息里"恰好一个"的顶层动作键，跟 genui 客户端做的强制校验对齐。 */
+    private static final Set<String> A2UI_ACTION_KEYS =
+            Set.of("createSurface", "updateComponents", "updateDataModel", "deleteSurface");
 
     private final ChatMessageRepository chatMessageRepository;
     private final ObjectMapper objectMapper;
@@ -163,11 +168,19 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
             if (message.getMessageType() == MessageType.TOOL && message instanceof ToolResponseMessage toolResponseMessage) {
                 for (ToolResponseMessage.ToolResponse resp : toolResponseMessage.getResponses()) {
                     UUID uuid = UUID.randomUUID();
+                    // 落库内容跟事件类型无关：不管这次结果要不要发 ACTIVITY_SNAPSHOT，
+                    // 都只存这一条 TOOL_RESULT，content 是工具的完整原始返回值。
                     ChatMessageEntity entity = ChatMessageEntity.createTool(
                             uuid, userId, sessionUuid, parentUuid, "TOOL_RESULT", ChatRole.TOOL_RESULT, toToolResultJson(resp));
                     chatMessageRepository.save(entity);
                     parentUuid = uuid;
-                    emit(eventSink, new AgUiEvent.ToolCallResult(uuid.toString(), resp.id(), toContentString(resp.responseData())));
+
+                    Object a2uiEnvelope = tryParseA2uiEnvelope(resp.responseData());
+                    if (a2uiEnvelope != null) {
+                        emit(eventSink, new AgUiEvent.ActivitySnapshot(uuid.toString(), "a2ui-surface", a2uiEnvelope));
+                    } else {
+                        emit(eventSink, new AgUiEvent.ToolCallResult(uuid.toString(), resp.id(), toContentString(resp.responseData())));
+                    }
                 }
             }
         }
@@ -185,6 +198,48 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
             return s;
         }
         return writeJson(responseData);
+    }
+
+    /**
+     * 判断工具的原始返回值是不是一张 A2UI 卡片（而非普通工具的文本结果）。
+     * 只做轻量校验：能解析成 JSON，且每条消息都带 version=v0.9 和恰好一个
+     * 顶层动作键——这是 genui 客户端严格校验的最小子集，够用来区分卡片工具
+     * 和普通工具，不需要照抄客户端完整的组件 schema 校验。
+     *
+     * <p>兼容单条消息（Map）和多条消息组成的数组（List）两种落地形状：
+     * 一张完整卡片通常要 createSurface + updateComponents 两条消息才能显示
+     * 内容，卡片工具会把它们打包成数组一起返回。
+     */
+    private Object tryParseA2uiEnvelope(String responseData) {
+        if (responseData == null || responseData.isBlank()) {
+            return null;
+        }
+        Object json;
+        try {
+            json = objectMapper.readValue(responseData, Object.class);
+        } catch (Exception e) {
+            return null;
+        }
+        if (json instanceof List<?> messages) {
+            if (!messages.isEmpty() && messages.stream().allMatch(this::isA2uiMessage)) {
+                return json;
+            }
+            return null;
+        }
+        return isA2uiMessage(json) ? json : null;
+    }
+
+    private boolean isA2uiMessage(Object json) {
+        if (!(json instanceof Map<?, ?> map)) {
+            return false;
+        }
+        if (!"v0.9".equals(map.get("version"))) {
+            return false;
+        }
+        long actionKeyCount = map.keySet().stream()
+                .filter(A2UI_ACTION_KEYS::contains)
+                .count();
+        return actionKeyCount == 1;
     }
 
     private String toToolCallJson(AssistantMessage.ToolCall call) {

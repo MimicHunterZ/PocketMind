@@ -125,6 +125,7 @@ class AiChatServicePauseTest {
                         new InMemoryMemoryRecordRepository()),
                 null,  // SessionCommitService — 单元测试不触发会话提交
                 resourceToolSetFactory,
+                new com.doublez.pocketmindserver.ai.application.tool.A2uiChoiceCardToolSet.A2uiChoiceCardToolSetFactory(objectMapper),
                 new com.doublez.pocketmindserver.ai.context.PersistingToolCallAdvisor(chatMessageRepository, objectMapper)
         );
 

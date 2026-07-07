@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.codec.ServerSentEvent;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AgUiEventTest {
@@ -74,6 +76,28 @@ class AgUiEventTest {
                 .containsEntry("name", "chat.paused")
                 .containsKey("value");
         assertThat(event.toJson().get("value")).isNull();
+    }
+
+    @Test
+    void activitySnapshot_defaultsReplaceToTrue() {
+        var event = new AgUiEvent.ActivitySnapshot("msg-3", "a2ui-surface", Map.of("version", "v0.9"));
+
+        assertThat(event.type()).isEqualTo("ACTIVITY_SNAPSHOT");
+        assertThat(event.toJson())
+                .containsEntry("messageId", "msg-3")
+                .containsEntry("activityType", "a2ui-surface")
+                .containsEntry("content", Map.of("version", "v0.9"))
+                .containsEntry("replace", true);
+    }
+
+    @Test
+    void activitySnapshot_keepsContentKeyPresentEvenWhenNull() {
+        var event = new AgUiEvent.ActivitySnapshot("msg-4", "a2ui-surface", null, false);
+
+        assertThat(event.toJson())
+                .containsKey("content")
+                .containsEntry("replace", false);
+        assertThat(event.toJson().get("content")).isNull();
     }
 
     @Test

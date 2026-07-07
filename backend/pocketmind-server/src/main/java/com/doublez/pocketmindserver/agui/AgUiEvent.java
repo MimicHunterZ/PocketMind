@@ -205,6 +205,33 @@ public sealed interface AgUiEvent {
     }
 
     // ------------------------------------------------------------------
+    // 活动事件：工具执行结果不是普通文本、而是要交给前端某种专用渲染器处理的
+    // 结构化内容（如 A2UI 卡片）时用这个事件，取代 ToolCallResult——渲染器
+    // 消费的是 content 里的结构化数据本身，不是"工具返回了什么文本"这个语义。
+    // ------------------------------------------------------------------
+
+    record ActivitySnapshot(String messageId, String activityType, Object content, boolean replace) implements AgUiEvent {
+        public ActivitySnapshot(String messageId, String activityType, Object content) {
+            this(messageId, activityType, content, true);
+        }
+
+        @Override
+        public String type() {
+            return "ACTIVITY_SNAPSHOT";
+        }
+
+        @Override
+        public Map<String, Object> fields() {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("messageId", messageId);
+            m.put("activityType", activityType);
+            m.put("content", content);
+            m.put("replace", replace);
+            return m;
+        }
+    }
+
+    // ------------------------------------------------------------------
     // 兜底事件：协议词汇里没有对应事件的场景（如用户主动打断生成）走这里，
     // 而不是发明一个不在 AG-UI 词汇表里的自定义事件名。
     // ------------------------------------------------------------------
