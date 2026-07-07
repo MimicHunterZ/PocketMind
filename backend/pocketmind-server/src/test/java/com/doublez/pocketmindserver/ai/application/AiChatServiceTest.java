@@ -15,6 +15,7 @@ import com.doublez.pocketmindserver.ai.tool.skill.TenantSkillToolResolver;
 import com.doublez.pocketmindserver.attachment.domain.vision.AttachmentVisionRepository;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageEntity;
 import com.doublez.pocketmindserver.chat.domain.message.ChatMessageRepository;
+import com.doublez.pocketmindserver.chat.domain.message.ChatMessageType;
 import com.doublez.pocketmindserver.chat.domain.message.ChatRole;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionEntity;
 import com.doublez.pocketmindserver.chat.domain.session.ChatSessionRepository;
@@ -129,7 +130,8 @@ class AiChatServiceTest {
                 chatMessageRepository,
                 contextAssembler,
                 sseReplyService,
-                chatTranscriptResourceSyncService);
+                chatTranscriptResourceSyncService,
+                new ObjectMapper());
         lenient().when(tenantSkillToolResolver.resolveForUser(anyLong(), anyString()))
                 .thenReturn(new TenantSkillToolResolver.ResolvedTenantSkillTool(
                         "user-100",
@@ -403,6 +405,87 @@ class AiChatServiceTest {
             service.updateBranchAlias(USER_ID, ASSISTANT_MSG_UUID, "  branch name  ");
 
             verify(chatMessageRepository).updateBranchAlias(ASSISTANT_MSG_UUID, USER_ID, "branch name");
+        }
+    }
+
+    @Nested
+    class ToSpringAiMessagesTest {
+
+        @Test
+        void toolCallAndResult_rebuildAsAssistantToolCallsPlusToolResponse() {
+            UUID userUuid = UUID.randomUUID();
+            UUID callUuid = UUID.randomUUID();
+            UUID resultUuid = UUID.randomUUID();
+            List<ChatMessageEntity> history = List.of(
+                    makeUser(userUuid, null),
+                    ChatMessageEntity.createTool(callUuid, USER_ID, SESSION_UUID, userUuid,
+                            "TOOL_CALL", ChatRole.TOOL_CALL,
+                            "{\"toolCallId\":\"call-1\",\"type\":\"function\",\"name\":\"searchMemories\",\"arguments\":\"{}\"}"),
+                    ChatMessageEntity.createTool(resultUuid, USER_ID, SESSION_UUID, callUuid,
+                            "TOOL_RESULT", ChatRole.TOOL_RESULT,
+                            "{\"toolCallId\":\"call-1\",\"name\":\"searchMemories\",\"result\":\"未找到相关记忆。\"}")
+            );
+
+            List<org.springframework.ai.chat.messages.Message> messages = service.toSpringAiMessages(history);
+
+            assertEquals(3, messages.size());
+            assertInstanceOf(org.springframework.ai.chat.messages.UserMessage.class, messages.get(0));
+            var assistant = (org.springframework.ai.chat.messages.AssistantMessage) messages.get(1);
+            assertEquals(1, assistant.getToolCalls().size());
+            assertEquals("call-1", assistant.getToolCalls().get(0).id());
+            assertEquals("searchMemories", assistant.getToolCalls().get(0).name());
+            var toolResponse = (org.springframework.ai.chat.messages.ToolResponseMessage) messages.get(2);
+            assertEquals(1, toolResponse.getResponses().size());
+            assertEquals("call-1", toolResponse.getResponses().get(0).id());
+            assertEquals("未找到相关记忆。", toolResponse.getResponses().get(0).responseData());
+        }
+
+        @Test
+        void multipleToolCallsInSameTurn_groupIntoOneAssistantAndOneToolResponse() {
+            UUID userUuid = UUID.randomUUID();
+            UUID call1 = UUID.randomUUID();
+            UUID call2 = UUID.randomUUID();
+            UUID result1 = UUID.randomUUID();
+            UUID result2 = UUID.randomUUID();
+            List<ChatMessageEntity> history = List.of(
+                    makeUser(userUuid, null),
+                    ChatMessageEntity.createTool(call1, USER_ID, SESSION_UUID, userUuid,
+                            "TOOL_CALL", ChatRole.TOOL_CALL,
+                            "{\"toolCallId\":\"call-1\",\"type\":\"function\",\"name\":\"a\",\"arguments\":\"{}\"}"),
+                    ChatMessageEntity.createTool(call2, USER_ID, SESSION_UUID, call1,
+                            "TOOL_CALL", ChatRole.TOOL_CALL,
+                            "{\"toolCallId\":\"call-2\",\"type\":\"function\",\"name\":\"b\",\"arguments\":\"{}\"}"),
+                    ChatMessageEntity.createTool(result1, USER_ID, SESSION_UUID, call2,
+                            "TOOL_RESULT", ChatRole.TOOL_RESULT,
+                            "{\"toolCallId\":\"call-1\",\"name\":\"a\",\"result\":\"结果一\"}"),
+                    ChatMessageEntity.createTool(result2, USER_ID, SESSION_UUID, result1,
+                            "TOOL_RESULT", ChatRole.TOOL_RESULT,
+                            "{\"toolCallId\":\"call-2\",\"name\":\"b\",\"result\":\"结果二\"}")
+            );
+
+            List<org.springframework.ai.chat.messages.Message> messages = service.toSpringAiMessages(history);
+
+            assertEquals(3, messages.size());
+            var assistant = (org.springframework.ai.chat.messages.AssistantMessage) messages.get(1);
+            assertEquals(2, assistant.getToolCalls().size());
+            var toolResponse = (org.springframework.ai.chat.messages.ToolResponseMessage) messages.get(2);
+            assertEquals(2, toolResponse.getResponses().size());
+        }
+
+        @Test
+        void textOnlyHistory_unaffected() {
+            UUID userUuid = UUID.randomUUID();
+            UUID assistantUuid = UUID.randomUUID();
+            List<ChatMessageEntity> history = List.of(
+                    makeUser(userUuid, null),
+                    makeAssistant(assistantUuid, userUuid)
+            );
+
+            List<org.springframework.ai.chat.messages.Message> messages = service.toSpringAiMessages(history);
+
+            assertEquals(2, messages.size());
+            assertInstanceOf(org.springframework.ai.chat.messages.UserMessage.class, messages.get(0));
+            assertInstanceOf(org.springframework.ai.chat.messages.AssistantMessage.class, messages.get(1));
         }
     }
 

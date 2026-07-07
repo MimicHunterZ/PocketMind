@@ -21,6 +21,7 @@ import reactor.core.publisher.Sinks;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -80,6 +81,40 @@ class PersistingToolCallAdvisorTest {
         var snapshot = (AgUiEvent.ActivitySnapshot) emitted.get(2);
         assertThat(snapshot.activityType()).isEqualTo("a2ui-surface");
         assertThat(snapshot.content()).isInstanceOf(List.class);
+    }
+
+    @Test
+    void knownHistoricalToolCallId_isSkippedNotPersistedAgain() {
+        List<AgUiEvent> emitted = new ArrayList<>();
+        Sinks.Many<AgUiEvent> sink = Sinks.many().multicast().onBackpressureBuffer();
+        sink.asFlux().subscribe(emitted::add);
+
+        UserMessage userMessage = new UserMessage("刚才选的是哪个？");
+        AssistantMessage historicalCall = AssistantMessage.builder()
+                .content("")
+                .toolCalls(List.of(new AssistantMessage.ToolCall("call-1", "function", "searchMemories", "{}")))
+                .build();
+        ToolResponseMessage historicalResult = ToolResponseMessage.builder()
+                .responses(List.of(new ToolResponseMessage.ToolResponse("call-1", "searchMemories", "上次的结果")))
+                .build();
+
+        List<Message> instructions = List.of(userMessage, historicalCall, historicalResult);
+        Map<String, Object> context = Map.of(
+                PersistingToolCallAdvisor.CTX_CONVERSATION_KEY, "conv-2",
+                PersistingToolCallAdvisor.CTX_USER_ID, 42L,
+                PersistingToolCallAdvisor.CTX_SESSION_UUID, UUID.randomUUID(),
+                PersistingToolCallAdvisor.CTX_EVENT_SINK, sink,
+                PersistingToolCallAdvisor.CTX_KNOWN_TOOL_CALL_IDS, Set.of("call-1")
+        );
+        ChatClientRequest request = new ChatClientRequest(new Prompt(instructions), context);
+
+        CallAdvisorChain chain = Mockito.mock(CallAdvisorChain.class);
+        Mockito.when(chain.nextCall(Mockito.any())).thenReturn(Mockito.mock(ChatClientResponse.class));
+
+        advisor.adviseCall(request, chain);
+
+        Mockito.verify(chatMessageRepository, Mockito.never()).save(Mockito.any());
+        assertThat(emitted).isEmpty();
     }
 
     private void adviseWithToolResponse(Sinks.Many<AgUiEvent> sink, String toolName, String responseData) {

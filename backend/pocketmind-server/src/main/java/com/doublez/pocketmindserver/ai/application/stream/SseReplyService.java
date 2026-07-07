@@ -15,6 +15,7 @@ import com.doublez.pocketmindserver.resource.application.tool.ResourceToolSet;
 import com.doublez.pocketmindserver.shared.util.PromptBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.tool.ToolCallback;
@@ -31,9 +32,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 聊天 SSE 回复服务。
@@ -206,6 +210,15 @@ public class SseReplyService {
             allCallbacks.addAll(Arrays.asList(resolvedSkillTool.skillCallback()));
         }
 
+        // 跨轮读回的历史里已经落过库的 toolCallId：这次请求发起前就存在，
+        // 遇到时告诉落库观察者跳过，不要把历史工具调用当成这一轮新产生的重新落库。
+        Set<String> knownToolCallIds = historyMessages.stream()
+                .filter(AssistantMessage.class::isInstance)
+                .map(AssistantMessage.class::cast)
+                .flatMap(m -> m.getToolCalls() == null ? Stream.<AssistantMessage.ToolCall>empty() : m.getToolCalls().stream())
+                .map(AssistantMessage.ToolCall::id)
+                .collect(Collectors.toSet());
+
         return aiFailoverRouter.executeChatStream(
                 "streamReply",
                 client -> {
@@ -224,7 +237,8 @@ public class SseReplyService {
                                     .param(PersistingToolCallAdvisor.CTX_USER_ID, userId)
                                     .param(PersistingToolCallAdvisor.CTX_SESSION_UUID, sessionUuid)
                                     .param(PersistingToolCallAdvisor.CTX_PARENT_UUID, userMsgUuid)
-                                    .param(PersistingToolCallAdvisor.CTX_EVENT_SINK, toolEventSink));
+                                    .param(PersistingToolCallAdvisor.CTX_EVENT_SINK, toolEventSink)
+                                    .param(PersistingToolCallAdvisor.CTX_KNOWN_TOOL_CALL_IDS, knownToolCallIds));
 
                     // 注入所有合并后的工具
                     if (!allCallbacks.isEmpty()) {

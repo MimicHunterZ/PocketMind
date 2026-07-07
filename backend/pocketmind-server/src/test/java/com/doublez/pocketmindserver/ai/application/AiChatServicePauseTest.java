@@ -142,7 +142,8 @@ class AiChatServicePauseTest {
                 chatMessageRepository,
             contextAssembler,
             sseReplyService,
-            chatTranscriptResourceSyncService
+            chatTranscriptResourceSyncService,
+            objectMapper
         );
 
         ReflectionTestUtils.setField(

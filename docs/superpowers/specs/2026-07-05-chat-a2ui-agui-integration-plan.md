@@ -142,7 +142,7 @@
   - 规模:M
   - 文件:后端新建工具类
 
-- [ ] **Task 2.5: 持久化核对(D9/D15 后端侧)**
+- [x] **Task 2.5: 持久化核对(D9/D15 后端侧)**
   - 描述:(a) 核对 A2UI 卡片工具的 `TOOL_RESULT` content 存的是完整 A2UI JSON,且不会重复落库(D9:卡片就是那条 tool_result,没有第二条)。(b) 卡片交互提交请求(带 `sendDataModel` metadata 的完整 dataModel)作为一条新 USER 侧消息落库,`parentUuid` 挂在卡片消息之后(D15);后端**不改写**已落库的卡片消息。
   - 验收:触发一次卡片生成 + 一次模拟交互提交,数据库里:卡片是一条 `TOOL_RESULT`(A2UI JSON);交互是一条新消息(dataModel JSON);卡片消息未被改写。
   - 验证:`./mvnw test` + 手动 curl + 查库。
@@ -150,7 +150,7 @@
   - 规模:M
   - 文件:`PersistingToolCallAdvisor.java`、SSE/交互接收接口
 
-- [ ] **Task 2.6: 修复跨轮工具历史丢失(D12)**
+- [x] **Task 2.6: 修复跨轮工具历史丢失(D12)**
   - 描述:改 `AiChatService.toSpringAiMessages`(或等价历史加载逻辑),把 `TOOL_CALL`/`TOOL_RESULT`(含 A2UI 卡片的 tool_result)按 Spring AI 的 `AssistantMessage`(带 toolCalls)+ `ToolResponseMessage` 形状重建喂回模型,让工具历史跨轮连续。注意 `toolCallId` 配对(否则 OpenAI 兼容网关报 400)、与 `PersistingPruningToolCallAdvisor` 裁剪的 token 预算交互(spec D12 风险项)。
   - 验收:先调一次功能型工具,下一轮追问"刚才那个结果里的 X",模型能基于上一轮工具结果回答(不重新调工具、不答不上)。
   - 验证:`./mvnw test` + 手动多轮 curl。
@@ -159,7 +159,7 @@
   - 文件:`AiChatService.java`
 
 #### Checkpoint 4
-- [ ] 后端新事件管线完整跑通,curl 能验证文本、工具、A2UI 卡片;卡片/交互/跨轮历史持久化正确。
+- [x] 后端新事件管线完整跑通,curl 能验证文本、工具、A2UI 卡片;卡片/交互/跨轮历史持久化正确。
 
 ### Phase 3: 打通客户端和后端
 

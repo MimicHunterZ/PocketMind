@@ -13,15 +13,19 @@ import com.doublez.pocketmindserver.resource.application.ChatTranscriptResourceS
 import com.doublez.pocketmindserver.shared.domain.PageQuery;
 import com.doublez.pocketmind.common.web.ApiCode;
 import com.doublez.pocketmind.common.web.BusinessException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -39,18 +43,21 @@ public class AiChatService {
     private final ContextAssembler contextAssembler;
     private final SseReplyService sseReplyService;
     private final ChatTranscriptResourceSyncService chatTranscriptResourceSyncService;
+    private final ObjectMapper objectMapper;
 
     public AiChatService(
             ChatSessionRepository chatSessionRepository,
             ChatMessageRepository chatMessageRepository,
             ContextAssembler contextAssembler,
             SseReplyService sseReplyService,
-            ChatTranscriptResourceSyncService chatTranscriptResourceSyncService) {
+            ChatTranscriptResourceSyncService chatTranscriptResourceSyncService,
+            ObjectMapper objectMapper) {
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.contextAssembler = contextAssembler;
         this.sseReplyService = sseReplyService;
         this.chatTranscriptResourceSyncService = chatTranscriptResourceSyncService;
+        this.objectMapper = objectMapper;
     }
 
     
@@ -437,21 +444,90 @@ public class AiChatService {
     
 
     /**
-     * 将领域消息列表转换为 Spring AI Message 对象列表
-     * 仅转TEXT 类型 USER/ASSISTANT 消息，跳过工具调用消息
+     * 将领域消息列表转换为 Spring AI Message 对象列表。
+     * TEXT 的 USER/ASSISTANT 消息按原样转换；连续的 TOOL_CALL/TOOL_RESULT
+     * 消息重建成 AssistantMessage(toolCalls) + ToolResponseMessage 一对，
+     * 让工具调用历史（含 A2UI 卡片的 tool_result）跨轮喂回模型。
      */
-    private List<Message> toSpringAiMessages(List<ChatMessageEntity> entities) {
-        return entities.stream()
-                .filter(e -> ChatMessageType.TEXT.getValue().equals(e.getMessageType()))
-                .filter(e -> e.getRole() == ChatRole.USER || e.getRole() == ChatRole.ASSISTANT)
-                .map(e -> {
-                    if (e.getRole() == ChatRole.USER) {
-                        return (Message) new UserMessage(e.getContent());
-                    } else {
-                        return (Message) new AssistantMessage(e.getContent());
-                    }
-                })
-                .toList();
+    // 包内可见，供单测直接验证跨轮工具历史重建逻辑
+    List<Message> toSpringAiMessages(List<ChatMessageEntity> entities) {
+        List<Message> result = new ArrayList<>();
+        List<AssistantMessage.ToolCall> pendingCalls = new ArrayList<>();
+        List<ToolResponseMessage.ToolResponse> pendingResults = new ArrayList<>();
+
+        for (ChatMessageEntity e : entities) {
+            String type = e.getMessageType();
+            if (ChatMessageType.TOOL_CALL.getValue().equals(type) && e.getRole() == ChatRole.TOOL_CALL) {
+                // 上一组的 result 已经收完，说明这是新一轮工具调用，先把上一组落到 result 里
+                if (!pendingResults.isEmpty()) {
+                    flushToolGroup(result, pendingCalls, pendingResults);
+                }
+                pendingCalls.add(parseToolCall(e));
+                continue;
+            }
+            if (ChatMessageType.TOOL_RESULT.getValue().equals(type) && e.getRole() == ChatRole.TOOL_RESULT) {
+                pendingResults.add(parseToolResult(e));
+                continue;
+            }
+            flushToolGroup(result, pendingCalls, pendingResults);
+            if (!ChatMessageType.TEXT.getValue().equals(type)) {
+                continue;
+            }
+            if (e.getRole() == ChatRole.USER) {
+                result.add(new UserMessage(e.getContent()));
+            } else if (e.getRole() == ChatRole.ASSISTANT) {
+                result.add(new AssistantMessage(e.getContent()));
+            }
+        }
+        flushToolGroup(result, pendingCalls, pendingResults);
+        return result;
+    }
+
+    /**
+     * OpenAI 兼容协议要求 assistant(tool_calls) 后必须紧跟每个 tool_call_id 对应的 TOOL 响应，
+     * 顺序错了或缺配对网关会报 400，所以两者必须一起 flush、不能只 flush 一半。
+     */
+    private void flushToolGroup(List<Message> result,
+                                 List<AssistantMessage.ToolCall> pendingCalls,
+                                 List<ToolResponseMessage.ToolResponse> pendingResults) {
+        if (pendingCalls.isEmpty() && pendingResults.isEmpty()) {
+            return;
+        }
+        if (!pendingCalls.isEmpty()) {
+            result.add(AssistantMessage.builder().content("").toolCalls(List.copyOf(pendingCalls)).build());
+        }
+        if (!pendingResults.isEmpty()) {
+            result.add(ToolResponseMessage.builder().responses(List.copyOf(pendingResults)).build());
+        }
+        pendingCalls.clear();
+        pendingResults.clear();
+    }
+
+    private AssistantMessage.ToolCall parseToolCall(ChatMessageEntity e) {
+        try {
+            JsonNode node = objectMapper.readTree(e.getContent());
+            return new AssistantMessage.ToolCall(
+                    node.path("toolCallId").asText(),
+                    node.path("type").asText("function"),
+                    node.path("name").asText(),
+                    node.path("arguments").asText(""));
+        } catch (Exception ex) {
+            log.warn("重建跨轮 TOOL_CALL 历史失败: messageUuid={}, error={}", e.getUuid(), ex.getMessage());
+            return new AssistantMessage.ToolCall(e.getUuid().toString(), "function", "unknown", "{}");
+        }
+    }
+
+    private ToolResponseMessage.ToolResponse parseToolResult(ChatMessageEntity e) {
+        try {
+            JsonNode node = objectMapper.readTree(e.getContent());
+            return new ToolResponseMessage.ToolResponse(
+                    node.path("toolCallId").asText(),
+                    node.path("name").asText(),
+                    node.path("result").asText(""));
+        } catch (Exception ex) {
+            log.warn("重建跨轮 TOOL_RESULT 历史失败: messageUuid={}, error={}", e.getUuid(), ex.getMessage());
+            return new ToolResponseMessage.ToolResponse(e.getUuid().toString(), "unknown", "");
+        }
     }
 
 }

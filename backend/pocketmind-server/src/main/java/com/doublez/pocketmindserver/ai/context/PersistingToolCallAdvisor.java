@@ -54,6 +54,8 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
     public static final String CTX_SESSION_UUID = "pm.persist.sessionUuid";
     public static final String CTX_PARENT_UUID = "pm.persist.parentUuid";
     public static final String CTX_EVENT_SINK = "pm.persist.eventSink";
+    /** 跨轮读回的历史里已经落过库的 toolCallId 集合，遇到就跳过，不重复落库/发事件。 */
+    public static final String CTX_KNOWN_TOOL_CALL_IDS = "pm.persist.knownToolCallIds";
 
     private static final int MAX_TRACKED_CONVERSATIONS = 200;
 
@@ -122,11 +124,18 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
         @SuppressWarnings("unchecked")
         Sinks.Many<AgUiEvent> eventSink = (Sinks.Many<AgUiEvent>) ctx.get(CTX_EVENT_SINK);
 
+        @SuppressWarnings("unchecked")
+        Set<String> knownToolCallIds = (Set<String>) ctx.getOrDefault(CTX_KNOWN_TOOL_CALL_IDS, Set.of());
+
         List<Message> delta = instructions.subList(lastSize, instructions.size());
-        parentUuid = persistMessages(userId, sessionUuid, parentUuid, delta, eventSink);
+        parentUuid = persistMessages(userId, sessionUuid, parentUuid, delta, eventSink, knownToolCallIds);
 
         persistedSizes.put(conversationKey, instructions.size());
-        tailParentUuids.put(conversationKey, parentUuid);
+        // parentUuid 可能全程未变（这批 delta 全是已知的历史 toolCallId，被跳过没落库），
+        // ConcurrentHashMap 不允许 null 值，只有真的往下移动过才更新链尾。
+        if (parentUuid != null) {
+            tailParentUuids.put(conversationKey, parentUuid);
+        }
         evictWhenTooManyConversations();
     }
 
@@ -143,7 +152,7 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
     }
 
     private UUID persistMessages(long userId, UUID sessionUuid, UUID parentUuid, List<Message> messages,
-                                 Sinks.Many<AgUiEvent> eventSink) {
+                                 Sinks.Many<AgUiEvent> eventSink, Set<String> knownToolCallIds) {
         for (Message message : messages) {
             if (message == null) {
                 continue;
@@ -154,6 +163,10 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
                     continue;
                 }
                 for (AssistantMessage.ToolCall call : assistant.getToolCalls()) {
+                    // 跨轮读回的历史工具调用已经落过库，混进这轮 delta 里时按 id 跳过，不重复落库/重复发事件。
+                    if (knownToolCallIds.contains(call.id())) {
+                        continue;
+                    }
                     UUID uuid = UUID.randomUUID();
                     ChatMessageEntity entity = ChatMessageEntity.createTool(
                             uuid, userId, sessionUuid, parentUuid, "TOOL_CALL", ChatRole.TOOL_CALL, toToolCallJson(call));
@@ -167,6 +180,9 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
 
             if (message.getMessageType() == MessageType.TOOL && message instanceof ToolResponseMessage toolResponseMessage) {
                 for (ToolResponseMessage.ToolResponse resp : toolResponseMessage.getResponses()) {
+                    if (knownToolCallIds.contains(resp.id())) {
+                        continue;
+                    }
                     UUID uuid = UUID.randomUUID();
                     // 落库内容跟事件类型无关：不管这次结果要不要发 ACTIVITY_SNAPSHOT，
                     // 都只存这一条 TOOL_RESULT，content 是工具的完整原始返回值。
