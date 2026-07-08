@@ -94,7 +94,9 @@ public class A2uiChoiceCardToolSet {
             String label = item.description() == null || item.description().isBlank()
                     ? item.title()
                     : item.title() + "：" + item.description();
-            options.add(Map.of("label", label, "value", "option-" + i));
+            // value 用标题本身而不是 option-N 索引：用户选完提交回来的 dataModel 会随消息
+            // 喂回模型，索引对模型无意义，标题才让模型知道用户到底选了什么（D7）。
+            options.add(Map.of("label", label, "value", item.title()));
         }
         components.add(component("picker", "ChoicePicker", Map.of(
                 "label", "请选择",

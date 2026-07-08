@@ -146,5 +146,31 @@ void main() {
       expect(byUuid['u1']!.lockedDataModel, isNull);
       expect(byUuid['a1']!.lockedDataModel, isNull);
     });
+
+    test('提交交互消息不渲染成气泡,只驱动锁定态', () {
+      final items = _messageItems([
+        _msg('u1', 'USER'),
+        _cardMsg('card1', 'surface-a'),
+        _submissionMsg('sub1', 'surface-a', {'x': 1}),
+      ]);
+      final uuids = items.map((e) => e.message.uuid).toList();
+      expect(uuids, isNot(contains('sub1')));
+      expect(uuids, containsAll(['u1', 'card1']));
+      final byUuid = {for (final item in items) item.message.uuid: item};
+      expect(byUuid['card1']!.lockedDataModel, {'x': 1});
+    });
+
+    test('提交消息不抢占 isLastUserMsg / isLastOfTurn', () {
+      final items = _messageItems([
+        _msg('u1', 'USER'),
+        _cardMsg('card1', 'surface-a'),
+        _submissionMsg('sub1', 'surface-a', {'x': 1}),
+      ]);
+      final byUuid = {for (final item in items) item.message.uuid: item};
+      // u1 仍是最后一条可编辑 USER 消息(提交消息不算)
+      expect(byUuid['u1']!.isLastUserMsg, isTrue);
+      // 卡片是这一轮最后一块可见消息(后面只剩被隐藏的提交消息)
+      expect(byUuid['card1']!.isLastOfTurn, isTrue);
+    });
   });
 }

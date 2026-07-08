@@ -46,11 +46,27 @@ class ChatMessageBubble extends ConsumerWidget {
     if (message.messageType == 'TOOL_RESULT') {
       final operations = tryParseA2uiCard(message.content);
       if (operations != null) {
+        // 优先用 preview 注入的 handler(debug 预览页写回本地假仓库);生产环境
+        // handler 为 null,退回把这次提交当作一次新的用户消息发出去——content 是
+        // {surfaceId, dataModel} JSON,后端按普通消息落库为 USER 消息并喂回模型
+        // (D15),reload 时据它推导锁定态。showPendingBubble:false 避免这条 JSON
+        // 元数据以气泡形式闪现。
+        final injected = ref.watch(a2uiCardSubmitHandlerProvider);
+        final onSubmitted =
+            injected ??
+            (String surfaceId, Map<String, dynamic> dataModel) {
+              ref
+                  .read(chatSendProvider(sessionUuid).notifier)
+                  .send(
+                    jsonEncode({'surfaceId': surfaceId, 'dataModel': dataModel}),
+                    showPendingBubble: false,
+                  );
+            };
         return A2uiCardMessage(
           key: ValueKey('a2ui-card-${message.uuid}'),
           operations: operations,
           lockedDataModel: lockedDataModel,
-          onSubmitted: ref.watch(a2uiCardSubmitHandlerProvider),
+          onSubmitted: onSubmitted,
         );
       }
     }
