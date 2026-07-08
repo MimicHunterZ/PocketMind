@@ -261,10 +261,10 @@ public class SseReplyService {
                                            StringBuilder accumulator,
                                            String requestId) {
         String partialContent = accumulator.toString();
-        UUID pausedMessageUuid = null;
-        if (!partialContent.isBlank()) {
-            pausedMessageUuid = persistAssistant(userId, sessionUuid, userMsgUuid, assistantMsgUuid, conversationKey, partialContent);
-            log.info("AI 流式回复暂停并保存部分内容: userId={}, sessionUuid={}, assistantMsgUuid={}",
+        UUID pausedMessageUuid = persistAssistant(
+                userId, sessionUuid, userMsgUuid, assistantMsgUuid, conversationKey, partialContent);
+        if (pausedMessageUuid != null) {
+            log.info("AI 流式回复暂停并保存部分内容: userId={}, sessionUuid={}, leafUuid={}",
                     userId, sessionUuid, pausedMessageUuid);
         } else {
             log.info("AI 流式回复暂停（无可保存增量）: userId={}, sessionUuid={}", userId, sessionUuid);
@@ -283,26 +283,37 @@ public class SseReplyService {
                                          StringBuilder accumulator,
                                          String requestId) {
         String fullContent = accumulator.toString();
-        persistAssistant(userId, sessionUuid, userMsgUuid, assistantMsgUuid, conversationKey, fullContent);
+        // persistAssistant 返回这轮的真实叶子 uuid：有收尾文本时是新落的 assistant 消息，
+        // 没有收尾文本时(整轮文本已作为工具前文本落过)是工具链尾(如卡片)。
+        UUID leafUuid = persistAssistant(
+                userId, sessionUuid, userMsgUuid, assistantMsgUuid, conversationKey, fullContent);
 
-        log.info("AI 流式回复完成: userId={}, sessionUuid={}, assistantMsgUuid={}",
-                userId, sessionUuid, assistantMsgUuid);
+        log.info("AI 流式回复完成: userId={}, sessionUuid={}, leafUuid={}",
+                userId, sessionUuid, leafUuid);
 
-        if (isFork) {
-            generateBranchAliasAsync(userId, assistantMsgUuid, historyMessages, userPrompt);
+        if (isFork && leafUuid != null) {
+            generateBranchAliasAsync(userId, leafUuid, historyMessages, userPrompt);
         }
 
         // 异步触发会话提交：生成阶段摘要 + 记忆抽取
         triggerSessionCommitAsync(userId, sessionUuid);
 
-        // RunFinished 的 result 带回这轮 assistant 消息 UUID：AG-UI 的 result 是任意可选字段，
+        // RunFinished 的 result 带回这轮真实叶子 UUID：AG-UI 的 result 是任意可选字段，
         // 客户端据此在分支/重新生成场景 syncMessages(leafUuid) + 切 activeLeaf，普通场景也用它定位落库消息。
-        return new AgUiEvent.RunFinished(sessionUuid.toString(), requestId, assistantMsgUuid.toString());
+        return new AgUiEvent.RunFinished(sessionUuid.toString(), requestId,
+                leafUuid == null ? null : leafUuid.toString());
     }
 
     /**
-     * 落库这轮的 assistant 回复。parentUuid 优先接在这轮工具调用链的落库尾部；
-     * 若这轮没有工具调用（advisor 里查不到链尾），退回用户消息作为父节点。
+     * 落库这轮 assistant 回复的"收尾文本"，返回这轮的真实叶子 uuid。
+     *
+     * <p>工具调用前的文本已由 {@link PersistingToolCallAdvisor} 在落工具调用前先落成独立 TEXT 消息
+     * (保证 reload 时按生成顺序排在工具前)，所以这里要从整轮全文里剥掉那段前缀，只落剩下的收尾文本：
+     * <ul>
+     *   <li>有收尾文本 → 落一条 assistant 消息(parentUuid 接工具链尾)，返回其 uuid；</li>
+     *   <li>收尾文本为空(整轮文本都在工具前) → 不落空消息，返回工具链尾 uuid(如卡片)作为叶子；</li>
+     *   <li>这轮没有任何工具 → 收尾文本即全文，正常落库，parentUuid 退回用户消息。</li>
+     * </ul>
      */
     private UUID persistAssistant(long userId,
                                   UUID sessionUuid,
@@ -314,13 +325,33 @@ public class SseReplyService {
                 ? null
                 : persistingToolCallAdvisor.getCurrentParentUuid(conversationKey);
         UUID parentUuid = toolChainTail != null ? toolChainTail : userMsgUuid;
+
+        // 剥掉 advisor 已作为独立 TEXT 落过的"工具前文本"前缀，避免同一段文本落两遍。
+        String alreadyPersisted = persistingToolCallAdvisor.getPersistedInterleavedText(conversationKey);
+        String tail = content;
+        if (!alreadyPersisted.isEmpty()) {
+            if (content.startsWith(alreadyPersisted)) {
+                tail = content.substring(alreadyPersisted.length());
+            } else {
+                // 理论上 advisor 落的文本是整轮全文的前缀，对不齐说明分块/空白有差异；
+                // 保守起见记录告警并按全文落，宁可极少数情况下重复也不丢收尾文本。
+                log.warn("工具前文本与整轮全文对不齐，按全文落库: userId={}, sessionUuid={}", userId, sessionUuid);
+            }
+        }
+
+        if (tail.isBlank()) {
+            // 整轮文本已经全部作为工具前文本落过了，没有收尾文本，不落空 assistant 消息。
+            // 叶子退回工具链尾(如卡片)。
+            return toolChainTail;
+        }
+
         ChatMessageEntity assistantMsg = ChatMessageEntity.create(
                 assistantMsgUuid,
                 userId,
                 sessionUuid,
                 parentUuid,
                 ChatRole.ASSISTANT,
-                content,
+                tail,
                 List.of());
         chatMessageRepository.save(assistantMsg);
         return assistantMsgUuid;

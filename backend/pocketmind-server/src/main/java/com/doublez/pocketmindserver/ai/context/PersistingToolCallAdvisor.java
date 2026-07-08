@@ -71,6 +71,11 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
      */
     private final ConcurrentMap<String, Integer> persistedSizes = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, UUID> tailParentUuids = new ConcurrentHashMap<>();
+    /**
+     * conversationKey -> 这轮已作为独立 TEXT 消息落库的"工具调用前文本"拼接。
+     * 终态落 assistant 收尾文本时,从整轮全文里剥掉这部分前缀,避免同一段文本落两遍。
+     */
+    private final ConcurrentMap<String, StringBuilder> persistedInterleavedText = new ConcurrentHashMap<>();
 
     public PersistingToolCallAdvisor(ChatMessageRepository chatMessageRepository, ObjectMapper objectMapper) {
         this.chatMessageRepository = chatMessageRepository;
@@ -128,7 +133,7 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
         Set<String> knownToolCallIds = (Set<String>) ctx.getOrDefault(CTX_KNOWN_TOOL_CALL_IDS, Set.of());
 
         List<Message> delta = instructions.subList(lastSize, instructions.size());
-        parentUuid = persistMessages(userId, sessionUuid, parentUuid, delta, eventSink, knownToolCallIds);
+        parentUuid = persistMessages(conversationKey, userId, sessionUuid, parentUuid, delta, eventSink, knownToolCallIds);
 
         persistedSizes.put(conversationKey, instructions.size());
         // parentUuid 可能全程未变（这批 delta 全是已知的历史 toolCallId，被跳过没落库），
@@ -148,10 +153,12 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
         if (anyKey != null) {
             persistedSizes.remove(anyKey);
             tailParentUuids.remove(anyKey);
+            persistedInterleavedText.remove(anyKey);
         }
     }
 
-    private UUID persistMessages(long userId, UUID sessionUuid, UUID parentUuid, List<Message> messages,
+    private UUID persistMessages(String conversationKey, long userId, UUID sessionUuid, UUID parentUuid,
+                                 List<Message> messages,
                                  Sinks.Many<AgUiEvent> eventSink, Set<String> knownToolCallIds) {
         for (Message message : messages) {
             if (message == null) {
@@ -161,6 +168,27 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
             if (message.getMessageType() == MessageType.ASSISTANT && message instanceof AssistantMessage assistant) {
                 if (assistant.getToolCalls() == null || assistant.getToolCalls().isEmpty()) {
                     continue;
+                }
+                // 一条带 toolCalls 的 AssistantMessage 上,模型可能同时输出了"调用工具前想说的话"
+                // (OpenAI 兼容 API 里 content 和 tool_calls 同条)。这段文本按生成顺序在工具【之前】,
+                // 先把它落成一条独立 ASSISTANT TEXT 消息(时间戳早于紧接着的 TOOL_CALL,reload 时排在工具前),
+                // 否则它会被并进流末尾的整轮全文、跑到卡片后面。
+                // 跨轮读回的历史(toolCall 全已知)不落:那段文本上一轮已落过。文本的流式呈现由
+                // SseReplyService 的 TEXT_MESSAGE_CONTENT 事件负责,这里只落库、不重复发事件。
+                boolean isNewToolTurn = assistant.getToolCalls().stream()
+                        .anyMatch(call -> !knownToolCallIds.contains(call.id()));
+                String interleavedText = assistant.getText();
+                if (isNewToolTurn && interleavedText != null && !interleavedText.isBlank()) {
+                    UUID textUuid = UUID.randomUUID();
+                    ChatMessageEntity textMsg = ChatMessageEntity.create(
+                            textUuid, userId, sessionUuid, parentUuid, ChatRole.ASSISTANT, interleavedText, List.of());
+                    chatMessageRepository.save(textMsg);
+                    parentUuid = textUuid;
+                    if (conversationKey != null) {
+                        persistedInterleavedText
+                                .computeIfAbsent(conversationKey, k -> new StringBuilder())
+                                .append(interleavedText);
+                    }
                 }
                 for (AssistantMessage.ToolCall call : assistant.getToolCalls()) {
                     // 跨轮读回的历史工具调用已经落过库，混进这轮 delta 里时按 id 跳过，不重复落库/重复发事件。
@@ -290,5 +318,18 @@ public class PersistingToolCallAdvisor implements CallAdvisor, StreamAdvisor {
      */
     public UUID getCurrentParentUuid(String conversationKey) {
         return tailParentUuids.get(conversationKey);
+    }
+
+    /**
+     * 取这轮已作为独立 TEXT 消息落库的"工具调用前文本"拼接(见 {@link #persistMessages})。
+     * 调用方(SseReplyService)落终态 assistant 回复时,从整轮全文里剥掉这段前缀,避免重复落库。
+     * 没有工具前文本时返回空串。
+     */
+    public String getPersistedInterleavedText(String conversationKey) {
+        if (conversationKey == null) {
+            return "";
+        }
+        StringBuilder sb = persistedInterleavedText.get(conversationKey);
+        return sb == null ? "" : sb.toString();
     }
 }
