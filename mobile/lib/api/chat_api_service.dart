@@ -308,36 +308,77 @@ class ChatApiService {
       currentEvent = null;
       dataLines.clear();
 
+      // 解析事件负载 JSON(所有细粒度事件的 data 都是一个扁平 JSON 对象)。
+      Map<String, dynamic>? json;
+      try {
+        final decoded = jsonDecode(data);
+        if (decoded is Map<String, dynamic>) {
+          json = decoded;
+        }
+      } catch (_) {
+        // 非 JSON 负载:仅个别事件容忍(见下),其余忽略。
+      }
+
+      // SSE event 帧名 = AG-UI 事件类型(大写下划线),对齐 `ag_ui ^0.3.0`。
+      // 只映射块序列渲染真正需要的事件,其余生命周期事件(START/END/STEP)忽略——
+      // 文本靠 CONTENT 累积,工具/卡片最终态靠流结束后 syncMessages 落库复现。
       switch (event) {
-        case 'delta':
-          yield ChatDeltaEvent(data);
-        case 'done':
-          try {
-            final json = jsonDecode(data) as Map<String, dynamic>;
+        case 'TEXT_MESSAGE_CONTENT':
+          final delta = json?['delta'];
+          if (delta is String) {
+            yield ChatDeltaEvent(delta);
+          }
+        case 'TOOL_CALL_START':
+          final toolCallId = json?['toolCallId'] as String?;
+          final toolCallName = json?['toolCallName'] as String?;
+          if (toolCallId != null) {
+            yield ChatToolCallStartEvent(toolCallId, toolCallName ?? '工具');
+          }
+        case 'TOOL_CALL_END':
+          final toolCallId = json?['toolCallId'] as String?;
+          if (toolCallId != null) {
+            yield ChatToolCallEndEvent(toolCallId);
+          }
+        case 'ACTIVITY_SNAPSHOT':
+          // content 是一张卡片的完整 A2UI envelope(单条对象或多条数组)。
+          // 内部 _LiveA2uiCardMessage 逐条消费,所以拆成逐条 chunk(每条重新
+          // 序列化成字符串),流式态渲染逻辑无需改动。
+          final content = json?['content'];
+          final messages = content is List
+              ? content
+              : (content == null ? const [] : [content]);
+          for (final message in messages) {
+            yield ChatA2uiChunkEvent(jsonEncode(message));
+          }
+        case 'RUN_FINISHED':
+          // result 带回这轮 assistant 消息 UUID(后端 handleDoneTerminal 放入),
+          // requestId 用 runId。
+          final messageUuid = json?['result'] as String?;
+          if (messageUuid != null) {
             yield ChatDoneEvent(
-              json['messageUuid'] as String,
-              requestId: json['requestId'] as String?,
+              messageUuid,
+              requestId: json?['runId'] as String?,
             );
-          } catch (_) {
-            PMlog.w(_tag, 'done 事件解析失败: $data');
+          } else {
+            PMlog.w(_tag, 'RUN_FINISHED 缺少 result(messageUuid): $data');
           }
-        case 'paused':
-          try {
-            final json = jsonDecode(data) as Map<String, dynamic>;
-            yield ChatPausedEvent(
-              requestId: json['requestId'] as String?,
-              messageUuid: json['messageUuid'] as String?,
-            );
-          } catch (_) {
-            yield const ChatPausedEvent();
+        case 'RUN_ERROR':
+          yield ChatErrorEvent(json?['message'] as String? ?? 'AI 服务异常');
+        case 'CUSTOM':
+          // 用户主动打断:AG-UI 词汇无对应事件,后端走 CUSTOM(name=chat.paused)。
+          if (json?['name'] == 'chat.paused') {
+            final value = json?['value'];
+            if (value is Map<String, dynamic>) {
+              yield ChatPausedEvent(
+                requestId: value['requestId'] as String?,
+                messageUuid: value['messageUuid'] as String?,
+              );
+            } else {
+              yield const ChatPausedEvent();
+            }
           }
-        case 'error':
-          try {
-            final json = jsonDecode(data) as Map<String, dynamic>;
-            yield ChatErrorEvent(json['message'] as String? ?? 'AI 服务异常');
-          } catch (_) {
-            yield ChatErrorEvent(data);
-          }
+        // TEXT_MESSAGE_START/END、RUN_STARTED、STEP_*、TOOL_CALL_RESULT 等
+        // 事件对块序列渲染无用,静默忽略。
       }
     }
 

@@ -163,31 +163,40 @@
 
 ### Phase 3: 打通客户端和后端
 
-- [ ] **Task 3.1: 客户端 `_parseSseStream` 改造(复用 `ag_ui` 包解析,D11)**
-  - 描述:把 Task 2.2–2.4 的事件格式对应到客户端解析。**复用 `ag_ui ^0.3.0` 的事件类型(`BaseEvent.fromJson`)**,不手写重复解析(D11)。覆盖文本/工具/`ACTIVITY_SNAPSHOT` 三类。
-  - 验收:单元测试覆盖新事件解析(文本/工具/activity)。
-  - 验证:`flutter test`。
-  - 依赖:Checkpoint 4、Checkpoint 2
-  - 规模:M
-  - 文件:`mobile/lib/api/chat_api_service.dart`、`mobile/lib/api/models/chat_models.dart`
+> 落地细节与端到端才暴露的契约错配(E1–E4)见
+> `2026-07-05-chat-a2ui-agui-integration-phase3-plan.md`。实施发现:后端(Phase 2)
+> 已发新事件、前端 `_consumeStreamEvents`(Task 1.5)已消费内部 sealed 事件,唯一缺口
+> 是 `_parseSseStream` 仍解析旧四件套。另修了两处端到端错配:后端 `RUN_FINISHED` 补
+> `result=messageId`(E1);前端 `tryParseA2uiCard` 剥工具结果包装,让 reload 的卡片
+> 不退化成工具卡(E2)。
 
-- [ ] **Task 3.2: `_consumeStreamEvents` 接真实后端,替换 Task 1.5 的临时 mock**
-  - 描述:把 Task 1.5 里"临时接 mock"的代码换成真实解析出的后端事件,驱动块序列流式(文本/工具提示/卡片)。
-  - 验收:端到端——发一条会触发 AI 生成卡片的真实消息,聊天界面里文字、工具记录、卡片按 AI 实际生成顺序混排出现;关闭重开聊天,原样复现,不重新请求后端。
-  - 验证:真机/模拟器手动跑完整流程。
-  - 依赖:3.1
-  - 规模:M
-  - 文件:`mobile/lib/providers/chat_providers.dart`
+- [x] **Task 3.1: 客户端 `_parseSseStream` 改造(对齐 `ag_ui ^0.3.0` 字段,D11)** ✅ 2026-07-08
+  - 描述:把新 AG-UI 事件映射到内部 sealed `ChatStreamEvent`。`ACTIVITY_SNAPSHOT.content`
+    拆成逐条 `ChatA2uiChunkEvent`(E3);`RUN_FINISHED.result` 取 messageId(E1);
+    `CUSTOM(chat.paused)` → `ChatPausedEvent`。删旧 `delta/done/paused/error`(D8 不兼容)。
+    未引入 `BaseEvent.fromJson`——现有行缓冲/UTF-8 分块解析器 + 直接取字段更省(ponytail),
+    经评审确认(问题 1 已回答倾向直接取字段)。
+  - 验收:15 条 SSE 解析单测覆盖文本累积/工具/activity 拆条/run_finished/paused/error/混排顺序。
+  - 验证:`flutter test test/api/chat_api_service_sse_parse_test.dart`(全绿)。
+  - 文件:`mobile/lib/api/chat_api_service.dart`、`mobile/test/api/chat_api_service_sse_parse_test.dart`
+  - 附带:`mobile/lib/util/a2ui_card_util.dart`(E2 剥包装)、`SseReplyService.java`(E1 后端补 result)
 
-- [ ] **Task 3.3: 事件字段对齐核对 + 端到端验收清单(D11)**
-  - 描述:对照 spec D11,逐字段核对后端 SSE 输出与 `ag_ui ^0.3.0` 各事件类;跑 spec Success Criteria 全部条目。检查 Task 1.5 的过渡代码是否已被 3.2 完全替换、无遗留。
-  - 验收:对照 spec 的 Success Criteria 逐条勾选确认;无 mock 过渡代码遗留。
-  - 验证:真机手动 + `flutter analyze` + `grep` 检查过渡代码。
-  - 依赖:3.2
-  - 规模:S
+- [x] **Task 3.2: 生产 send 路径接真实后端** ✅ 2026-07-08
+  - 描述:确认生产 `send()` 走真实 `streamMessage` → `_parseSseStream` → `_consumeStreamEvents`
+    的块序列驱动;Task 1.5 的 mock 只在 demo 预览页 `override`,从未污染生产路径(已 grep 核实)。
+    因此本任务无需"替换临时接线"——生产从一开始就没接 mock,只差 `_parseSseStream` 认新格式(3.1 已补)。
+  - 验收:端到端手动(见 3.3,需后端+真机)。
+  - 文件:无生产代码改动(3.1 的解析层即打通点)
+
+- [x] **Task 3.3: 事件字段对齐核对 + 端到端验收清单(D11)** — 自动化部分 ✅ 2026-07-08 / 手动待跑
+  - 描述:逐字段核对后端 SSE 输出与 `ag_ui ^0.3.0`(见 phase3-plan 契约对照表,全部对齐);
+    grep 确认无 mock 过渡代码残留生产;`dart analyze` 改动文件无新增问题。
+  - **仍需人工(需后端 + 真机)**:发一条触发卡片生成的真实消息看块序列混排;关闭重开会话看
+    文字/工具记录/卡片原样复现(重点验 E2:卡片 reload 不退化成工具卡);工具进度提示不落库。
+  - 验证:`flutter analyze` + `grep`(已过);真机手动(待用户跑)。
 
 #### Checkpoint 5(最终验收)
-- [ ] 对照 spec 的 Success Criteria 逐条勾选确认。
+- [ ] 对照 spec 的 Success Criteria 逐条勾选确认(需后端 + 真机手动跑,代码侧已就绪)。
 
 ## Risks and Mitigations
 

@@ -295,7 +295,9 @@ public class SseReplyService {
         // 异步触发会话提交：生成阶段摘要 + 记忆抽取
         triggerSessionCommitAsync(userId, sessionUuid);
 
-        return new AgUiEvent.RunFinished(sessionUuid.toString(), requestId);
+        // RunFinished 的 result 带回这轮 assistant 消息 UUID：AG-UI 的 result 是任意可选字段，
+        // 客户端据此在分支/重新生成场景 syncMessages(leafUuid) + 切 activeLeaf，普通场景也用它定位落库消息。
+        return new AgUiEvent.RunFinished(sessionUuid.toString(), requestId, assistantMsgUuid.toString());
     }
 
     /**

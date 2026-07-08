@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genui/genui.dart';
 import 'package:pocketmind/util/a2ui_card_util.dart';
@@ -73,6 +75,75 @@ void main() {
       const content = '''
       {"version": "v1.0", "createSurface": {"surfaceId": "s1"}}
       ''';
+      expect(tryParseA2uiCard(content), isNull);
+    });
+
+    test('后端工具结果包装内嵌 A2UI 数组(reload 复现形状)→ 剥包装后解析成功', () {
+      // PersistingToolCallAdvisor.toToolResultJson 落库形状:
+      // {"toolCallId","name","result": "<转义的 A2UI envelope 数组 JSON>"}
+      final envelope = jsonEncode([
+        {
+          'version': 'v0.9',
+          'createSurface': {
+            'surfaceId': 'choice-card-1',
+            'catalogId':
+                'https://a2ui.org/specification/v0_9/standard_catalog.json',
+          },
+        },
+        {
+          'version': 'v0.9',
+          'updateComponents': {
+            'surfaceId': 'choice-card-1',
+            'components': [
+              {
+                'id': 'root',
+                'component': 'Column',
+                'children': ['title'],
+              },
+              {'id': 'title', 'component': 'Text', 'text': '选一个'},
+            ],
+          },
+        },
+      ]);
+      final content = jsonEncode({
+        'toolCallId': 'call_1',
+        'name': 'renderChoiceCard',
+        'result': envelope,
+      });
+
+      final messages = tryParseA2uiCard(content);
+      expect(messages, isNotNull);
+      expect(messages, hasLength(2));
+      expect(messages![0], isA<CreateSurface>());
+      expect(messages[1], isA<UpdateComponents>());
+      expect(a2uiSurfaceId(messages), 'choice-card-1');
+    });
+
+    test('后端工具结果包装内嵌单条 A2UI 消息 → 剥包装后解析成功', () {
+      final envelope = jsonEncode({
+        'version': 'v0.9',
+        'createSurface': {
+          'surfaceId': 's1',
+          'catalogId':
+              'https://a2ui.org/specification/v0_9/standard_catalog.json',
+        },
+      });
+      final content = jsonEncode({
+        'toolCallId': 'call_1',
+        'name': 'renderChoiceCard',
+        'result': envelope,
+      });
+      final messages = tryParseA2uiCard(content);
+      expect(messages, isNotNull);
+      expect(messages!.single, isA<CreateSurface>());
+    });
+
+    test('后端工具结果包装但 result 是纯文本(功能型工具)→ 判别为假', () {
+      final content = jsonEncode({
+        'toolCallId': 'call_1',
+        'name': 'searchMemory',
+        'result': '找到 3 条相关记忆',
+      });
       expect(tryParseA2uiCard(content), isNull);
     });
   });
