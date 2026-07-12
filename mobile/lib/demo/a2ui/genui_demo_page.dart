@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:ag_ui/ag_ui.dart'
-    show BaseEvent, CustomEvent, RunErrorEvent, RunFinishedEvent;
+    show ActivitySnapshotEvent, BaseEvent, RunErrorEvent, RunFinishedEvent;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -219,8 +219,8 @@ class _GenUiDemoPageState extends ConsumerState<GenUiDemoPage> {
         return;
       }
       switch (event) {
-        case CustomEvent(:final value):
-          final data = value as String;
+        case ActivitySnapshotEvent(:final content):
+          final data = jsonEncode(content);
           _transportAdapter.addChunk(data);
           _log(_describeFrame(data));
         case RunFinishedEvent():

@@ -1,6 +1,4 @@
-import 'dart:convert';
-
-import 'package:ag_ui/ag_ui.dart' show BaseEvent, CustomEvent, RunErrorEvent, RunFinishedEvent, RunStartedEvent;
+import 'package:ag_ui/ag_ui.dart' show ActivitySnapshotEvent, BaseEvent, RunErrorEvent, RunFinishedEvent, RunStartedEvent;
 import 'package:dio/dio.dart' show CancelToken;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,19 +7,19 @@ final a2uiStreamApiServiceProvider = Provider<A2uiStreamApiService>((ref) {
 });
 
 /// A2UI 用 AG-UI 作为传输层:AG-UI 管 run 生命周期,A2UI JSON 消息作为内容
-/// 包在 [CustomEvent](name: `'a2ui'`)里传输——这是 A2UI 官方文档里
-/// "AG-UI as the pipe, A2UI as the content" 的映射方式。
+/// 包在 [ActivitySnapshotEvent](activityType: `'a2ui-surface'`)里传输,
+/// 与真实聊天后端(`AgUiEvent.ActivitySnapshot`)使用同一个事件承载 A2UI 内容。
 /// mock 与真后端共用同一份 `Stream<BaseEvent>` 契约:
-/// - [RunStartedEvent]                       → 开始一次 run
-/// - `CustomEvent(name: 'a2ui', value: json)` → 一条 A2UI v0.9 消息(JSON 字符串)
-/// - [RunFinishedEvent]                      → 本轮结束
-/// - [RunErrorEvent]                         → 出错
+/// - [RunStartedEvent]                              → 开始一次 run
+/// - `ActivitySnapshotEvent(activityType, content)`  → 一条 A2UI v0.9 消息
+/// - [RunFinishedEvent]                              → 本轮结束
+/// - [RunErrorEvent]                                  → 出错
 ///
 /// 接真后端时,把 `mockStream`/`continueWithTopic` 换成
 /// `AgUiClient(config: ...).runAgent(endpoint, input)` 即可,返回类型不变,
 /// demo 页完全不用改。
 ///
-/// 其中 `CustomEvent.value` 的 JSON 体必须是合法的 A2UI v0.9 消息:
+/// 其中 `ActivitySnapshotEvent.content` 必须是合法的 A2UI v0.9 消息:
 /// `createSurface` / `updateComponents` / `updateDataModel` / `deleteSurface`
 /// 之一,且顶层带 `"version": "v0.9"`(genui SDK 强校验此版本号)。
 
@@ -63,8 +61,12 @@ class A2uiStreamApiService {
       return !cancelled();
     }
 
-    CustomEvent delta(Map<String, Object?> payload) {
-      return CustomEvent(name: 'a2ui', value: jsonEncode(payload));
+    ActivitySnapshotEvent delta(Map<String, Object?> payload) {
+      return ActivitySnapshotEvent(
+        messageId: surfaceId,
+        activityType: 'a2ui-surface',
+        content: payload,
+      );
     }
 
     yield RunStartedEvent(threadId: surfaceId, runId: runId);
@@ -166,8 +168,12 @@ class A2uiStreamApiService {
       return !cancelled();
     }
 
-    CustomEvent delta(Map<String, Object?> payload) =>
-        CustomEvent(name: 'a2ui', value: jsonEncode(payload));
+    ActivitySnapshotEvent delta(Map<String, Object?> payload) =>
+        ActivitySnapshotEvent(
+          messageId: surfaceId,
+          activityType: 'a2ui-surface',
+          content: payload,
+        );
 
     Map<String, Object?> data(String path, Object? value) => {
       'version': 'v0.9',
@@ -225,7 +231,7 @@ class A2uiStreamApiService {
     required String fullText,
     required String path,
     required Map<String, Object?> Function(String, Object?) data,
-    required CustomEvent Function(Map<String, Object?>) delta,
+    required ActivitySnapshotEvent Function(Map<String, Object?>) delta,
     required bool Function() cancelled,
     Duration tick = const Duration(milliseconds: 36),
     int charsPerTick = 4,
