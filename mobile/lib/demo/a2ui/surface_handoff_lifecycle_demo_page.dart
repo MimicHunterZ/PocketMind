@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:genui/genui.dart';
 
-import 'streaming_markdown_catalog_item.dart';
+import 'package:pocketmind/util/streaming_markdown_catalog_item.dart';
 
 /// PLAN Task 1.3a 的验证 spike:测试"流式中的临时 SurfaceController → 交接给
 /// 持久化后的 SurfaceController"这个动作,交接瞬间会不会闪烁、旧 controller

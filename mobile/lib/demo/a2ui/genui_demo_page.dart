@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:genui/genui.dart';
 import 'package:pocketmind/demo/a2ui/a2ui_stream_api_service.dart';
-import 'package:pocketmind/demo/a2ui/streaming_markdown_catalog_item.dart';
+import 'package:pocketmind/util/streaming_markdown_catalog_item.dart';
 import 'package:pocketmind/util/theme_data.dart';
 import 'package:uuid/uuid.dart';
 

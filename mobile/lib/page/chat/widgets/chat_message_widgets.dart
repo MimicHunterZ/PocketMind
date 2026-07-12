@@ -7,12 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_streaming_text_markdown/flutter_streaming_text_markdown.dart';
 import 'package:genui/genui.dart' hide ChatMessage;
-import 'package:pocketmind/demo/a2ui/streaming_markdown_catalog_item.dart';
 import 'package:pocketmind/model/chat_message.dart';
 import 'package:pocketmind/page/chat/widgets/chat_branch_sheet.dart';
 import 'package:pocketmind/page/widget/creative_toast.dart';
 import 'package:pocketmind/providers/chat_providers.dart';
 import 'package:pocketmind/util/a2ui_card_util.dart';
+import 'package:pocketmind/util/streaming_markdown_catalog_item.dart';
 import 'package:pocketmind/util/theme_data.dart';
 
 /// 单条消息气泡。
@@ -48,8 +48,8 @@ class ChatMessageBubble extends ConsumerWidget {
       if (operations != null) {
         // 优先用 preview 注入的 handler(debug 预览页写回本地假仓库);生产环境
         // handler 为 null,退回把这次提交当作一次新的用户消息发出去——content 是
-        // {surfaceId, dataModel} JSON,后端按普通消息落库为 USER 消息并喂回模型
-        // (D15),reload 时据它推导锁定态。showPendingBubble:false 避免这条 JSON
+        // {surfaceId, dataModel} JSON,后端按普通消息落库为 USER 消息并喂回模型,
+        // reload 时据它推导锁定态。showPendingBubble:false 避免这条 JSON
         // 元数据以气泡形式闪现。
         final injected = ref.watch(a2uiCardSubmitHandlerProvider);
         final onSubmitted =

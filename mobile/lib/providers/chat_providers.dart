@@ -44,9 +44,9 @@ ChatService chatService(Ref ref) {
   );
 }
 
-/// 卡片提交交互后的回调,默认无操作。生产环境暂不接入——把"提交"变成一次
-/// 真实的带 dataModel 的聊天请求是接后端时才做的事;这里先只提供一个可被
-/// debug mock 预览页覆盖的挂点,用来验证"提交后锁定"的完整交互闭环。
+/// 卡片提交交互后的回调,默认 null。生产环境走 [ChatMessageBubble] 里的默认
+/// 兜底(把提交当新用户消息发出去);这里只留一个可被 debug 预览页覆盖的挂点,
+/// 用来在不接真实后端的情况下验证"提交后锁定"的交互闭环。
 @riverpod
 void Function(String surfaceId, Map<String, dynamic> dataModel)?
 a2uiCardSubmitHandler(Ref ref) => null;
