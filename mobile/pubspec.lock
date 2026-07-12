@@ -764,10 +764,10 @@ packages:
     dependency: "direct main"
     description:
       name: genui
-      sha256: "95321aabf73fc1a2258546f1e66aef8cd6d6e52682541b0b4383298cdfa2ce5e"
+      sha256: "3e6688a9bc5e0147be3c3837f9bfc4588618416dd5a346b746aa9f64f8ffd7bf"
       url: "https://pub.flutter-io.cn"
     source: hosted
-    version: "0.8.0"
+    version: "0.9.2"
   glob:
     dependency: transitive
     description:

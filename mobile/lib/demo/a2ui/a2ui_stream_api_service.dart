@@ -7,6 +7,7 @@ import 'package:ag_ui/ag_ui.dart'
         RunStartedEvent;
 import 'package:dio/dio.dart' show CancelToken;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:genui/genui.dart' show basicCatalogId;
 
 final a2uiStreamApiServiceProvider = Provider<A2uiStreamApiService>((ref) {
   return A2uiStreamApiService();
@@ -110,8 +111,7 @@ class A2uiStreamApiService {
       'version': 'v0.9',
       'createSurface': {
         'surfaceId': surfaceId,
-        'catalogId':
-            'https://a2ui.org/specification/v0_9/standard_catalog.json',
+        'catalogId': basicCatalogId,
       },
     });
     if (!await wait()) return;

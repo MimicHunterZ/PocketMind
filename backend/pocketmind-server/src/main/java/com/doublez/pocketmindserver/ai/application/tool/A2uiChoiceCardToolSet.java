@@ -28,10 +28,13 @@ import java.util.UUID;
 public class A2uiChoiceCardToolSet {
 
     /**
-     * 前端 A2UI 客户端内置识别的标准 catalog id，已经在聊天卡片交互的
-     * mock 场景里验证过可以被真实的组件渲染器解析。
+     * 前端 A2UI 客户端内置识别的标准 catalog id，必须和移动端 genui 包导出的
+     * {@code basicCatalogId} 常量字符串完全一致，否则客户端 SurfaceController
+     * 找不到匹配的 catalog，卡片会渲染失败。genui 曾在 0.9.0 把这个 URL 从
+     * standard_catalog.json 改成 basic_catalog.json（未在 CHANGELOG 提及），
+     * 升级 mobile 端 genui 版本时要顺带核对这个值有没有变。
      */
-    private static final String STANDARD_CATALOG_ID = "https://a2ui.org/specification/v0_9/standard_catalog.json";
+    private static final String STANDARD_CATALOG_ID = "https://a2ui.org/specification/v0_9/basic_catalog.json";
 
     private final ObjectMapper objectMapper;
 

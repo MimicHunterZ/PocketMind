@@ -12,7 +12,7 @@ void main() {
         "version": "v0.9",
         "createSurface": {
           "surfaceId": "s1",
-          "catalogId": "https://a2ui.org/specification/v0_9/standard_catalog.json"
+          "catalogId": "$basicCatalogId"
         }
       }
       ''';
@@ -26,7 +26,7 @@ void main() {
       const content = '''
       [
         {"version":"v0.9","createSurface":{"surfaceId":"s1",
-          "catalogId":"https://a2ui.org/specification/v0_9/standard_catalog.json"}},
+          "catalogId":"$basicCatalogId"}},
         {"version":"v0.9","updateComponents":{"surfaceId":"s1",
           "components":[{"id":"root","component":"Column","children":["title"]},
           {"id":"title","component":"Text","text":{"path":"/title"},"variant":"h2"}]}},
@@ -56,7 +56,7 @@ void main() {
       const content = '''
       [
         {"version":"v0.9","createSurface":{"surfaceId":"s1",
-          "catalogId":"https://a2ui.org/specification/v0_9/standard_catalog.json"}},
+          "catalogId":"$basicCatalogId"}},
         {"toolCallId":"call_1","name":"searchMemory","result":"不是 A2UI 消息"}
       ]
       ''';
@@ -86,8 +86,7 @@ void main() {
           'version': 'v0.9',
           'createSurface': {
             'surfaceId': 'choice-card-1',
-            'catalogId':
-                'https://a2ui.org/specification/v0_9/standard_catalog.json',
+            'catalogId': basicCatalogId,
           },
         },
         {
@@ -124,8 +123,7 @@ void main() {
         'version': 'v0.9',
         'createSurface': {
           'surfaceId': 's1',
-          'catalogId':
-              'https://a2ui.org/specification/v0_9/standard_catalog.json',
+          'catalogId': basicCatalogId,
         },
       });
       final content = jsonEncode({

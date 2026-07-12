@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:genui/genui.dart' show basicCatalogId;
 import 'package:pocketmind/model/chat_message.dart';
 import 'package:pocketmind/page/chat/chat_list/chat_list_formatter.dart';
 import 'package:pocketmind/page/chat/chat_list/chat_list_item.dart';
@@ -15,8 +16,7 @@ ChatMessage _msg(String uuid, String role, {String messageType = 'TEXT'}) {
     ..content = uuid;
 }
 
-const String _standardCatalogId =
-    'https://a2ui.org/specification/v0_9/standard_catalog.json';
+const String _standardCatalogId = basicCatalogId;
 
 ChatMessage _cardMsg(String uuid, String surfaceId) {
   return ChatMessage()

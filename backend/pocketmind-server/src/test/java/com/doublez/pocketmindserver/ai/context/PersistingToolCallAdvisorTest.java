@@ -62,7 +62,7 @@ class PersistingToolCallAdvisorTest {
 
         String a2uiJson = """
                 [
-                  {"version":"v0.9","createSurface":{"surfaceId":"card-1","catalogId":"https://a2ui.org/specification/v0_9/standard_catalog.json"}},
+                  {"version":"v0.9","createSurface":{"surfaceId":"card-1","catalogId":"https://a2ui.org/specification/v0_9/basic_catalog.json"}},
                   {"version":"v0.9","updateComponents":{"surfaceId":"card-1","components":[]}}
                 ]
                 """;

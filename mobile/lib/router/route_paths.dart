@@ -41,6 +41,10 @@ class RoutePaths {
   /// 聊天卡片提交锁定 mock 预览页面
   static const String genuiDemoChatCardLock = '/genui-demo/chat-card-lock';
 
+  /// openNote 本地函数验证页面
+  static const String genuiDemoOpenNoteFunction =
+      '/genui-demo/open-note-function';
+
   /// 平台账号管理
   static const String platformAccounts = '/settings/platform-accounts';
 

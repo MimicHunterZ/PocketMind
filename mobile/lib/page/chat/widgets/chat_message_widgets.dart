@@ -12,6 +12,7 @@ import 'package:pocketmind/page/chat/widgets/chat_branch_sheet.dart';
 import 'package:pocketmind/page/widget/creative_toast.dart';
 import 'package:pocketmind/providers/chat_providers.dart';
 import 'package:pocketmind/util/a2ui_card_util.dart';
+import 'package:pocketmind/util/pocketmind_a2ui_catalog.dart';
 import 'package:pocketmind/util/theme_data.dart';
 
 /// 单条消息气泡。
@@ -333,7 +334,7 @@ class _LiveA2uiCardMessageState extends State<_LiveA2uiCardMessage> {
   @override
   void initState() {
     super.initState();
-    _controller = SurfaceController(catalogs: [BasicCatalogItems.asCatalog()]);
+    _controller = SurfaceController(catalogs: [pocketMindA2uiCatalog]);
     _adapter = A2uiTransportAdapter();
     _adapter.incomingMessages.listen(_controller.handleMessage);
     _consumeNewChunks();
@@ -518,7 +519,7 @@ class _A2uiCardMessageState extends State<A2uiCardMessage> {
   @override
   void initState() {
     super.initState();
-    _controller = SurfaceController(catalogs: [BasicCatalogItems.asCatalog()]);
+    _controller = SurfaceController(catalogs: [pocketMindA2uiCatalog]);
     for (final operation in widget.operations) {
       _controller.handleMessage(operation);
     }

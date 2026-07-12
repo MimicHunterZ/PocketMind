@@ -54,6 +54,13 @@ class GenUiDemoHubPage extends StatelessWidget {
             icon: Icons.lock_outline,
             onTap: () => context.push(RoutePaths.genuiDemoChatCardLock),
           ),
+          const SizedBox(height: 12),
+          _DemoEntryCard(
+            title: 'openNote 本地函数验证',
+            subtitle: '验证共享 catalog 注册的本地 functionCall 生效,点击后本地跳转笔记详情页',
+            icon: Icons.note_alt_outlined,
+            onTap: () => context.push(RoutePaths.genuiDemoOpenNoteFunction),
+          ),
         ],
       ),
     );

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:genui/genui.dart' show basicCatalogId;
 import 'package:pocketmind/api/models/chat_models.dart';
 import 'package:pocketmind/model/chat_message.dart';
 
@@ -16,13 +17,11 @@ const String _toolName = 'searchMemory';
 const String _toolArguments = '{"query":"上次讨论的方案"}';
 const String _toolResult = '命中 3 条相关记忆';
 const String _surfaceId = 'streaming-mock-card';
-const String _standardCatalogId =
-    'https://a2ui.org/specification/v0_9/standard_catalog.json';
 
 List<String> _chatStreamingMockA2uiChunks() => [
   jsonEncode({
     'version': 'v0.9',
-    'createSurface': {'surfaceId': _surfaceId, 'catalogId': _standardCatalogId},
+    'createSurface': {'surfaceId': _surfaceId, 'catalogId': basicCatalogId},
   }),
   jsonEncode({
     'version': 'v0.9',

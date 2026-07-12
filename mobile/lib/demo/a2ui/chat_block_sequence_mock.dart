@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:genui/genui.dart' show basicCatalogId;
 import 'package:pocketmind/model/chat_message.dart';
 
 /// 块序列渲染(文本 + 工具卡片 + A2UI 卡片混排)的固定 mock 消息集,供
@@ -67,8 +68,7 @@ ChatMessage _toolResultMessage(String sessionUuid, String uuid) {
         '{"toolCallId":"call_1","name":"searchMemory","result":"命中 3 条相关记忆"}';
 }
 
-const String _standardCatalogId =
-    'https://a2ui.org/specification/v0_9/standard_catalog.json';
+const String _standardCatalogId = basicCatalogId;
 
 /// A2UI 卡片一:带 [ChoicePicker] + [Button] 的可交互选择卡片,套在
 /// [Card] 组件里(不是裸 Text),这样在消息列表里能一眼看出"这是一张卡片"

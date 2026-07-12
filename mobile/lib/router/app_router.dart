@@ -8,6 +8,7 @@ import 'package:pocketmind/demo/a2ui/chat_streaming_mock_preview_page.dart';
 import 'package:pocketmind/demo/a2ui/genui_demo_hub_page.dart';
 import 'package:pocketmind/demo/a2ui/genui_demo_page.dart';
 import 'package:pocketmind/demo/a2ui/markdown_sse_mock_demo_page.dart';
+import 'package:pocketmind/demo/a2ui/open_note_function_demo_page.dart';
 import 'package:pocketmind/demo/a2ui/surface_handoff_lifecycle_demo_page.dart';
 import 'package:pocketmind/model/note.dart';
 import 'package:pocketmind/page/chat/branch_list_page.dart';
@@ -139,6 +140,12 @@ final appRouter = GoRouter(
     GoRoute(
       path: RoutePaths.genuiDemoChatCardLock,
       builder: (context, state) => const ChatCardLockPreviewPage(),
+    ),
+
+    // openNote 本地函数验证页面 - 全屏，不含侧边栏
+    GoRoute(
+      path: RoutePaths.genuiDemoOpenNoteFunction,
+      builder: (context, state) => const OpenNoteFunctionDemoPage(),
     ),
 
     // 聊天页 - 全屏，不含侧边栏

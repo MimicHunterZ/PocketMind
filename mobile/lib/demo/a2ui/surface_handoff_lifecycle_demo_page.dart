@@ -32,7 +32,7 @@ const String _surfaceId = 'handoff-demo';
 /// 同一份序列同步喂给全新 controller,验证交接前后渲染内容完全一致。
 List<String> fixedHandoffMessages() => [
   '{"version":"v0.9","createSurface":{"surfaceId":"$_surfaceId",'
-      '"catalogId":"https://a2ui.org/specification/v0_9/standard_catalog.json"}}',
+      '"catalogId":"$basicCatalogId"}}',
   '{"version":"v0.9","updateComponents":{"surfaceId":"$_surfaceId",'
       '"components":[{"id":"root","component":"Column","children":["title"]},'
       '{"id":"title","component":"Text","text":{"path":"/title"},"variant":"h2"}]}}',

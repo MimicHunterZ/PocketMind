@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:genui/genui.dart' show basicCatalogId;
 import 'package:pocketmind/model/chat_message.dart';
 
 /// 卡片交互 + 提交锁定的固定 mock 场景,供 debug 预览页验证:
@@ -9,8 +10,7 @@ import 'package:pocketmind/model/chat_message.dart';
 /// functionCall、"提交选择"走 event 往返),用来验证这三种交互方式都不
 /// 出问题——只有 event 往返才会经 [ChatSendState] 之外的挂点触发提交。
 
-const String _standardCatalogId =
-    'https://a2ui.org/specification/v0_9/standard_catalog.json';
+const String _standardCatalogId = basicCatalogId;
 
 List<ChatMessage> buildChatCardLockMockMessages(String sessionUuid) {
   final messages = <ChatMessage>[

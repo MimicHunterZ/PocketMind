@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:genui/genui.dart' show Surface;
+import 'package:genui/genui.dart' show Surface, basicCatalogId;
 import 'package:pocketmind/page/chat/widgets/chat_message_widgets.dart';
 import 'package:pocketmind/providers/chat_providers.dart';
 import 'package:pocketmind/util/theme_data.dart';
@@ -43,7 +43,7 @@ void main() {
         ),
         ChatLiveBlock.a2ui([
           '{"version":"v0.9","createSurface":{"surfaceId":"$surfaceId",'
-              '"catalogId":"https://a2ui.org/specification/v0_9/standard_catalog.json"}}',
+              '"catalogId":"$basicCatalogId"}}',
         ]),
       ];
 

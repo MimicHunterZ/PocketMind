@@ -3,14 +3,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:genui/genui.dart' show A2uiMessage;
+import 'package:genui/genui.dart' show A2uiMessage, basicCatalogId;
 import 'package:pocketmind/page/chat/widgets/chat_message_widgets.dart';
 import 'package:pocketmind/util/a2ui_card_util.dart';
 import 'package:pocketmind/util/theme_data.dart';
 
 const String _surfaceId = 'lock-widget-test';
-const String _standardCatalogId =
-    'https://a2ui.org/specification/v0_9/standard_catalog.json';
+const String _standardCatalogId = basicCatalogId;
 
 List<A2uiMessage> _cardOperations() {
   final raw = [
