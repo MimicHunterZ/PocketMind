@@ -9,7 +9,6 @@ import 'package:pocketmind/providers/note_providers.dart';
 import 'package:pocketmind/util/theme_data.dart';
 
 import 'item_bar.dart';
-import 'package:pocketmind/util/theme_data.dart';
 
 class CategoriesBar extends ConsumerWidget {
   const CategoriesBar({super.key});
@@ -21,8 +20,7 @@ class CategoriesBar extends ConsumerWidget {
     // 从 provider 获取当前激活的索引
     final activeIndex = ref.watch(activeNavIndexProvider);
 
-    // 获取当前主题亮度
-    final isDark = context.isDark;
+    final appColors = context.appColors;
     return navItemsAsync.when(
       data: (navItems) {
         // 如果没有导航项，返回空容器
@@ -42,24 +40,15 @@ class CategoriesBar extends ConsumerWidget {
                   child: Container(
                     padding: EdgeInsets.all(8.0.r),
                     decoration: BoxDecoration(
-                      // 根据主题调整毛玻璃颜色 - 亮色模式使用更深的背景
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.1)
-                          : Colors.black.withValues(alpha: 0.05), // 改用黑色半透明
+                      color: appColors.glassBackground,
                       borderRadius: BorderRadius.circular(100.0.r),
-                      // 添加边框以在亮色模式下提供对比度
                       border: Border.all(
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.2)
-                            : Colors.black.withValues(alpha: 0.08), // 使用黑色半透明边框
+                        color: appColors.glassBorder,
                         width: 1.0.w,
                       ),
-                      // 添加微妙阴影
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(
-                            alpha: isDark ? 0.3 : 0.08,
-                          ),
+                          color: appColors.glassShadow,
                           blurRadius: 12.r,
                           spreadRadius: 0,
                           offset: Offset(0, 2.h),

@@ -6,6 +6,7 @@ import 'package:pocketmind/page/settings/bilibili_login_page.dart';
 import 'package:pocketmind/page/settings/xhs_login_page.dart';
 import 'package:pocketmind/page/settings/zhihu_login_page.dart';
 import 'package:pocketmind/util/logger_service.dart';
+import 'package:pocketmind/util/theme_data.dart';
 import 'package:pocketmind/util/platform_detector.dart';
 
 /// 平台账号管理页面
@@ -96,7 +97,7 @@ class _PlatformAccountsPageState extends ConsumerState<PlatformAccountsPage> {
       await _loadPlatformStatuses();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('登录成功'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('登录成功'), backgroundColor: BilibiliColors.success),
         );
       }
     }
@@ -116,7 +117,7 @@ class _PlatformAccountsPageState extends ConsumerState<PlatformAccountsPage> {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: BilibiliColors.error),
             child: const Text('退出'),
           ),
         ],
@@ -143,7 +144,7 @@ class _PlatformAccountsPageState extends ConsumerState<PlatformAccountsPage> {
           ? const Center(child: CircularProgressIndicator())
           : _platformStatuses.isEmpty
           ? const Center(
-              child: Text('暂无支持的平台', style: TextStyle(color: Colors.grey)),
+              child: Text('暂无支持的平台', style: TextStyle(color: BilibiliColors.subtitleText)),
             )
           : RefreshIndicator(
               onRefresh: _loadPlatformStatuses,
@@ -170,7 +171,7 @@ class _PlatformAccountsPageState extends ConsumerState<PlatformAccountsPage> {
             ? TextButton(
                 onPressed: () =>
                     _handleLogout(status.platformId, status.platformName),
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                style: TextButton.styleFrom(foregroundColor: BilibiliColors.error),
                 child: const Text('退出'),
               )
             : ElevatedButton(
@@ -188,19 +189,19 @@ class _PlatformAccountsPageState extends ConsumerState<PlatformAccountsPage> {
     switch (platformId) {
       case 'xhs':
         iconData = Icons.auto_awesome;
-        iconColor = Colors.red;
+        iconColor = XhsColors.primary;
         break;
       case 'zhihu':
         iconData = Icons.question_answer;
-        iconColor = Colors.blue;
+        iconColor = ZhihuColors.primary;
         break;
       case 'bilibili':
         iconData = Icons.play_circle_fill;
-        iconColor = Colors.pink;
+        iconColor = BilibiliColors.primary;
         break;
       default:
         iconData = Icons.language;
-        iconColor = Colors.grey;
+        iconColor = BilibiliColors.subtitleText;
     }
 
     return Container(
@@ -216,7 +217,7 @@ class _PlatformAccountsPageState extends ConsumerState<PlatformAccountsPage> {
 
   Widget _buildSubtitle(_PlatformStatus status) {
     if (!status.isLoggedIn) {
-      return const Text('未登录', style: TextStyle(color: Colors.grey));
+      return const Text('未登录', style: TextStyle(color: BilibiliColors.subtitleText));
     }
 
     if (status.expiresAt != null) {
@@ -224,16 +225,16 @@ class _PlatformAccountsPageState extends ConsumerState<PlatformAccountsPage> {
       if (daysLeft <= 3) {
         return Text(
           '即将过期（$daysLeft天后）',
-          style: const TextStyle(color: Colors.orange),
+          style: const TextStyle(color: BilibiliColors.warning),
         );
       }
       return Text(
         '已登录，$daysLeft天后过期',
-        style: const TextStyle(color: Colors.green),
+        style: const TextStyle(color: BilibiliColors.success),
       );
     }
 
-    return const Text('已登录', style: TextStyle(color: Colors.green));
+    return const Text('已登录', style: TextStyle(color: BilibiliColors.success));
   }
 }
 

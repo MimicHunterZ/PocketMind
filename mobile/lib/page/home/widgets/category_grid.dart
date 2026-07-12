@@ -6,7 +6,9 @@ import 'package:pocketmind/model/category.dart';
 import 'package:pocketmind/page/home/category_posts_screen.dart';
 import 'package:pocketmind/page/home/model/category_theme_icon_registry.dart';
 import 'package:pocketmind/page/home/widgets/category_card.dart';
-import 'package:pocketmind/providers/note_providers.dart';
+import 'package:pocketmind/util/theme_data.dart';
+
+import '../../../providers/note_providers.dart';
 
 class CategoryGrid extends ConsumerWidget {
   const CategoryGrid({super.key, required this.categories});
@@ -32,13 +34,7 @@ class CategoryGrid extends ConsumerWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final columns = columnsForWidth(constraints.maxWidth);
-        final accents = <Color>[
-          const Color(0xFF38BDF8),
-          const Color(0xFFD946EF),
-          const Color(0xFF10B981),
-          const Color(0xFFF59E0B),
-          const Color(0xFFFB7185),
-        ];
+        final accents = CategoryPalette.colors;
 
         return GridView.builder(
           key: ValueKey('category-grid-$columns'),

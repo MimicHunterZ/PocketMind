@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:pocketmind/service/cookie_manager_service.dart';
 import 'package:pocketmind/util/logger_service.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 /// 小红书登录页面
 ///
@@ -342,12 +343,12 @@ class _XhsLoginPageState extends State<XhsLoginPage> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
-            color: _loginSuccess ? Colors.green.shade100 : Colors.blue.shade50,
+            color: _loginSuccess ? XhsColors.tagBackground : XhsColors.tagBackground,
             child: Row(
               children: [
                 Icon(
                   _loginSuccess ? Icons.check_circle : Icons.qr_code_scanner,
-                  color: _loginSuccess ? Colors.green : Colors.blue,
+                  color: _loginSuccess ? XhsColors.success : XhsColors.primary,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -359,8 +360,8 @@ class _XhsLoginPageState extends State<XhsLoginPage> {
                         _statusMessage,
                         style: TextStyle(
                           color: _loginSuccess
-                              ? Colors.green.shade900
-                              : Colors.blue.shade900,
+                              ? XhsColors.success
+                              : XhsColors.tagText,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -368,14 +369,14 @@ class _XhsLoginPageState extends State<XhsLoginPage> {
                         Text(
                           '剩余等待时间: ${_formatRemainingTime()}',
                           style: TextStyle(
-                            color: Colors.blue.shade700,
+                            color: XhsColors.primary,
                             fontSize: 12,
                           ),
                         ),
                     ],
                   ),
                 ),
-                if (_loginSuccess) const Icon(Icons.check, color: Colors.green),
+                if (_loginSuccess) const Icon(Icons.check, color: XhsColors.success),
               ],
             ),
           ),
@@ -388,12 +389,12 @@ class _XhsLoginPageState extends State<XhsLoginPage> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: Colors.amber.shade50,
+              color: XhsColors.tagBackground,
               child: Row(
                 children: [
                   Icon(
                     Icons.info_outline,
-                    color: Colors.amber.shade700,
+                    color: XhsColors.warning,
                     size: 16,
                   ),
                   const SizedBox(width: 8),
@@ -401,7 +402,7 @@ class _XhsLoginPageState extends State<XhsLoginPage> {
                     child: Text(
                       '请使用小红书 APP 扫描二维码登录，登录成功后会自动保存',
                       style: TextStyle(
-                        color: Colors.amber.shade900,
+                        color: XhsColors.tagText,
                         fontSize: 12,
                       ),
                     ),

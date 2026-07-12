@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,9 +20,6 @@ class GlassNavBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 获取当前主题亮度
-    final isDark = context.isDark;
-
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -37,7 +33,6 @@ class GlassNavBar extends ConsumerWidget {
           context,
           icon: Icons.search,
           onPressed: onSearchPressed ?? () {},
-          isDark: isDark,
         ),
 
         SizedBox(width: 8.w),
@@ -49,7 +44,6 @@ class GlassNavBar extends ConsumerWidget {
           onPressed: () {
             context.push(RoutePaths.settings);
           },
-          isDark: isDark,
         ),
       ],
     );
@@ -60,25 +54,19 @@ class GlassNavBar extends ConsumerWidget {
     BuildContext context, {
     required IconData icon,
     required VoidCallback onPressed,
-    required bool isDark,
-    String? tooltip,
   }) {
+    final appColors = context.appColors;
     return Container(
       decoration: BoxDecoration(
-        // 亮色模式使用黑色半透明，暗色模式使用白色半透明
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.1)
-            : Colors.black.withValues(alpha: 0.05),
+        color: appColors.glassBackground,
         shape: BoxShape.circle,
         border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.2)
-              : Colors.black.withValues(alpha: 0.08),
+          color: appColors.glassBorder,
           width: 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+            color: appColors.glassShadow,
             blurRadius: 8.r,
             offset: Offset(0, 2.h),
           ),

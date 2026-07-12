@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:pocketmind/service/cookie_manager_service.dart';
 import 'package:pocketmind/util/logger_service.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 /// 知乎登录页面
 ///
@@ -308,12 +309,12 @@ class _ZhihuLoginPageState extends State<ZhihuLoginPage> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
-            color: _loginSuccess ? Colors.green.shade100 : Colors.blue.shade50,
+            color: _loginSuccess ? ZhihuColors.tagBackground : ZhihuColors.tagBackground,
             child: Row(
               children: [
                 Icon(
                   _loginSuccess ? Icons.check_circle : Icons.login,
-                  color: _loginSuccess ? Colors.green : Colors.blue,
+                  color: _loginSuccess ? ZhihuColors.success : ZhihuColors.primary,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -325,8 +326,8 @@ class _ZhihuLoginPageState extends State<ZhihuLoginPage> {
                         _statusMessage,
                         style: TextStyle(
                           color: _loginSuccess
-                              ? Colors.green.shade900
-                              : Colors.blue.shade900,
+                              ? ZhihuColors.success
+                              : ZhihuColors.tagText,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -334,14 +335,14 @@ class _ZhihuLoginPageState extends State<ZhihuLoginPage> {
                         Text(
                           '剩余等待时间: ${_formatRemainingTime()}',
                           style: TextStyle(
-                            color: Colors.blue.shade700,
+                            color: ZhihuColors.primary,
                             fontSize: 12,
                           ),
                         ),
                     ],
                   ),
                 ),
-                if (_loginSuccess) const Icon(Icons.check, color: Colors.green),
+                if (_loginSuccess) const Icon(Icons.check, color: ZhihuColors.success),
               ],
             ),
           ),
@@ -354,12 +355,12 @@ class _ZhihuLoginPageState extends State<ZhihuLoginPage> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: Colors.amber.shade50,
+              color: ZhihuColors.tagBackground,
               child: Row(
                 children: [
                   Icon(
                     Icons.info_outline,
-                    color: Colors.amber.shade700,
+                    color: ZhihuColors.warning,
                     size: 16,
                   ),
                   const SizedBox(width: 8),
@@ -367,7 +368,7 @@ class _ZhihuLoginPageState extends State<ZhihuLoginPage> {
                     child: Text(
                       '请使用知乎 APP 扫码登录，或使用手机号登录',
                       style: TextStyle(
-                        color: Colors.amber.shade900,
+                        color: ZhihuColors.tagText,
                         fontSize: 12,
                       ),
                     ),

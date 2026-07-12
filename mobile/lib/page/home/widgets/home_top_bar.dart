@@ -149,23 +149,19 @@ class _SearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = context.colorScheme;
-    final isDark = context.isDark;
+    final appColors = context.appColors;
 
     return Container(
       decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.1)
-            : Colors.black.withValues(alpha: 0.05),
+        color: appColors.glassBackground,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.2)
-              : Colors.black.withValues(alpha: 0.08),
+          color: appColors.glassBorder,
           width: 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+            color: appColors.glassShadow,
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),

@@ -300,20 +300,40 @@ final class SyncEngineProvider
 
 String _$syncEngineHash() => r'48a5dfd85082a7b6886eefc94d3d97110e8f5251';
 
-/// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器（前台进程）。
+/// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器。
 ///
-/// 注入 noteApi / assetApi / notificationService / prefs 后，整个抓取
-/// 流水线（metadata → 图片上传 → AI 提交 → 通知）都在此 Provider 实例
-/// 中完成，不再下沉到 Workmanager 的独立任务函数。
+/// **重要**：本 provider 仅负责**实例化**调度器，不会自动调 `start()`。
+///
+/// 原因：本 provider 在三个 isolate 里都可能被实例化（主 App / 分享 /
+/// Workmanager 后台任务）。`start()` 会立刻 unawaited 发射一发 runNow，
+/// 在后台 isolate 里这会与 dispatcher 的显式 `await runNow()` 形成
+/// "前者占位 → 后者 skip → dispatcher 立即返回 → Android 杀 isolate →
+/// 前者半路被砍"的链条，导致抓取根本跑不完。
+///
+/// 因此：
+///   - 主 App：`main.dart` 显式调用 `scheduler.start()` 一次（订阅
+///     connectivity + 立即扫描一次）；
+///   - Workmanager dispatcher：仅 `await scheduler.runNow(...)`；
+///   - 分享 isolate：不使用本 provider。
 
 @ProviderFor(resourceFetchScheduler)
 const resourceFetchSchedulerProvider = ResourceFetchSchedulerProvider._();
 
-/// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器（前台进程）。
+/// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器。
 ///
-/// 注入 noteApi / assetApi / notificationService / prefs 后，整个抓取
-/// 流水线（metadata → 图片上传 → AI 提交 → 通知）都在此 Provider 实例
-/// 中完成，不再下沉到 Workmanager 的独立任务函数。
+/// **重要**：本 provider 仅负责**实例化**调度器，不会自动调 `start()`。
+///
+/// 原因：本 provider 在三个 isolate 里都可能被实例化（主 App / 分享 /
+/// Workmanager 后台任务）。`start()` 会立刻 unawaited 发射一发 runNow，
+/// 在后台 isolate 里这会与 dispatcher 的显式 `await runNow()` 形成
+/// "前者占位 → 后者 skip → dispatcher 立即返回 → Android 杀 isolate →
+/// 前者半路被砍"的链条，导致抓取根本跑不完。
+///
+/// 因此：
+///   - 主 App：`main.dart` 显式调用 `scheduler.start()` 一次（订阅
+///     connectivity + 立即扫描一次）；
+///   - Workmanager dispatcher：仅 `await scheduler.runNow(...)`；
+///   - 分享 isolate：不使用本 provider。
 
 final class ResourceFetchSchedulerProvider
     extends
@@ -323,11 +343,21 @@ final class ResourceFetchSchedulerProvider
           ResourceFetchScheduler
         >
     with $Provider<ResourceFetchScheduler> {
-  /// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器（前台进程）。
+  /// ResourceFetchScheduler Provider —— 端侧元数据抓取调度器。
   ///
-  /// 注入 noteApi / assetApi / notificationService / prefs 后，整个抓取
-  /// 流水线（metadata → 图片上传 → AI 提交 → 通知）都在此 Provider 实例
-  /// 中完成，不再下沉到 Workmanager 的独立任务函数。
+  /// **重要**：本 provider 仅负责**实例化**调度器，不会自动调 `start()`。
+  ///
+  /// 原因：本 provider 在三个 isolate 里都可能被实例化（主 App / 分享 /
+  /// Workmanager 后台任务）。`start()` 会立刻 unawaited 发射一发 runNow，
+  /// 在后台 isolate 里这会与 dispatcher 的显式 `await runNow()` 形成
+  /// "前者占位 → 后者 skip → dispatcher 立即返回 → Android 杀 isolate →
+  /// 前者半路被砍"的链条，导致抓取根本跑不完。
+  ///
+  /// 因此：
+  ///   - 主 App：`main.dart` 显式调用 `scheduler.start()` 一次（订阅
+  ///     connectivity + 立即扫描一次）；
+  ///   - Workmanager dispatcher：仅 `await scheduler.runNow(...)`；
+  ///   - 分享 isolate：不使用本 provider。
   const ResourceFetchSchedulerProvider._()
     : super(
         from: null,
@@ -363,7 +393,7 @@ final class ResourceFetchSchedulerProvider
 }
 
 String _$resourceFetchSchedulerHash() =>
-    r'c3395deb49f6fd9459eb52cd02d0b793f7744453';
+    r'caa5f4c64ba90221d8018c4060b5759cdce5f63f';
 
 /// 自适应轮询 Provider —— 根据应用状态自动调整 Pull 间隔。
 ///

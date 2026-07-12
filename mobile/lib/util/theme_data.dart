@@ -28,6 +28,11 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.errorText,
     required this.cardBorder,
     required this.themeDataColor,
+    required this.glassBackground,
+    required this.glassBorder,
+    required this.glassShadow,
+    required this.overlayForeground,
+    required this.barrierColor,
   });
 
   /// 骨架屏底色
@@ -51,6 +56,21 @@ class AppColors extends ThemeExtension<AppColors> {
   /// 点睛色
   final Color themeDataColor;
 
+  /// 毛玻璃背景色（用于导航栏、浮层等）
+  final Color glassBackground;
+
+  /// 毛玻璃边框色
+  final Color glassBorder;
+
+  /// 毛玻璃阴影色
+  final Color glassShadow;
+
+  /// 覆盖层前景色（深色背景上的文字/图标）
+  final Color overlayForeground;
+
+  /// 模态遮罩色
+  final Color barrierColor;
+
   @override
   AppColors copyWith({
     Color? skeletonBase,
@@ -60,6 +80,11 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? errorText,
     Color? cardBorder,
     Color? themeDataColor,
+    Color? glassBackground,
+    Color? glassBorder,
+    Color? glassShadow,
+    Color? overlayForeground,
+    Color? barrierColor,
   }) {
     return AppColors(
       skeletonBase: skeletonBase ?? this.skeletonBase,
@@ -69,6 +94,11 @@ class AppColors extends ThemeExtension<AppColors> {
       errorText: errorText ?? this.errorText,
       cardBorder: cardBorder ?? this.cardBorder,
       themeDataColor: themeDataColor ?? this.themeDataColor,
+      glassBackground: glassBackground ?? this.glassBackground,
+      glassBorder: glassBorder ?? this.glassBorder,
+      glassShadow: glassShadow ?? this.glassShadow,
+      overlayForeground: overlayForeground ?? this.overlayForeground,
+      barrierColor: barrierColor ?? this.barrierColor,
     );
   }
 
@@ -87,6 +117,12 @@ class AppColors extends ThemeExtension<AppColors> {
       errorText: Color.lerp(errorText, other.errorText, t)!,
       cardBorder: Color.lerp(cardBorder, other.cardBorder, t)!,
       themeDataColor: Color.lerp(themeDataColor, other.themeDataColor, t)!,
+      glassBackground: Color.lerp(glassBackground, other.glassBackground, t)!,
+      glassBorder: Color.lerp(glassBorder, other.glassBorder, t)!,
+      glassShadow: Color.lerp(glassShadow, other.glassShadow, t)!,
+      overlayForeground:
+          Color.lerp(overlayForeground, other.overlayForeground, t)!,
+      barrierColor: Color.lerp(barrierColor, other.barrierColor, t)!,
     );
   }
 
@@ -104,6 +140,11 @@ const lightAppColors = AppColors(
   errorText: Color(0xFF9E9E9E),
   cardBorder: Color(0x1A000000), // black 10%
   themeDataColor: Color(0xFFD97757),
+  glassBackground: Color(0x0D000000), // black 5%
+  glassBorder: Color(0x14000000), // black 8%
+  glassShadow: Color(0x14000000), // black 8%
+  overlayForeground: Color(0xFFFFFFFF),
+  barrierColor: Color(0x80000000), // black 50%
 );
 
 /// 暗色模式扩展颜色
@@ -115,6 +156,11 @@ const darkAppColors = AppColors(
   errorText: Color(0xFF6A6A6A),
   cardBorder: Color(0x33FFFFFF), // white 20%
   themeDataColor: Color(0xFFD97757),
+  glassBackground: Color(0x1AFFFFFF), // white 10%
+  glassBorder: Color(0x33FFFFFF), // white 20%
+  glassShadow: Color(0x4D000000), // black 30%
+  overlayForeground: Color(0xFFFFFFFF),
+  barrierColor: Color(0x80000000), // black 50%
 );
 
 class SharePageThemeColors extends ThemeExtension<SharePageThemeColors> {
@@ -738,4 +784,79 @@ extension ThemeContextExt on BuildContext {
   ChatBubbleColors get chatBubbleColors =>
       Theme.of(this).extension<ChatBubbleColors>() ??
       (isDark ? darkChatBubbleColors : lightChatBubbleColors);
+}
+
+// ---------------------------------------------------------------------------
+// 分类色板 — 用于分类列表/图标等需要多种颜色的场景
+// ---------------------------------------------------------------------------
+
+/// 分类徽标色板（固定调色，与亮暗模式无关）
+class CategoryPalette {
+  const CategoryPalette._();
+
+  static const List<Color> colors = [
+    Color(0xFF38BDF8), // sky-400
+    Color(0xFFD946EF), // fuchsia-500
+    Color(0xFF10B981), // emerald-500
+    Color(0xFFF59E0B), // amber-500
+    Color(0xFFFB7185), // rose-400
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// 平台品牌色 — 仅用于对应平台的登录/账号页
+// ---------------------------------------------------------------------------
+
+/// B站品牌色
+class BilibiliColors {
+  const BilibiliColors._();
+
+  static const Color primary = Color(0xFF00AEEC); // 品牌蓝
+  static const Color primaryLight = Color(0xFF66CCFF);
+  static const Color gradientStart = Color(0xFF00AEEC);
+  static const Color gradientEnd = Color(0xFF0078D4);
+  static const Color success = Color(0xFF4CAF50);
+  static const Color warning = Color(0xFFFF9800);
+  static const Color error = Color(0xFFF44336);
+  static const Color tagBackground = Color(0xFFE3F2FD);
+  static const Color tagText = Color(0xFF1565C0);
+  static const Color divider = Color(0xFFE0E0E0);
+  static const Color subtitleText = Color(0xFF9E9E9E);
+  static const Color tileBackground = Color(0xFFF5F5F5);
+}
+
+/// 小红书品牌色
+class XhsColors {
+  const XhsColors._();
+
+  static const Color primary = Color(0xFFFF2442); // 品牌红
+  static const Color primaryLight = Color(0xFFFF6B8A);
+  static const Color gradientStart = Color(0xFFFF2442);
+  static const Color gradientEnd = Color(0xFFFF6B35);
+  static const Color success = Color(0xFF4CAF50);
+  static const Color warning = Color(0xFFFF9800);
+  static const Color error = Color(0xFFF44336);
+  static const Color tagBackground = Color(0xFFFFEBEE);
+  static const Color tagText = Color(0xFFC62828);
+  static const Color divider = Color(0xFFE0E0E0);
+  static const Color subtitleText = Color(0xFF9E9E9E);
+  static const Color tileBackground = Color(0xFFF5F5F5);
+}
+
+/// 知乎品牌色
+class ZhihuColors {
+  const ZhihuColors._();
+
+  static const Color primary = Color(0xFF0084FF); // 品牌蓝
+  static const Color primaryLight = Color(0xFF4DA6FF);
+  static const Color gradientStart = Color(0xFF0084FF);
+  static const Color gradientEnd = Color(0xFF00C6FF);
+  static const Color success = Color(0xFF4CAF50);
+  static const Color warning = Color(0xFFFF9800);
+  static const Color error = Color(0xFFF44336);
+  static const Color tagBackground = Color(0xFFE3F2FD);
+  static const Color tagText = Color(0xFF1565C0);
+  static const Color divider = Color(0xFFE0E0E0);
+  static const Color subtitleText = Color(0xFF9E9E9E);
+  static const Color tileBackground = Color(0xFFF5F5F5);
 }

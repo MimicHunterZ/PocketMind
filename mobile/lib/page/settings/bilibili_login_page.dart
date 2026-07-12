@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:pocketmind/service/cookie_manager_service.dart';
 import 'package:pocketmind/util/logger_service.dart';
+import 'package:pocketmind/util/theme_data.dart';
 
 /// B站登录页面
 ///
@@ -283,12 +284,12 @@ class _BilibiliLoginPageState extends State<BilibiliLoginPage> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
-            color: _loginSuccess ? Colors.green.shade100 : Colors.pink.shade50,
+            color: _loginSuccess ? BilibiliColors.tagBackground : Colors.pink.shade50,
             child: Row(
               children: [
                 Icon(
                   _loginSuccess ? Icons.check_circle : Icons.login,
-                  color: _loginSuccess ? Colors.green : Colors.pink,
+                  color: _loginSuccess ? BilibiliColors.success : BilibiliColors.primary,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -300,8 +301,8 @@ class _BilibiliLoginPageState extends State<BilibiliLoginPage> {
                         _statusMessage,
                         style: TextStyle(
                           color: _loginSuccess
-                              ? Colors.green.shade900
-                              : Colors.pink.shade900,
+                              ? BilibiliColors.success
+                              : BilibiliColors.primary,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -309,32 +310,32 @@ class _BilibiliLoginPageState extends State<BilibiliLoginPage> {
                         Text(
                           '剩余等待时间: ${_formatRemainingTime()}',
                           style: TextStyle(
-                            color: Colors.pink.shade700,
+                            color: BilibiliColors.gradientEnd,
                             fontSize: 12,
                           ),
                         ),
                     ],
                   ),
                 ),
-                if (_loginSuccess) const Icon(Icons.check, color: Colors.green),
+                if (_loginSuccess) const Icon(Icons.check, color: BilibiliColors.success),
               ],
             ),
           ),
 
           // 加载指示器
-          if (_isLoading) const LinearProgressIndicator(color: Colors.pink),
+          if (_isLoading) const LinearProgressIndicator(color: BilibiliColors.primary),
 
           // 使用说明
           if (!_loginSuccess)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: Colors.amber.shade50,
+              color: BilibiliColors.tagBackground,
               child: Row(
                 children: [
                   Icon(
                     Icons.info_outline,
-                    color: Colors.amber.shade700,
+                    color: BilibiliColors.warning,
                     size: 16,
                   ),
                   const SizedBox(width: 8),
@@ -342,7 +343,7 @@ class _BilibiliLoginPageState extends State<BilibiliLoginPage> {
                     child: Text(
                       '请使用 B站 APP 扫码登录，或使用短信验证码登录',
                       style: TextStyle(
-                        color: Colors.amber.shade900,
+                        color: BilibiliColors.gradientEnd,
                         fontSize: 12,
                       ),
                     ),
