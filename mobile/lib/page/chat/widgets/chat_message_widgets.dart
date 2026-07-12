@@ -12,7 +12,6 @@ import 'package:pocketmind/page/chat/widgets/chat_branch_sheet.dart';
 import 'package:pocketmind/page/widget/creative_toast.dart';
 import 'package:pocketmind/providers/chat_providers.dart';
 import 'package:pocketmind/util/a2ui_card_util.dart';
-import 'package:pocketmind/util/streaming_markdown_catalog_item.dart';
 import 'package:pocketmind/util/theme_data.dart';
 
 /// 单条消息气泡。
@@ -58,7 +57,10 @@ class ChatMessageBubble extends ConsumerWidget {
               ref
                   .read(chatSendProvider(sessionUuid).notifier)
                   .send(
-                    jsonEncode({'surfaceId': surfaceId, 'dataModel': dataModel}),
+                    jsonEncode({
+                      'surfaceId': surfaceId,
+                      'dataModel': dataModel,
+                    }),
                     showPendingBubble: false,
                   );
             };
@@ -242,8 +244,10 @@ class ChatStreamingBubble extends StatelessWidget {
           ],
         ),
       ),
-      ChatLiveToolCallBlock(:final toolName, :final done) =>
-        _LiveToolCallHint(toolName: toolName, done: done),
+      ChatLiveToolCallBlock(:final toolName, :final done) => _LiveToolCallHint(
+        toolName: toolName,
+        done: done,
+      ),
       ChatLiveA2uiBlock(:final chunks) => _LiveA2uiCardMessage(chunks: chunks),
     };
   }
@@ -329,7 +333,7 @@ class _LiveA2uiCardMessageState extends State<_LiveA2uiCardMessage> {
   @override
   void initState() {
     super.initState();
-    _controller = SurfaceController(catalogs: [buildAppCatalog()]);
+    _controller = SurfaceController(catalogs: [BasicCatalogItems.asCatalog()]);
     _adapter = A2uiTransportAdapter();
     _adapter.incomingMessages.listen(_controller.handleMessage);
     _consumeNewChunks();
@@ -514,7 +518,7 @@ class _A2uiCardMessageState extends State<A2uiCardMessage> {
   @override
   void initState() {
     super.initState();
-    _controller = SurfaceController(catalogs: [buildAppCatalog()]);
+    _controller = SurfaceController(catalogs: [BasicCatalogItems.asCatalog()]);
     for (final operation in widget.operations) {
       _controller.handleMessage(operation);
     }
@@ -530,7 +534,10 @@ class _A2uiCardMessageState extends State<A2uiCardMessage> {
         final dataModel = _controller.store
             .getDataModel(_surfaceId)
             .getValue<Map<String, Object?>>(DataPath.root);
-        widget.onSubmitted!(_surfaceId, Map<String, dynamic>.from(dataModel ?? {}));
+        widget.onSubmitted!(
+          _surfaceId,
+          Map<String, dynamic>.from(dataModel ?? {}),
+        );
       });
     }
   }

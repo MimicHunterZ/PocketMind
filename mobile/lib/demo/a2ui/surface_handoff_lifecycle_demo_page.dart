@@ -4,8 +4,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:genui/genui.dart';
 
-import 'package:pocketmind/util/streaming_markdown_catalog_item.dart';
-
 /// PLAN Task 1.3a 的验证 spike:测试"流式中的临时 SurfaceController → 交接给
 /// 持久化后的 SurfaceController"这个动作,交接瞬间会不会闪烁、旧 controller
 /// 会不会正确释放。不接 mock 服务、不接真实发送流程,纯手写固定的 A2UI 消息
@@ -59,7 +57,9 @@ class _SurfaceHandoffLifecycleDemoPageState
   }
 
   void _startLiveStreaming() {
-    final controller = SurfaceController(catalogs: [buildAppCatalog()]);
+    final controller = SurfaceController(
+      catalogs: [BasicCatalogItems.asCatalog()],
+    );
     final adapter = A2uiTransportAdapter();
     adapter.incomingMessages.listen(controller.handleMessage);
     _liveController = controller;
@@ -84,7 +84,9 @@ class _SurfaceHandoffLifecycleDemoPageState
   void _handOff() {
     if (!mounted) return;
 
-    final finalController = SurfaceController(catalogs: [buildAppCatalog()]);
+    final finalController = SurfaceController(
+      catalogs: [BasicCatalogItems.asCatalog()],
+    );
     for (final raw in fixedHandoffMessages()) {
       final json = jsonDecode(raw) as Map<String, dynamic>;
       finalController.handleMessage(A2uiMessage.fromJson(json));
@@ -140,9 +142,7 @@ class _SurfaceHandoffLifecycleDemoPageState
             if (activeController != null)
               Surface(surfaceContext: activeController.contextFor(_surfaceId)),
             const Divider(height: 24),
-            Expanded(
-              child: ListView(children: _log.map(Text.new).toList()),
-            ),
+            Expanded(child: ListView(children: _log.map(Text.new).toList())),
           ],
         ),
       ),

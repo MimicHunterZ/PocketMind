@@ -1,4 +1,10 @@
-import 'package:ag_ui/ag_ui.dart' show ActivitySnapshotEvent, BaseEvent, RunErrorEvent, RunFinishedEvent, RunStartedEvent;
+import 'package:ag_ui/ag_ui.dart'
+    show
+        ActivitySnapshotEvent,
+        BaseEvent,
+        RunErrorEvent,
+        RunFinishedEvent,
+        RunStartedEvent;
 import 'package:dio/dio.dart' show CancelToken;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -38,8 +44,9 @@ class A2uiStreamApiService {
   /// 3. A2UI 交互闭环(用户选择 → event 回传 → 据选择追加第二段讲解)
   ///
   /// 流式 md 的实现:把整段 md 全文按字符切片,逐帧把「累积到当前的全量文本」
-  /// 写入同一 path。客户端的 StreamingMarkdown 组件检测到新值是旧值的前缀延长,
-  /// 只对新增片段做打字动画。这与真后端「按 token 累积重发」语义一致。
+  /// 写入同一 path。genui 的 Text 组件每帧收到新值就整体重渲染,这跟真后端
+  /// 「按 token 累积重发」语义一致——流式感来自数据到达的节奏,不依赖组件
+  /// 自己的动画。
   Stream<BaseEvent> mockStream({
     String? requestId,
     CancelToken? cancelToken,
@@ -267,7 +274,7 @@ class A2uiStreamApiService {
       },
       {
         'id': 'answer1',
-        'component': 'StreamingMarkdown',
+        'component': 'Text',
         'text': {'path': '/answer1'},
       },
     ];
@@ -279,7 +286,12 @@ class A2uiStreamApiService {
       {
         'id': 'choiceColumn',
         'component': 'Column',
-        'children': ['choiceTitle', 'choiceStatus', 'topicPicker', 'deepButton'],
+        'children': [
+          'choiceTitle',
+          'choiceStatus',
+          'topicPicker',
+          'deepButton',
+        ],
         'align': 'stretch',
       },
       {
@@ -327,7 +339,7 @@ class A2uiStreamApiService {
     return [
       {
         'id': 'answer2',
-        'component': 'StreamingMarkdown',
+        'component': 'Text',
         'text': {'path': '/answer2'},
       },
     ];
